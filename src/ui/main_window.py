@@ -598,6 +598,7 @@ class StoryBibleUI(ctk.CTk):
         current_text = ""
         char_context = None
         project_memory = ""
+        project_name = "Current Project"
         
         if target == 'editor':
             # Writing Mode
@@ -609,31 +610,53 @@ class StoryBibleUI(ctk.CTk):
                 char_context = self.db_manager.get_character_details(char_name)
 
         elif target == 'assistant':
-            # Lore Assistant Mode
+            # Lore Assistant Mode (Deep Search)
             self.assistant.set_thinking(True)
             self.assistant.append_log(f"AI: ")
-            # FETCH MEMORY!
+            
             if self.current_project_id:
-                project_memory = self.db_manager.get_project_memory(self.current_project_id)
+                # Get Project Name
+                # Small optimization: could cache this
+                projects = self.db_manager.get_projects_with_chapters()
+                for p in projects:
+                    if p['id'] == self.current_project_id:
+                        project_name = p['name']
+                        break
+                
+                # Fetch DEEP Memory based on prompt query
+                project_memory = self.db_manager.get_deep_memory(self.current_project_id, prompt)
             else:
                 project_memory = "No project selected."
 
         self.is_generating = True
         threading.Thread(
             target=self._ai_thread,
-            args=(prompt, target, current_text, char_context, project_memory),
+            args=(prompt, target, current_text, char_context, project_memory, project_name),
             daemon=True
         ).start()
 
-    def _ai_thread(self, prompt, target, context, char_context, memory):
+    def _ai_thread(self, prompt, target, context, char_context, memory, project_name):
         try:
             if target == 'editor':
                 self.ai_engine.stream_response(prompt, self.response_queue, "", context, char_context)
+                
+                # After writing, trigger beat summary update if content is substantial (simple heuristic)
+                if len(context) > 100 and self.current_project_id and self.current_chapter_id:
+                     # Fire and forget summary update
+                     threading.Thread(target=self._update_beat_summary, args=(context,), daemon=True).start()
+
             elif target == 'assistant':
-                self.ai_engine.ask_lore_assistant(prompt, self.response_queue, memory)
+                self.ai_engine.ask_lore_assistant(prompt, self.response_queue, memory, project_name)
         except Exception as e:
             self.response_queue.put(f"Error: {e}")
             self.response_queue.put("[[END]]")
+
+    def _update_beat_summary(self, text):
+        """Background task to generate and save story beat."""
+        summary = self.ai_engine.generate_beat_summary(text)
+        if summary and self.current_project_id and self.current_chapter_id:
+            self.db_manager.save_beat(self.current_project_id, self.current_chapter_id, summary)
+            print(f"[DEBUG] Beat saved for Ch {self.current_chapter_id}: {summary}")
 
     def check_queue(self):
         try:

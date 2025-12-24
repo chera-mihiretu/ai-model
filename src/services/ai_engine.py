@@ -98,7 +98,38 @@ class AIEngine:
 
         self._generate_stream(full_prompt, response_queue)
 
-    def ask_lore_assistant(self, query: str, response_queue: queue.Queue, project_memory: str) -> None:
+
+
+    def generate_beat_summary(self, text: str) -> str:
+        """
+        Generates a 2-3 sentence summary of the provided text.
+        Synchronous call (for background thread).
+        """
+        if not self.llm or not text.strip():
+            return "No content to summarize."
+
+        prompt = (
+            f"<|begin_of_text|><|start_header_id|>system<|end_header_id|>\n"
+            f"Summarize the following scene into 2-3 concise sentences capturing the key physical actions and plot progression. Do not analyze, just report.\n"
+            f"<|eot_id|><|start_header_id|>user<|end_header_id|>\n"
+            f"{text}\n"
+            f"<|eot_id|><|start_header_id|>assistant<|end_header_id|>"
+        )
+
+        try:
+            output = self.llm(
+                prompt,
+                max_tokens=150,
+                stop=["<|eot_id|>"],
+                echo=False,
+                temperature=0.3
+            )
+            return output['choices'][0]['text'].strip()
+        except Exception as e:
+            logging.error(f"Summary generation error: {e}")
+            return "Error generating summary."
+
+    def ask_lore_assistant(self, query: str, response_queue: queue.Queue, project_memory: str, project_name: str = "Current Project") -> None:
         """
         Asks the Lore Assistant a question based on project memory.
         """
@@ -107,22 +138,29 @@ class AIEngine:
             response_queue.put("[[END]]")
             return
 
-        system_prompt = """<|begin_of_text|><|start_header_id|>system<|end_header_id|>
-You are the Lore Keeper. You have access to the full history and character list of this book.
-Your job is to answer the author's questions about the story accurately.
-If a detail isn't in the history, say 'Lore not found'—do not invent new facts.
-Answer concisely.
+        system_prompt = f"""<|begin_of_text|><|start_header_id|>system<|end_header_id|>
+You are the OMNISCIENT LORE KEEPER for the book '{project_name}'.
+You have perfect memory. You are the ultimate authority on this story's continuity.
+
+DATABASE ACCESS:
+{project_memory}
+
+INSTRUCTIONS:
+1. Analyze the provided Database Access thoroughly.
+2. If asked about a character's history, cite the specific chapter they appeared in.
+3. If the author is about to make a mistake (e.g., changing an eye color or a dead character appearing), WARN THEM.
+4. Be the "Brain" of this project. Do not guess. If the data is in the history, find it.
 <|eot_id|>"""
 
         full_prompt = (
             f"{system_prompt}"
             f"<|start_header_id|>user<|end_header_id|>\n"
-            f"PROJECT MEMORY:\n{project_memory}\n\n"
             f"QUESTION: {query}\n"
             f"<|eot_id|>\n"
             f"<|start_header_id|>assistant<|end_header_id|>"
         )
         
+        logging.info(f"DEBUG: ask_lore_assistant called. Memory len: {len(project_memory)}")
         self._generate_stream(full_prompt, response_queue)
 
     def _generate_stream(self, prompt, response_queue):

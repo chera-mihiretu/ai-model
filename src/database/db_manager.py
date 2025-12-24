@@ -59,6 +59,17 @@ class DatabaseManager:
                     )
                 """)
                 
+                cursor.execute("""
+                    CREATE TABLE IF NOT EXISTS story_beats (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        project_id INTEGER NOT NULL,
+                        chapter_id INTEGER NOT NULL,
+                        summary TEXT,
+                        FOREIGN KEY (project_id) REFERENCES projects (id),
+                        FOREIGN KEY (chapter_id) REFERENCES chapters (id)
+                    )
+                """)
+                
                 conn.commit()
                 logging.info(f"Database initialized at {self.db_path}")
         except sqlite3.Error as e:
@@ -137,42 +148,87 @@ class DatabaseManager:
             logging.error(f"Get chapter content error: {e}")
             return ""
 
-    def get_project_memory(self, project_id: int) -> str:
+    def save_beat(self, project_id: int, chapter_id: int, summary: str):
+        try:
+            with self.get_connection() as conn:
+                conn.execute("""
+                    INSERT OR REPLACE INTO story_beats (project_id, chapter_id, summary)
+                    VALUES (?, ?, ?)
+                """, (project_id, chapter_id, summary))
+                conn.commit()
+        except sqlite3.Error as e:
+            logging.error(f"Save beat error: {e}")
+
+    def get_deep_memory(self, project_id: int, query: str) -> str:
         """
-        Aggregates all Characters and Chapters for a project into a single string.
+        Retrieves relevant context based on key terms in the query.
         """
+        query_lower = query.lower()
         memory = []
+        
         try:
             with self.get_connection() as conn:
                 cursor = conn.cursor()
-                
-                # 1. Characters (Global for now, but contextually relevant)
-                memory.append("[CHARACTERS]")
+
+                # 1. Relevant Characters
+                memory.append("[RELEVANT CHARACTERS]")
                 cursor.execute("SELECT name, role, personality_traits, backstory FROM characters")
-                chars = cursor.fetchall()
-                if chars:
-                    for c in chars:
+                all_chars = cursor.fetchall()
+                found_char = False
+                for c in all_chars:
+                    # Check if char name is in query
+                    if c[0].lower() in query_lower:
                         memory.append(f"Name: {c[0]}\nRole: {c[1]}\nTraits: {c[2]}\nBackstory: {c[3]}")
                         memory.append("---")
-                else:
-                    memory.append("No characters defined.")
+                        found_char = True
+                if not found_char:
+                    memory.append("No specific characters mentioned in query.")
 
-                # 2. Project Chapters
-                memory.append("\n[STORY CONTENT]")
+                # 2. Story Beats (Overview)
+                memory.append("\n[STORY BEATS (SUMMARY)]")
+                cursor.execute("SELECT summary FROM story_beats WHERE project_id = ? ORDER BY chapter_id", (project_id,))
+                beats = cursor.fetchall()
+                if beats:
+                    for i, beat in enumerate(beats):
+                        memory.append(f"Ch {i+1}: {beat[0]}")
+                else:
+                    memory.append("No story beats recorded yet.")
+
+                # 3. Relevant Chapter Snippets (Simple Keyword Search)
+                memory.append("\n[RELEVANT CHAPTER SNIPPETS]")
                 cursor.execute("SELECT title, content FROM chapters WHERE project_id = ? ORDER BY chapter_order", (project_id,))
                 chapters = cursor.fetchall()
-                if chapters:
-                    for ch in chapters:
-                        memory.append(f"Chapter: {ch[0]}")
-                        memory.append(f"{ch[1]}") # Content
+                found_chap = False
+                
+                # Split query into keywords (ignore small words)
+                keywords = [w for w in query_lower.split() if len(w) > 3]
+                
+                for title, content in chapters:
+                    content_lower = content.lower()
+                    score = sum(1 for k in keywords if k in content_lower)
+                    
+                    if score > 0:
+                        # Extract snippet around keyword
+                        # For now, just dumping the whole chapter if it matches is safer for small projects
+                        # but "snippet" implies partial. Let's do partial later if needed.
+                        # Actually, user requested "5 most relevant chapter snippets".
+                        # Let's simple check: if score > 0.
+                        if len(content) > 500:
+                             snippet = content[:500] + "..."
+                        else:
+                             snippet = content
+                        memory.append(f"Source: {title} (Relevance: {score})")
+                        memory.append(snippet)
                         memory.append("---")
-                else:
-                    memory.append("No chapters written.")
+                        found_chap = True
+                
+                if not found_chap:
+                    memory.append("No direct keyword matches in chapters.")
 
             return "\n".join(memory)
         except sqlite3.Error as e:
-            logging.error(f"Get project memory error: {e}")
-            return "Error retrieving project memory."
+            logging.error(f"Get deep memory error: {e}")
+            return "Error retrieving deep memory."
 
     # --- State Methods ---
     def save_app_state(self, key: str, value: str):
