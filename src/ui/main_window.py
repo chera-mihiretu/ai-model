@@ -5,8 +5,9 @@ import queue
 import time
 import logging
 from .theme_engine import ThemeEngine
+from src.ui.character_frame import CharacterFrame
 from src.ui.story_bible_view import StoryBibleView
-from src.ui.story_bible_controls import StoryBibleControls
+from src.ui.story_bible_drawer import StoryBibleDrawer
 
 # --- CUSTOM COMPONENTS ---
 
@@ -133,8 +134,7 @@ class SidebarFrame(ctk.CTkFrame):
         nav_frame.grid(row=3, column=0, sticky="ew", padx=8, pady=10)
         
         buttons = [
-            ("📝 Writing", "Writing"), 
-            ("👥 Characters", "Characters"),
+            ("📖 Story Bible", "StoryBible"),
             ("⚙️ Settings", "Settings")
         ]
         
@@ -198,53 +198,14 @@ class SidebarFrame(ctk.CTkFrame):
                 )
                 ch_btn.pack(fill="x", padx=(10, 5), pady=1)
         
-        # Chapter Beats Section
-        beats_header = ctk.CTkLabel(
-            self.project_tree, 
-            text="📝 Chapter Beats",
-            font=("Inter", 13, "bold"),
-            text_color=ThemeEngine.TEXT_PRIMARY
-        )
-        beats_header.pack(fill="x", padx=15, pady=(15, 5))
-        
-        self.beats_textbox = ctk.CTkTextbox(
-            self.project_tree,
-            height=150,
-            fg_color=ThemeEngine.BG_SIDEBAR,
-            border_color=ThemeEngine.BORDER_COLOR,
-            border_width=1,
-            wrap="word"
-        )
-        self.beats_textbox.pack(fill="x", padx=15, pady=5)
-        self.beats_textbox.insert("1.0", "Enter beats:\n1. \n2. \n3. ")
-        
-        # Smart Auto-Generate Button (changes based on context)
-        self.auto_gen_btn = ctk.CTkButton(
-            self.project_tree,
-            text="🪄 Auto-Generate from Prose",
-            fg_color=ThemeEngine.ACCENT_SECONDARY,
-            hover_color=ThemeEngine.ACCENT_HOVER,
-            command=self.on_auto_generate_beats
-        )
-        self.auto_gen_btn.pack(fill="x", padx=15, pady=(5, 0))
-        
-        generate_btn = ctk.CTkButton(
-            self.project_tree,
-            text="🔥 Generate Full Scene",
-            fg_color=ThemeEngine.ACCENT_PRIMARY,
-            hover_color=ThemeEngine.ACCENT_HOVER,
-            command=self.on_generate_from_beats
-        )
-        generate_btn.pack(fill="x", padx=15, pady=5)
+        # Chapter Beats UI Removed (Logic preserved for future use)
         
 
 
     def update_auto_gen_button(self, has_content):
         """Update button text based on whether chapter has content."""
-        if has_content:
-            self.auto_gen_btn.configure(text="🪄 Auto-Generate from Prose")
-        else:
-            self.auto_gen_btn.configure(text="🪄 Suggest Beats for this Chapter")
+        # UI Element removed, logic preserved.
+        pass
 
     def create_new_project_dialog(self):
         dialog = ctk.CTkInputDialog(text="Project Name:", title="New Project")
@@ -540,73 +501,7 @@ class EditorFrame(ctk.CTkFrame):
 
 
 
-class CharacterFrame(ctk.CTkFrame):
-    def __init__(self, master, db_manager):
-        super().__init__(master, corner_radius=0, fg_color=ThemeEngine.BG_MAIN)
-        self.db_manager = db_manager
-        
-        self.grid_columnconfigure(0, weight=1) # List
-        self.grid_columnconfigure(1, weight=3) # Form
-        self.grid_rowconfigure(0, weight=1)
-        
-        # 1. List Area (Left)
-        self.list_frame = ctk.CTkFrame(self, width=250, corner_radius=0, fg_color=ThemeEngine.BG_SIDEBAR)
-        self.list_frame.grid(row=0, column=0, sticky="nsew", padx=(0, 1))
-        
-        ctk.CTkLabel(self.list_frame, text="CHARACTERS", font=ThemeEngine.FONT_HEADER, text_color=ThemeEngine.TEXT_MUTED).pack(pady=20)
-        
-        self.char_scroll = ctk.CTkScrollableFrame(self.list_frame, fg_color="transparent")
-        self.char_scroll.pack(fill="both", expand=True)
-        
-        ctk.CTkButton(self.list_frame, text="Refresh", command=self.load_list, fg_color=ThemeEngine.BG_HOVER).pack(pady=10)
-        
-        # 2. Form Area (Right)
-        self.form_frame = ctk.CTkScrollableFrame(self, fg_color="transparent")
-        self.form_frame.grid(row=0, column=1, sticky="nsew", padx=40, pady=40)
-        
-        ctk.CTkLabel(self.form_frame, text="Character Profile", font=("Georgia", 24)).pack(pady=(0, 20), anchor="w")
-        
-        self.entries = {}
-        fields = [("Name", "name"), ("Role", "role"), ("Traits", "personality_traits"), ("Speech", "speech_pattern"), ("Relationship", "relationship_to_author")]
-        
-        for label, key in fields:
-            ctk.CTkLabel(self.form_frame, text=label, text_color=ThemeEngine.TEXT_MUTED).pack(anchor="w", pady=(10, 5))
-            entry = ctk.CTkEntry(self.form_frame, height=35, corner_radius=6, border_width=1, border_color=ThemeEngine.BORDER_COLOR, fg_color=ThemeEngine.BG_SIDEBAR)
-            entry.pack(fill="x")
-            self.entries[key] = entry
-            
-        ctk.CTkLabel(self.form_frame, text="Backstory", text_color=ThemeEngine.TEXT_MUTED).pack(anchor="w", pady=(10, 5))
-        self.entries["backstory"] = ctk.CTkTextbox(self.form_frame, height=150, corner_radius=6, border_width=1, border_color=ThemeEngine.BORDER_COLOR, fg_color=ThemeEngine.BG_SIDEBAR)
-        self.entries["backstory"].pack(fill="x")
-        
-        ctk.CTkButton(self.form_frame, text="Save Character", height=40, fg_color=ThemeEngine.ACCENT_PRIMARY, command=self.save_character).pack(pady=30, anchor="e")
 
-    def load_list(self):
-        for w in self.char_scroll.winfo_children(): w.destroy()
-        chars = self.db_manager.get_all_characters()
-        for name in chars:
-            ctk.CTkButton(self.char_scroll, text=name, fg_color="transparent", text_color=ThemeEngine.TEXT_PRIMARY, anchor="w", command=lambda n=name: self.load_details(n)).pack(fill="x", pady=2)
-
-    def load_details(self, name):
-        details = self.db_manager.get_character_details(name)
-        if not details: return
-        for key, widget in self.entries.items():
-            val = details.get(key, "")
-            if isinstance(widget, ctk.CTkEntry):
-                widget.delete(0, 'end')
-                widget.insert(0, str(val))
-            elif isinstance(widget, ctk.CTkTextbox):
-                widget.delete("1.0", "end")
-                widget.insert("1.0", str(val))
-
-    def save_character(self):
-        data = {}
-        for key, widget in self.entries.items():
-            if isinstance(widget, ctk.CTkEntry): data[key] = widget.get()
-            elif isinstance(widget, ctk.CTkTextbox): data[key] = widget.get("1.0", "end-1c")
-        if data.get("name"):
-            self.db_manager.save_character(data)
-            self.load_list()
 
 
 class SettingsFrame(ctk.CTkFrame):
@@ -754,157 +649,7 @@ class AssistantPanel(ctk.CTkTabview):
         pass # Optional loading state
 
 
-class StoryBibleUI(ctk.CTk):
-    def __init__(self, ai_engine, db_manager):
-        super().__init__()
-        self.ai_engine = ai_engine
-        self.db_manager = db_manager
-        
-        self.current_project_id = None
-        self.current_chapter_id = None
-        self.is_generating = False
-        self.response_queue = queue.Queue()
-        self.target_panel = None  # 'editor' or 'assistant'
-        
-        # Setup Window
-        ctk.set_appearance_mode("Dark")
-        self.title("Story Bible Pro")
-        self.geometry("1400x900")
-        self.configure(fg_color=ThemeEngine.BG_MAIN)
-        
-        # Grid Layout (3 Columns)
-        self.grid_columnconfigure(1, weight=1)
-        self.grid_rowconfigure(0, weight=1)
-        
-        # Col 0: Sidebar
-        self.sidebar = SidebarFrame(self, db_manager, self.nav_select, self.load_chapter)
-        self.sidebar.grid(row=0, column=0, sticky="nsew")
-        
-        # Col 1: Center Area (Swappable)
-        self.center_area = ctk.CTkFrame(self, fg_color=ThemeEngine.BG_MAIN, corner_radius=0)
-        self.center_area.grid(row=0, column=1, sticky="nsew")
-        self.center_area.grid_rowconfigure(0, weight=1)
-        self.center_area.grid_columnconfigure(0, weight=1)
-        
-        # Pages for Center Area
-        self.pages = {}
-        # Pass manual_summarize callback
-        self.editor = EditorFrame(self.center_area, self.on_editor_instruction, self.manual_summarize)
-        self.pages["Writing"] = self.editor
-        
-        self.char_page = CharacterFrame(self.center_area, db_manager)
-        self.pages["Characters"] = self.char_page
-        
-        self.settings_page = SettingsFrame(self.center_area)
-        self.pages["Settings"] = self.settings_page
-        
-        # Show default
-        self.pages["Writing"].grid(row=0, column=0, sticky="nsew")
-        
-        # Col 2: Assistant (Always visible)
-        self.assistant = AssistantPanel(self, lambda p: self.handle_ai_request(p, 'assistant'))
-        self.assistant.grid(row=0, column=2, sticky="nsew")
 
-        # Load Data
-        self.sidebar.select_nav("Writing")
-        self.load_session()
-        self.update_mimic_list()
-        
-        # Event Loops
-        self.after(100, self.check_queue)
-        self.after(30000, self.auto_save_loop)
-        self.protocol("WM_DELETE_WINDOW", self.on_close)
-
-    def nav_select(self, name):
-        # Swap Center Page
-        for page in self.pages.values():
-            page.grid_forget()
-        
-        if name in self.pages:
-            self.pages[name].grid(row=0, column=0, sticky="nsew")
-            
-        if name == "Characters":
-            self.char_page.load_list()
-        elif name == "Writing":
-            self.update_mimic_list()
-
-    def on_editor_instruction(self, prompt):
-        self.handle_ai_request(prompt, 'editor')
-
-    def manual_summarize(self):
-        """Force a summary update for the current chapter."""
-        if self.current_project_id and self.current_chapter_id:
-             content = self.editor.get_content()
-             if content:
-                 threading.Thread(target=self._update_beat_summary, args=(content,), daemon=True).start()
-                 self.assistant.append_log("System: Chapter summary updated.")
-
-    def handle_ai_request(self, prompt, target):
-        if self.is_generating: return
-        
-        self.target_panel = target
-        current_text = ""
-        char_context = None
-        project_memory = ""
-        project_name = "Current Project"
-        
-        # --- ROUTING LOGIC ---
-        plugin_type = None
-        
-        if target == 'editor':
-            current_text = self.editor.get_content()
-            self.editor.set_generating(True)
-            
-            # Check for Plugins
-            if prompt.startswith("PLUGIN::"):
-                parts = prompt.split("::")
-                plugin_type = parts[1]
-                # If selection exists, it's in parts[2], else empty
-                selection_text = parts[2] if len(parts) > 2 else ""
-                
-                if plugin_type == 'expand_scene':
-                    # Special handling for expansion
-                    prompt = "" # Prompt is implicit
-                else:
-                    # For rewrite/describe, prompt is the text to act on
-                    prompt = selection_text
-            
-            else:
-                # Normal writing instruction
-                selection = self.editor.get_mimic_selection()
-                if selection.startswith("Mimic: "):
-                    char_name = selection.replace("Mimic: ", "")
-                    char_context = self.db_manager.get_character_details(char_name)
-
-        elif target == 'assistant':
-             # Check for Sensory Lab
-             if prompt.startswith("SENSORY::"):
-                 self.target_panel = 'sensory'
-                 plugin_type = "sensory_lab"
-                 prompt = prompt.replace("SENSORY::", "")
-             else:
-                 # Lore Assistant Mode (Deep Search)
-                 self.target_panel = 'assistant'
-                 self.assistant.set_thinking(True)
-                 self.assistant.append_log(f"AI: ")
-            
-                 if self.current_project_id:
-                    # Get Project Name
-                    projects = self.db_manager.get_projects_with_chapters()
-                    for p in projects:
-                        if p['id'] == self.current_project_id:
-                            project_name = p['name']
-                            break
-                    project_memory = self.db_manager.get_deep_memory(self.current_project_id, prompt)
-                 else:
-                    project_memory = "No project selected."
-
-        self.is_generating = True
-        threading.Thread(
-            target=self._ai_thread,
-            args=(prompt, target, current_text, char_context, project_memory, project_name, plugin_type),
-            daemon=True
-        ).start()
 
 
 class StoryBibleUI(ctk.CTk):
@@ -916,6 +661,7 @@ class StoryBibleUI(ctk.CTk):
         self.current_project_id = None
         self.current_chapter_id = None
         self.is_generating = False
+        self.is_bible_open = False # Animation State
         self.response_queue = queue.Queue()
         self.target_panel = None  # 'editor' or 'assistant'
         
@@ -945,26 +691,19 @@ class StoryBibleUI(ctk.CTk):
         self.editor = EditorFrame(self.center_area, self.on_editor_instruction, self.manual_summarize)
         self.pages["Writing"] = self.editor
         
-        self.char_page = CharacterFrame(self.center_area, db_manager)
-        self.pages["Characters"] = self.char_page
-        
         self.settings_page = SettingsFrame(self.center_area)
         self.pages["Settings"] = self.settings_page
         
         # Story Bible View (Hidden by default)
         self.bible_view = StoryBibleView(self.center_area, db_manager)
         
+        # Story Bible Drawer (Left-side navigation, hidden initially)
+        self.bible_drawer = StoryBibleDrawer(self, on_tab_select=self.show_bible_field)
+        # Place on left edge, off-screen initially
+        # Will slide from rely=1.0 to rely=0.5 when toggled
+        
         # Show default
         self.pages["Writing"].grid(row=0, column=0, sticky="nsew")
-        
-        # Bible Controls (Floating Bottom-Left)
-        # We pass on_tab_select and on_back methods (defined below)
-        self.bible_controls = StoryBibleControls(
-            self.center_area, 
-            on_tab_select=self.open_bible_section,
-            on_back_to_writing=self.back_to_writing
-        )
-        self.bible_controls.place(relx=0.01, rely=0.99, anchor="sw")
         
         # Col 2: Assistant (Always visible)
         self.assistant = AssistantPanel(self, lambda p: self.handle_ai_request(p, 'assistant'))
@@ -980,31 +719,71 @@ class StoryBibleUI(ctk.CTk):
         self.after(30000, self.auto_save_loop)
         self.protocol("WM_DELETE_WINDOW", self.on_close)
 
-    def open_bible_section(self, tab_name):
-        """Swaps Editor for Bible View and shows specific tab."""
-        # Hide Editor (and other pages)
+
+    def animate_drawer(self, start_y, target_y, step=0.08):
+        """Slide drawer vertically on left edge."""
+        current_y = start_y
+        
+        if start_y > target_y: # Sliding up
+            current_y -= step
+            if current_y <= target_y:
+                current_y = target_y
+                self.bible_drawer.place(relx=0, rely=current_y, anchor="sw", relheight=0.5)
+                return
+        else: # Sliding down
+            current_y += step
+            if current_y >= target_y:
+                current_y = target_y
+                if target_y >= 1.0:
+                    self.bible_drawer.place_forget() # Hide when off-screen
+                else:
+                    self.bible_drawer.place(relx=0, rely=current_y, anchor="sw", relheight=0.5)
+                return
+
+        self.bible_drawer.place(relx=0, rely=current_y, anchor="sw", relheight=0.5)
+        self.after(10, lambda: self.animate_drawer(current_y, target_y, step))
+
+    def toggle_story_bible_anim(self):
+        """Toggle drawer visibility with slide animation."""
+        if self.is_bible_open:
+            # Slide down and hide
+            self.animate_drawer(0.5, 1.0)
+            self.is_bible_open = False
+        else:
+            # Show and slide up
+            self.bible_drawer.place(relx=0, rely=1.0, anchor="sw", relheight=0.5)
+            self.bible_drawer.tkraise()
+            self.animate_drawer(1.0, 0.5)
+            self.is_bible_open = True
+
+    def show_bible_field(self, field_name):
+        """Display selected Bible field in center area (replaces editor)."""
+        # Hide editor and other pages
         for page in self.pages.values():
             page.grid_forget()
         
-        # Show Bible View
+        # Show Bible view
         self.bible_view.grid(row=0, column=0, sticky="nsew")
         
-        # Load Data
+        # Load project data if needed
         if self.current_project_id:
-             self.bible_view.load_project(self.current_project_id)
-             
-        # Switch to section
-        self.bible_view.show_section(tab_name)
-
-    def back_to_writing(self):
-        """Return to Editor."""
-        self.bible_view.grid_forget()
-        self.sidebar.select_nav("Writing")
+            self.bible_view.load_project(self.current_project_id)
+        
+        # Show specific field
+        self.bible_view.show_field(field_name)
 
     def nav_select(self, name):
-        # Swap Center Page
-        if hasattr(self, 'bible_view'):
-            self.bible_view.grid_forget()
+        """Handle navigation between pages."""
+        if name == "StoryBible":
+            self.toggle_story_bible_anim()
+            return
+
+        # Close drawer if navigating to other pages
+        if self.is_bible_open:
+            self.toggle_story_bible_anim()
+        
+        # Hide Bible view and restore normal page
+        self.bible_view.grid_forget()
             
         for page in self.pages.values():
             page.grid_forget()
@@ -1012,9 +791,7 @@ class StoryBibleUI(ctk.CTk):
         if name in self.pages:
             self.pages[name].grid(row=0, column=0, sticky="nsew")
             
-        if name == "Characters":
-            self.char_page.load_list()
-        elif name == "Writing":
+        if name == "Writing":
             self.update_mimic_list()
 
     def on_editor_instruction(self, prompt):
@@ -1269,8 +1046,10 @@ class StoryBibleUI(ctk.CTk):
         if not self.current_project_id or not self.current_chapter_id:
             return
         
-        beats_text = self.sidebar.beats_textbox.get("1.0", "end").strip()
-        beats_list = [l.strip() for l in beats_text.split("\n") if l.strip() and "Enter" not in l]
+        # beats_text = self.sidebar.beats_textbox.get("1.0", "end").strip()
+        beats_text = ""
+        # beats_list = [l.strip() for l in beats_text.split("\n") if l.strip() and "Enter" not in l]
+        beats_list = []
         
         if not beats_list:
             return
@@ -1311,8 +1090,8 @@ class StoryBibleUI(ctk.CTk):
         if len(prose) > 100:
             # Extract beats from existing prose
             beats = self.ai_engine.generate_beats_from_prose(prose)
-            self.sidebar.beats_textbox.delete("1.0", "end")
-            self.sidebar.beats_textbox.insert("1.0", beats)
+            # self.sidebar.beats_textbox.delete("1.0", "end")
+            # self.sidebar.beats_textbox.insert("1.0", beats)
             # Save to database
             self.db_manager.update_chapter_beats(self.current_chapter_id, beats)
             logging.info(f"Extracted {len(beats.splitlines())} beats from prose")
@@ -1321,7 +1100,7 @@ class StoryBibleUI(ctk.CTk):
             if not self.current_project_id:
                 return
             
-           # Get previous chapter beats
+            # Get previous chapter beats
             prev_beats = ""
             if self.current_chapter_id:
                 # Find previous chapter
@@ -1342,8 +1121,8 @@ class StoryBibleUI(ctk.CTk):
             
             # Generate suggestions
             suggested_beats = self.ai_engine.suggest_next_beats(prev_beats, lore_package)
-            self.sidebar.beats_textbox.delete("1.0", "end")
-            self.sidebar.beats_textbox.insert("1.0", suggested_beats)
+            # self.sidebar.beats_textbox.delete("1.0", "end")
+            # self.sidebar.beats_textbox.insert("1.0", suggested_beats)
             # Save to database
             self.db_manager.update_chapter_beats(self.current_chapter_id, suggested_beats)
             logging.info(f"Suggested beats for new chapter")
