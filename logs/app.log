@@ -873,3 +873,117 @@ _tkinter.TclError: bad option "-px": must be -after, -anchor, -before, -expand, 
 2025-12-25 21:05:16,677 - INFO - Auto-saved Bible field: braindump
 2025-12-25 21:07:30,915 - INFO - Unloading model and freeing VRAM...
 2025-12-25 21:07:31,206 - INFO - App shutdown complete.
+2025-12-25 21:31:51,150 - INFO - Starting Story Bible App - Milestone 1.3
+2025-12-25 21:31:51,152 - INFO - Database initialized at /home/sabona/Desktop/DesktopApp/data/story_bible.db
+2025-12-25 21:31:51,153 - INFO - Loading model from /home/sabona/Desktop/DesktopApp/models/llama/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf with n_gpu_layers=-1
+2025-12-25 21:31:52,860 - INFO - Model loaded successfully.
+2025-12-25 21:31:55,160 - INFO - Unloading model and freeing VRAM...
+2025-12-25 21:31:55,563 - INFO - App shutdown complete.
+2025-12-25 21:32:00,110 - INFO - Starting Story Bible App - Milestone 1.3
+2025-12-25 21:32:00,111 - INFO - Database initialized at /home/sabona/Desktop/DesktopApp/data/story_bible.db
+2025-12-25 21:32:00,112 - INFO - Loading model from /home/sabona/Desktop/DesktopApp/models/llama/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf with n_gpu_layers=-1
+2025-12-25 21:32:01,697 - INFO - Model loaded successfully.
+2025-12-25 21:32:36,635 - INFO - Auto-saved Bible field: genre
+2025-12-25 21:32:44,117 - INFO - Auto-saved Bible field: genre
+2025-12-25 21:32:54,398 - INFO - Auto-saved Bible field: genre
+2025-12-25 21:32:56,951 - INFO - Auto-saved Bible field: genre
+2025-12-25 21:32:59,115 - INFO - Auto-saved Bible field: genre
+2025-12-25 21:33:07,459 - INFO - Auto-saved Bible field: genre
+2025-12-25 21:33:45,099 - INFO - KeyboardInterrupt caught. Shutting down...
+2025-12-25 21:33:45,100 - INFO - Unloading model and freeing VRAM...
+2025-12-25 21:33:45,224 - INFO - App shutdown complete.
+2025-12-25 21:33:49,197 - INFO - Starting Story Bible App - Milestone 1.3
+2025-12-25 21:33:49,198 - INFO - Database initialized at /home/sabona/Desktop/DesktopApp/data/story_bible.db
+2025-12-25 21:33:49,199 - INFO - Loading model from /home/sabona/Desktop/DesktopApp/models/llama/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf with n_gpu_layers=-1
+2025-12-25 21:33:50,575 - INFO - Model loaded successfully.
+2025-12-25 21:34:02,586 - INFO - Auto-saved Bible field: genre
+2025-12-25 21:39:15,774 - INFO - KeyboardInterrupt caught. Shutting down...
+2025-12-25 21:39:15,774 - INFO - Unloading model and freeing VRAM...
+2025-12-25 21:39:16,103 - INFO - App shutdown complete.
+2025-12-25 21:39:19,659 - INFO - Starting Story Bible App - Milestone 1.3
+2025-12-25 21:39:19,659 - INFO - Database initialized at /home/sabona/Desktop/DesktopApp/data/story_bible.db
+2025-12-25 21:39:19,660 - INFO - Loading model from /home/sabona/Desktop/DesktopApp/models/llama/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf with n_gpu_layers=-1
+2025-12-25 21:39:20,982 - INFO - Model loaded successfully.
+2025-12-25 21:39:30,741 - INFO - Auto-saved Bible field: genre
+2025-12-25 21:39:32,147 - INFO - Auto-saved Bible field: genre
+2025-12-25 21:39:37,754 - INFO - Auto-saved Bible field: genre
+2025-12-25 21:39:41,461 - INFO - Force-saved Bible field: genre
+2025-12-25 21:39:44,908 - INFO - Force-saved Bible field: genre
+2025-12-25 21:39:46,443 - INFO - Force-saved Bible field: genre
+2025-12-25 21:39:47,291 - INFO - Force-saved Bible field: braindump
+2025-12-25 21:39:49,395 - INFO - Force-saved Bible field: style
+2025-12-25 21:39:50,380 - INFO - Force-saved Bible field: synopsis
+2025-12-25 21:39:51,321 - INFO - Force-saved Bible field: worldbuilding
+2025-12-25 21:39:52,672 - INFO - Force-saved Bible field: outline
+2025-12-25 21:39:53,871 - INFO - Force-saved Bible field: style
+2025-12-25 21:39:55,259 - INFO - Force-saved Bible field: braindump
+2025-12-25 21:39:59,149 - INFO - Force-saved Bible field: braindump
+2025-12-25 21:40:00,313 - INFO - Force-saved Bible field: genre
+2025-12-25 21:40:02,495 - INFO - Force-saved Bible field: style
+2025-12-25 21:40:03,691 - INFO - Force-saved Bible field: genre
+2025-12-25 21:40:04,584 - INFO - Force-saved Bible field: style
+2025-12-25 21:40:06,015 - INFO - Force-saved Bible field: synopsis
+2025-12-25 21:40:06,920 - INFO - Force-saved Bible field: genre
+2025-12-25 21:40:07,720 - INFO - Force-saved Bible field: braindump
+2025-12-25 21:40:10,918 - INFO - Auto-saved Bible field: braindump
+2025-12-25 21:40:12,499 - INFO - Auto-saved Bible field: braindump
+2025-12-25 21:40:14,604 - INFO - Auto-saved Bible field: braindump
+2025-12-25 21:40:14,974 - INFO - Force-saved Bible field: braindump
+2025-12-25 21:40:15,954 - INFO - Force-saved Bible field: genre
+2025-12-25 21:40:17,012 - INFO - Force-saved Bible field: style
+2025-12-25 21:40:17,833 - INFO - Force-saved Bible field: synopsis
+2025-12-25 21:40:18,602 - INFO - Force-saved Bible field: worldbuilding
+2025-12-25 21:40:19,458 - INFO - Force-saved Bible field: style
+2025-12-25 21:40:20,216 - INFO - Force-saved Bible field: genre
+2025-12-25 21:40:21,369 - INFO - Force-saved Bible field: braindump
+2025-12-25 21:40:24,530 - INFO - Force-saved Bible field: braindump
+2025-12-25 21:40:27,338 - INFO - Auto-saved Bible field: genre
+2025-12-25 21:40:29,111 - INFO - Force-saved Bible field: genre
+2025-12-25 21:40:30,217 - INFO - Force-saved Bible field: braindump
+2025-12-25 21:40:31,417 - INFO - Force-saved Bible field: genre
+2025-12-25 21:40:34,066 - INFO - Force-saved Bible field: braindump
+2025-12-25 21:40:35,036 - INFO - Force-saved Bible field: genre
+2025-12-25 21:40:35,950 - INFO - Force-saved Bible field: style
+2025-12-25 21:40:36,687 - INFO - Force-saved Bible field: synopsis
+2025-12-25 21:40:37,611 - INFO - Force-saved Bible field: worldbuilding
+2025-12-25 21:40:55,589 - INFO - Force-saved Bible field: outline
+2025-12-25 21:40:56,779 - INFO - Force-saved Bible field: worldbuilding
+2025-12-25 21:40:58,972 - INFO - Force-saved Bible field: synopsis
+2025-12-25 21:41:03,003 - INFO - Force-saved Bible field: braindump
+2025-12-25 21:41:04,406 - INFO - Force-saved Bible field: genre
+2025-12-25 21:41:07,265 - INFO - Auto-saved Bible field: braindump
+2025-12-25 21:41:11,082 - INFO - Auto-saved Bible field: braindump
+2025-12-25 21:41:11,115 - INFO - Force-saved Bible field: braindump
+2025-12-25 21:41:12,086 - INFO - Force-saved Bible field: genre
+2025-12-25 21:41:13,547 - INFO - Force-saved Bible field: braindump
+2025-12-25 21:42:48,453 - INFO - Unloading model and freeing VRAM...
+2025-12-25 21:42:48,766 - INFO - App shutdown complete.
+2025-12-25 22:07:40,524 - INFO - Starting Story Bible App - Milestone 1.3
+2025-12-25 22:07:40,525 - INFO - Database initialized at /home/sabona/Desktop/DesktopApp/data/story_bible.db
+2025-12-25 22:07:40,526 - INFO - Loading model from /home/sabona/Desktop/DesktopApp/models/llama/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf with n_gpu_layers=-1
+2025-12-25 22:07:44,316 - INFO - Model loaded successfully.
+2025-12-25 22:07:55,594 - INFO - Force-saved Bible field: braindump
+2025-12-25 22:07:56,790 - INFO - Force-saved Bible field: genre
+2025-12-25 22:07:57,768 - INFO - Force-saved Bible field: style
+2025-12-25 22:07:58,705 - INFO - Force-saved Bible field: synopsis
+2025-12-25 22:08:00,205 - INFO - Force-saved Bible field: worldbuilding
+2025-12-25 22:08:01,969 - INFO - Force-saved Bible field: outline
+2025-12-25 22:08:06,682 - INFO - Auto-saved Bible field: outline
+2025-12-25 22:14:54,566 - INFO - Auto-saved Bible field: outline
+2025-12-25 22:14:55,153 - INFO - Unloading model and freeing VRAM...
+2025-12-25 22:14:55,294 - INFO - App shutdown complete.
+2025-12-25 22:40:24,490 - INFO - Starting Story Bible App - Milestone 1.3
+2025-12-25 22:40:24,491 - INFO - Database initialized at /home/sabona/Desktop/DesktopApp/data/story_bible.db
+2025-12-25 22:40:24,491 - INFO - Loading model from /home/sabona/Desktop/DesktopApp/models/llama/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf with n_gpu_layers=-1
+2025-12-25 22:40:26,722 - INFO - Model loaded successfully.
+2025-12-25 22:40:41,362 - INFO - Force-saved Bible field: genre
+2025-12-25 22:40:58,268 - INFO - Force-saved Bible field: style
+2025-12-25 22:40:59,340 - INFO - Force-saved Bible field: braindump
+2025-12-25 22:41:00,338 - INFO - Force-saved Bible field: genre
+2025-12-25 22:41:01,135 - INFO - Force-saved Bible field: style
+2025-12-25 22:41:18,712 - INFO - Force-saved Bible field: synopsis
+2025-12-25 22:41:19,744 - INFO - Force-saved Bible field: braindump
+2025-12-25 22:41:21,168 - INFO - Force-saved Bible field: genre
+2025-12-25 22:41:22,243 - INFO - Force-saved Bible field: synopsis
+2025-12-25 22:43:51,961 - INFO - Unloading model and freeing VRAM...
+2025-12-25 22:43:52,305 - INFO - App shutdown complete.

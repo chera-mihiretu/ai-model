@@ -191,7 +191,89 @@ class AIEngine:
             logging.error(f"Failed to load model: {e}")
             self.llm = None
 
-    def stream_response(self, instruction: str, response_queue: queue.Queue, bible_data: str = "", current_text: str = "", character_context: dict = None, rag_context: dict = None) -> None:
+    def get_genre_context(self, genre: str) -> dict:
+        """
+        Generate genre-specific context for AI prompt conditioning.
+        Returns dict with archetypes, conflicts, tone guidelines, and elements to avoid.
+        """
+        # Normalize genre input
+        genre_lower = genre.lower().strip() if genre else "general fiction"
+        
+        # Genre-specific context mapping
+        genre_contexts = {
+            "fantasy": {
+                "genre": "Fantasy",
+                "archetypes": ["Hero", "Mentor", "Villain", "Sidekick", "Oracle"],
+                "common_conflicts": ["Quest", "Political Intrigue", "War", "Prophecy", "Magic vs Technology"],
+                "tone_guidelines": "Epic, adventurous, and high-stakes. Emphasize wonder and magic.",
+                "avoid_elements": ["Modern technology", "Contemporary slang", "Scientific explanations"],
+                "narrative_elements": ["Magic systems", "Kingdoms", "Ancient prophecies", "Mythical creatures"],
+                "style_notes": "Use archaic or elevated language when appropriate. Focus on worldbuilding and lore."
+            },
+            "sci-fi": {
+                "genre": "Science Fiction",
+                "archetypes": ["Scientist", "Explorer", "AI/Robot", "Rebel", "Visionary"],
+                "common_conflicts": ["Technological advancement", "Space exploration", "AI uprising", "Dystopian control"],
+                "tone_guidelines": "Intellectual, speculative, and forward-thinking. Emphasize innovation and discovery.",
+                "avoid_elements": ["Magic without scientific basis", "Fantasy creatures", "Medieval settings"],
+                "narrative_elements": ["Advanced technology", "Space travel", "Scientific concepts", "Future societies"],
+                "style_notes": "Ground fantastical elements in plausible science. Use technical vocabulary appropriately."
+            },
+            "romance": {
+                "genre": "Romance",
+                "archetypes": ["Lover", "Best Friend", "Rival", "Confidant"],
+                "common_conflicts": ["Forbidden love", "Misunderstanding", "Class differences", "Love triangle"],
+                "tone_guidelines": "Emotional, intimate, and tension-filled. Focus on character chemistry.",
+                "avoid_elements": ["Excessive violence", "Political intrigue overshadowing relationships"],
+                "narrative_elements": ["Emotional beats", "Relationship development", "Internal conflicts"],
+                "style_notes": "Emphasize emotional depth, attraction, and interpersonal dynamics."
+            },
+            "thriller": {
+                "genre": "Thriller",
+                "archetypes": ["Detective", "Victim", "Antagonist", "Ally", "Red Herring"],
+                "common_conflicts": ["Investigation", "Chase", "Conspiracy", "Psychological manipulation"],
+                "tone_guidelines": "Suspenseful, tense, and fast-paced. Build dread and anticipation.",
+                "avoid_elements": ["Slow pacing", "Comedic relief that breaks tension"],
+                "narrative_elements": ["Clues", "Red herrings", "Time pressure", "High stakes"],
+                "style_notes": "Use short, punchy sentences for action. Build suspense through pacing."
+            },
+            "mystery": {
+                "genre": "Mystery",
+                "archetypes": ["Detective", "Suspect", "Witness", "Victim", "Investigator"],
+                "common_conflicts": ["Solving crime", "Uncovering secrets", "Following clues"],
+                "tone_guidelines": "Intriguing, methodical, and cerebral. Encourage reader deduction.",
+                "avoid_elements": ["Deus ex machina solutions", "Unearned revelations"],
+                "narrative_elements": ["Clues", "Misdirection", "Logical deduction", "Plot twists"],
+                "style_notes": "Plant clues fairly. Build logical progression of discovery."
+            },
+            "horror": {
+                "genre": "Horror",
+                "archetypes": ["Final Girl/Boy", "Monster", "Skeptic", "Believer", "Victim"],
+                "common_conflicts": ["Survival", "Unknown threat", "Psychological breakdown"],
+                "tone_guidelines": "Dreadful, atmospheric, and visceral. Build terror and unease.",
+                "avoid_elements": ["Excessive humor", "Safe, predictable outcomes"],
+                "narrative_elements": ["Atmosphere", "Gore/violence", "Psychological terror", "Isolation"],
+                "style_notes": "Use sensory details to build dread. Pace revelations carefully."
+            }
+        }
+        
+        # Find matching genre (fuzzy match)
+        for key, context in genre_contexts.items():
+            if key in genre_lower or genre_lower in key:
+                return context
+        
+        # Default/general fiction context
+        return {
+            "genre": genre or "General Fiction",
+            "archetypes": ["Protagonist", "Antagonist", "Supporting Character"],
+            "common_conflicts": ["Character vs Self", "Character vs Character", "Character vs Society"],
+            "tone_guidelines": "Balanced and narrative-focused. Adapt to story needs.",
+            "avoid_elements": [],
+            "narrative_elements": ["Plot development", "Character arcs", "Theme exploration"],
+            "style_notes": "Maintain consistency with established tone and voice."
+        }
+
+    def stream_response(self, instruction: str, response_queue: queue.Queue, bible_data: str = "", current_text: str = "", character_context: dict = None, rag_context: dict = None, genre: str = None) -> None:
         """
         Streams response tokens into the provided queue.
         Uses Llama 3 Header format.
@@ -212,15 +294,28 @@ class AIEngine:
             else:
                 char_notes = "No characters mentioned in recent text."
             
-            # Get genre - default to "fiction"
-            genre = "fiction"
+            # Get genre context
+            genre_name = genre or rag_context.get('genre', 'fiction')
+            genre_ctx = self.get_genre_context(genre_name)
+            
+            # Build genre guidance string
+            genre_guidance = f"""
+GENRE: {genre_ctx['genre']}
+TONE: {genre_ctx['tone_guidelines']}
+APPROPRIATE ELEMENTS: {', '.join(genre_ctx['narrative_elements'])}
+AVOID: {', '.join(genre_ctx['avoid_elements']) if genre_ctx['avoid_elements'] else 'None'}
+STYLE NOTES: {genre_ctx['style_notes']}
+"""
             
             system_prompt = PROMPT_WRITER_GODMODE.format(
-                genre=genre,
+                genre=genre_ctx['genre'],
                 character_notes=char_notes,
                 prev_summary=rag_context.get('prev_summary', 'Beginning of story'),
                 recent_context=rag_context.get('recent_text', current_text[-3000:])
             )
+            
+            # Append genre guidance to system prompt
+            system_prompt = system_prompt.replace("<|eot_id|>", f"{genre_guidance}<|eot_id|>")
             
             full_prompt = (
                 f"{system_prompt}"

@@ -44,7 +44,11 @@ class StoryBibleView(ctk.CTkFrame):
                 font=("Inter", 16),
                 undo=True
             )
-            txt.bind("<KeyRelease>", lambda e, f=db_field: self._schedule_save(f))
+            # Store field info on widget to avoid lambda closure issues
+            txt._db_field = db_field
+            txt._tab_name = tab_name
+            # Bind to handler that retrieves field from widget
+            txt.bind("<KeyRelease>", self._on_text_change)
             self.text_widgets[tab_name] = txt
         
         # Track current field
@@ -52,6 +56,10 @@ class StoryBibleView(ctk.CTkFrame):
 
     def show_field(self, field_name):
         """Display the specified Bible field or Characters."""
+        # Save current field immediately before switching
+        if self.current_field and self.current_field != "Characters":
+            self._force_save_current()
+        
         # Hide all fields and characters
         for widget in self.text_widgets.values():
             widget.grid_forget()
@@ -66,6 +74,24 @@ class StoryBibleView(ctk.CTkFrame):
             self.text_widgets[field_name].grid(row=0, column=0, sticky="nsew", padx=40, pady=40)
             self.text_widgets[field_name].focus_set()
             self.current_field = field_name
+    
+    def _force_save_current(self):
+        """Immediately save the current field without debounce."""
+        if not self.current_project_id or not self.current_field:
+            return
+        
+        # Cancel pending debounced save
+        db_field = self.field_map.get(self.current_field)
+        if db_field and db_field in self.debounce_timers:
+            self.after_cancel(self.debounce_timers[db_field])
+        
+        # Perform immediate save
+        if self.current_field in self.text_widgets:
+            widget = self.text_widgets[self.current_field]
+            content = widget.get("1.0", "end-1c")
+            db_field = self.field_map[self.current_field]
+            self.db_manager.save_bible_field(self.current_project_id, db_field, content)
+            logging.info(f"Force-saved Bible field: {db_field}")
 
     def load_project(self, project_id):
         """Load Bible data for the given project."""
@@ -81,6 +107,12 @@ class StoryBibleView(ctk.CTkFrame):
                     widget = self.text_widgets[tab_name]
                     widget.delete("1.0", "end")
                     widget.insert("1.0", content)
+    
+    def _on_text_change(self, event):
+        """Handler for text change events - retrieves field from widget."""
+        widget = event.widget
+        if hasattr(widget, '_db_field'):
+            self._schedule_save(widget._db_field)
 
     def _schedule_save(self, field_name):
         """Debounced auto-save for Bible fields."""

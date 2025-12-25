@@ -782,6 +782,10 @@ class StoryBibleUI(ctk.CTk):
         if self.is_bible_open:
             self.toggle_story_bible_anim()
         
+        # Force save current Bible field before hiding
+        if hasattr(self.bible_view, '_force_save_current'):
+            self.bible_view._force_save_current()
+        
         # Hide Bible view and restore normal page
         self.bible_view.grid_forget()
             

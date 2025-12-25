@@ -254,10 +254,18 @@ class DatabaseManager:
                         if char_details:
                             mentioned_characters.append(char_details)
                 
+                # 4. Get genre from Story Bible
+                genre = "fiction"  # default
+                cursor.execute("SELECT genre FROM story_bible WHERE project_id = ?", (project_id,))
+                bible_row = cursor.fetchone()
+                if bible_row and bible_row[0]:
+                    genre = bible_row[0].strip()
+                
                 return {
                     'recent_text': recent_text,
                     'prev_summary': prev_summary,
-                    'mentioned_characters': mentioned_characters
+                    'mentioned_characters': mentioned_characters,
+                    'genre': genre
                 }
                 
         except sqlite3.Error as e:
