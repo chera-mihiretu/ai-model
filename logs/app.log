@@ -1,0 +1,989 @@
+2025-12-24 13:16:25,636 - INFO - Starting Story Bible App - Milestone 1.3
+2025-12-24 13:16:25,680 - INFO - Database initialized at /home/sabona/Desktop/DesktopApp/data/story_bible.db
+2025-12-24 13:16:25,680 - INFO - Mock AI Engine initialized.
+2025-12-24 13:16:50,046 - INFO - [Mock] Generating response for: Why people die for love
+2025-12-24 13:19:03,386 - INFO - KeyboardInterrupt caught. Shutting down...
+2025-12-24 13:19:03,386 - INFO - Mock AI Engine unloaded.
+2025-12-24 13:19:03,386 - INFO - App shutdown complete.
+2025-12-24 13:25:06,608 - INFO - Starting Story Bible App - Milestone 1.3
+2025-12-24 13:25:06,608 - INFO - Database initialized at /home/sabona/Desktop/DesktopApp/data/story_bible.db
+2025-12-24 13:25:06,608 - INFO - Loading model from /home/sabona/Desktop/DesktopApp/models/llama/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf with n_gpu_layers=-1
+2025-12-24 13:25:17,825 - INFO - Model loaded successfully.
+2025-12-24 13:25:34,537 - INFO - Generating response for prompt: Why people die for money?...
+2025-12-24 13:27:50,137 - INFO - Unloading model and freeing VRAM...
+2025-12-24 13:27:50,184 - INFO - App shutdown complete.
+2025-12-24 13:28:14,586 - INFO - Starting Story Bible App - Milestone 1.3
+2025-12-24 13:28:14,588 - INFO - Database initialized at /home/sabona/Desktop/DesktopApp/data/story_bible.db
+2025-12-24 13:28:14,589 - INFO - Loading model from /home/sabona/Desktop/DesktopApp/models/llama/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf with n_gpu_layers=-1
+2025-12-24 13:28:18,746 - INFO - Model loaded successfully.
+2025-12-24 13:28:31,519 - INFO - Generating response for prompt: Mysterious force love...
+2025-12-24 13:28:52,989 - INFO - Unloading model and freeing VRAM...
+2025-12-24 13:28:53,273 - INFO - App shutdown complete.
+2025-12-24 13:29:24,969 - INFO - Starting Story Bible App - Milestone 1.3
+2025-12-24 13:29:24,977 - INFO - Database initialized at /home/sabona/Desktop/DesktopApp/data/story_bible.db
+2025-12-24 13:29:24,978 - INFO - Loading model from /home/sabona/Desktop/DesktopApp/models/llama/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf with n_gpu_layers=-1
+2025-12-24 13:29:27,768 - INFO - Model loaded successfully.
+2025-12-24 13:29:40,565 - INFO - Generating response for prompt: why people die for love...
+2025-12-24 13:29:48,792 - INFO - KeyboardInterrupt caught. Shutting down...
+2025-12-24 13:29:48,793 - INFO - Unloading model and freeing VRAM...
+2025-12-24 13:29:48,811 - INFO - App shutdown complete.
+2025-12-24 13:29:59,948 - INFO - Starting Story Bible App - Milestone 1.3
+2025-12-24 13:29:59,950 - INFO - Database initialized at /home/sabona/Desktop/DesktopApp/data/story_bible.db
+2025-12-24 13:29:59,951 - INFO - Loading model from /home/sabona/Desktop/DesktopApp/models/llama/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf with n_gpu_layers=-1
+2025-12-24 13:30:02,305 - INFO - Model loaded successfully.
+2025-12-24 13:30:10,767 - INFO - Generating response for prompt: why people die for love...
+2025-12-24 13:30:16,767 - INFO - KeyboardInterrupt caught. Shutting down...
+2025-12-24 13:30:16,767 - INFO - Unloading model and freeing VRAM...
+2025-12-24 13:30:16,786 - INFO - App shutdown complete.
+2025-12-24 13:33:12,386 - INFO - Starting Story Bible App - Milestone 1.3
+2025-12-24 13:33:12,390 - INFO - Database initialized at /home/sabona/Desktop/DesktopApp/data/story_bible.db
+2025-12-24 13:33:12,391 - INFO - Loading model from /home/sabona/Desktop/DesktopApp/models/llama/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf with n_gpu_layers=-1
+2025-12-24 13:33:17,617 - INFO - Model loaded successfully.
+2025-12-24 13:33:35,508 - INFO - KeyboardInterrupt caught. Shutting down...
+2025-12-24 13:33:35,509 - INFO - Unloading model and freeing VRAM...
+2025-12-24 13:33:35,953 - INFO - App shutdown complete.
+2025-12-24 13:40:17,412 - INFO - Starting Story Bible App - Milestone 1.3
+2025-12-24 13:40:17,415 - INFO - Database initialized at /home/sabona/Desktop/DesktopApp/data/story_bible.db
+2025-12-24 13:40:17,416 - INFO - Loading model from /home/sabona/Desktop/DesktopApp/models/llama/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf with n_gpu_layers=-1
+2025-12-24 13:40:19,516 - INFO - Model loaded successfully.
+2025-12-24 13:41:01,671 - INFO - Generating response for prompt: Why people are dying for love...
+2025-12-24 13:41:11,443 - INFO - KeyboardInterrupt caught. Shutting down...
+2025-12-24 13:41:11,443 - INFO - Unloading model and freeing VRAM...
+2025-12-24 13:41:11,460 - INFO - App shutdown complete.
+2025-12-24 13:42:55,355 - INFO - Starting Story Bible App - Milestone 1.3
+2025-12-24 13:42:55,357 - INFO - Database initialized at /home/sabona/Desktop/DesktopApp/data/story_bible.db
+2025-12-24 13:42:55,357 - INFO - Loading model from /home/sabona/Desktop/DesktopApp/models/llama/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf with n_gpu_layers=-1
+2025-12-24 13:43:00,993 - INFO - Model loaded successfully.
+2025-12-24 13:45:15,358 - INFO - Starting Story Bible App - Milestone 1.3
+2025-12-24 13:45:15,360 - INFO - Database initialized at /home/sabona/Desktop/DesktopApp/data/story_bible.db
+2025-12-24 13:45:15,360 - INFO - Loading model from /home/sabona/Desktop/DesktopApp/models/llama/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf with n_gpu_layers=-1
+2025-12-24 13:45:18,151 - INFO - Model loaded successfully.
+2025-12-24 13:45:46,899 - INFO - Generating response for instruction: Why people die for love...
+2025-12-24 13:57:13,295 - INFO - Starting Story Bible App - Milestone 1.3
+2025-12-24 13:57:13,350 - INFO - Database initialized at /home/sabona/Desktop/DesktopApp/data/story_bible.db
+2025-12-24 13:57:13,351 - INFO - Loading model from /home/sabona/Desktop/DesktopApp/models/llama/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf with n_gpu_layers=-1
+2025-12-24 13:57:17,430 - INFO - Model loaded successfully.
+2025-12-24 14:30:56,041 - INFO - Starting Story Bible App - Milestone 1.3
+2025-12-24 14:30:56,054 - INFO - Database initialized at /home/sabona/Desktop/DesktopApp/data/story_bible.db
+2025-12-24 14:30:56,054 - INFO - Loading model from /home/sabona/Desktop/DesktopApp/models/llama/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf with n_gpu_layers=-1
+2025-12-24 14:30:59,249 - INFO - Model loaded successfully.
+2025-12-24 14:31:54,789 - INFO - Generating response for instruction: mysterious force which is love, the love I have fo...
+2025-12-24 14:33:34,660 - INFO - Generating response for instruction: I am addicted to winning and gaining of money...
+2025-12-24 14:36:19,983 - INFO - Generating response for instruction: I want to have many belongings...
+2025-12-24 14:38:59,445 - INFO - Generating response for instruction: Why are people willing to die for love...
+2025-12-24 14:40:19,198 - INFO - Generating response for instruction: The fealing you feel when you got what you fought ...
+2025-12-24 14:42:21,703 - INFO - Generating response for instruction: Doubting if that was just his imagination doubting...
+2025-12-24 14:52:58,634 - INFO - KeyboardInterrupt caught. Shutting down...
+2025-12-24 14:52:58,634 - INFO - Unloading model and freeing VRAM...
+2025-12-24 14:52:59,034 - INFO - App shutdown complete.
+2025-12-24 14:58:00,390 - INFO - Starting Story Bible App - Milestone 1.3
+2025-12-24 14:58:00,416 - INFO - Database initialized at /home/sabona/Desktop/DesktopApp/data/story_bible.db
+2025-12-24 14:58:00,416 - INFO - Loading model from /home/sabona/Desktop/DesktopApp/models/llama/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf with n_gpu_layers=-1
+2025-12-24 14:58:04,084 - INFO - Model loaded successfully.
+2025-12-24 15:00:07,153 - INFO - Generating response for instruction: What is purpose of life without Jesus...
+2025-12-24 15:02:03,647 - INFO - Generating response for instruction: What is love...
+2025-12-24 15:04:44,398 - INFO - Starting Story Bible App - Milestone 1.3
+2025-12-24 15:04:44,401 - INFO - Database initialized at /home/sabona/Desktop/DesktopApp/data/story_bible.db
+2025-12-24 15:04:44,402 - INFO - Loading model from /home/sabona/Desktop/DesktopApp/models/llama/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf with n_gpu_layers=-1
+2025-12-24 15:04:47,273 - INFO - Model loaded successfully.
+2025-12-24 15:05:01,739 - INFO - KeyboardInterrupt caught. Shutting down...
+2025-12-24 15:05:01,739 - INFO - Unloading model and freeing VRAM...
+2025-12-24 15:05:02,389 - INFO - App shutdown complete.
+2025-12-24 15:12:25,079 - INFO - Starting Story Bible App - Milestone 1.3
+2025-12-24 15:12:25,079 - INFO - Database initialized at /home/sabona/Desktop/DesktopApp/data/story_bible.db
+2025-12-24 15:12:25,080 - INFO - Loading model from /home/sabona/Desktop/DesktopApp/models/llama/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf with n_gpu_layers=-1
+2025-12-24 15:12:27,263 - INFO - Model loaded successfully.
+2025-12-24 15:15:30,768 - INFO - Unloading model and freeing VRAM...
+2025-12-24 15:15:31,171 - INFO - App shutdown complete.
+2025-12-24 15:15:41,265 - INFO - Starting Story Bible App - Milestone 1.3
+2025-12-24 15:15:41,267 - INFO - Database initialized at /home/sabona/Desktop/DesktopApp/data/story_bible.db
+2025-12-24 15:15:41,268 - INFO - Loading model from /home/sabona/Desktop/DesktopApp/models/llama/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf with n_gpu_layers=-1
+2025-12-24 15:15:43,533 - INFO - Model loaded successfully.
+2025-12-24 15:15:49,594 - INFO - KeyboardInterrupt caught. Shutting down...
+2025-12-24 15:15:49,594 - INFO - Unloading model and freeing VRAM...
+2025-12-24 15:15:49,981 - INFO - App shutdown complete.
+2025-12-24 15:17:49,810 - INFO - Starting Story Bible App - Milestone 1.3
+2025-12-24 15:17:49,811 - INFO - Database initialized at /home/sabona/Desktop/DesktopApp/data/story_bible.db
+2025-12-24 15:17:49,811 - INFO - Loading model from /home/sabona/Desktop/DesktopApp/models/llama/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf with n_gpu_layers=-1
+2025-12-24 15:17:51,859 - INFO - Model loaded successfully.
+2025-12-24 15:18:09,256 - INFO - Unloading model and freeing VRAM...
+2025-12-24 15:18:09,754 - INFO - App shutdown complete.
+2025-12-24 15:27:05,785 - INFO - Starting Story Bible App - Milestone 1.3
+2025-12-24 15:27:05,785 - INFO - Database initialized at /home/sabona/Desktop/DesktopApp/data/story_bible.db
+2025-12-24 15:27:05,786 - INFO - Loading model from /home/sabona/Desktop/DesktopApp/models/llama/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf with n_gpu_layers=-1
+2025-12-24 15:27:07,855 - INFO - Model loaded successfully.
+2025-12-24 15:29:42,325 - INFO - Starting Story Bible App - Milestone 1.3
+2025-12-24 15:29:42,326 - INFO - Database initialized at /home/sabona/Desktop/DesktopApp/data/story_bible.db
+2025-12-24 15:29:42,327 - INFO - Loading model from /home/sabona/Desktop/DesktopApp/models/llama/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf with n_gpu_layers=-1
+2025-12-24 15:29:44,175 - INFO - Model loaded successfully.
+2025-12-24 15:30:33,083 - INFO - Generating response for instruction: explain what love is not...
+2025-12-24 15:33:13,123 - INFO - Unloading model and freeing VRAM...
+2025-12-24 15:33:13,503 - INFO - App shutdown complete.
+2025-12-24 15:33:45,103 - INFO - Starting Story Bible App - Milestone 1.3
+2025-12-24 15:33:45,104 - INFO - Database initialized at /home/sabona/Desktop/DesktopApp/data/story_bible.db
+2025-12-24 15:33:45,104 - INFO - Loading model from /home/sabona/Desktop/DesktopApp/models/llama/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf with n_gpu_layers=-1
+2025-12-24 15:33:46,995 - INFO - Model loaded successfully.
+2025-12-24 15:33:47,237 - CRITICAL - Unhandled app exception: EditorFrame.__init__() takes 2 positional arguments but 3 were given
+Traceback (most recent call last):
+  File "/home/sabona/Desktop/DesktopApp/main.py", line 51, in main
+    app = StoryBibleUI(ai_engine, db_mgr)
+  File "/home/sabona/Desktop/DesktopApp/src/ui/main_window.py", line 414, in __init__
+    self.editor = EditorFrame(self.center_area, lambda p: self.handle_ai_request(p, 'editor'))
+                  ~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: EditorFrame.__init__() takes 2 positional arguments but 3 were given
+2025-12-24 15:33:47,238 - INFO - Unloading model and freeing VRAM...
+2025-12-24 15:33:47,427 - INFO - App shutdown complete.
+2025-12-24 15:33:53,692 - INFO - Starting Story Bible App - Milestone 1.3
+2025-12-24 15:33:53,693 - INFO - Database initialized at /home/sabona/Desktop/DesktopApp/data/story_bible.db
+2025-12-24 15:33:53,694 - INFO - Loading model from /home/sabona/Desktop/DesktopApp/models/llama/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf with n_gpu_layers=-1
+2025-12-24 15:33:55,541 - INFO - Model loaded successfully.
+2025-12-24 15:33:55,938 - CRITICAL - Unhandled app exception: EditorFrame.__init__() takes 2 positional arguments but 3 were given
+Traceback (most recent call last):
+  File "/home/sabona/Desktop/DesktopApp/main.py", line 51, in main
+    app = StoryBibleUI(ai_engine, db_mgr)
+  File "/home/sabona/Desktop/DesktopApp/src/ui/main_window.py", line 414, in __init__
+    self.editor = EditorFrame(self.center_area, lambda p: self.handle_ai_request(p, 'editor'))
+                  ~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: EditorFrame.__init__() takes 2 positional arguments but 3 were given
+2025-12-24 15:33:55,940 - INFO - Unloading model and freeing VRAM...
+2025-12-24 15:33:56,151 - INFO - App shutdown complete.
+2025-12-24 15:34:03,178 - INFO - Starting Story Bible App - Milestone 1.3
+2025-12-24 15:34:03,179 - INFO - Database initialized at /home/sabona/Desktop/DesktopApp/data/story_bible.db
+2025-12-24 15:34:03,180 - INFO - Loading model from /home/sabona/Desktop/DesktopApp/models/llama/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf with n_gpu_layers=-1
+2025-12-24 15:34:05,145 - INFO - Model loaded successfully.
+2025-12-24 15:34:05,475 - CRITICAL - Unhandled app exception: EditorFrame.__init__() takes 2 positional arguments but 3 were given
+Traceback (most recent call last):
+  File "/home/sabona/Desktop/DesktopApp/main.py", line 51, in main
+    app = StoryBibleUI(ai_engine, db_mgr)
+  File "/home/sabona/Desktop/DesktopApp/src/ui/main_window.py", line 414, in __init__
+    self.editor = EditorFrame(self.center_area, lambda p: self.handle_ai_request(p, 'editor'))
+                  ~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: EditorFrame.__init__() takes 2 positional arguments but 3 were given
+2025-12-24 15:34:05,476 - INFO - Unloading model and freeing VRAM...
+2025-12-24 15:34:05,682 - INFO - App shutdown complete.
+2025-12-24 15:34:17,969 - INFO - Starting Story Bible App - Milestone 1.3
+2025-12-24 15:34:17,970 - INFO - Database initialized at /home/sabona/Desktop/DesktopApp/data/story_bible.db
+2025-12-24 15:34:17,971 - INFO - Loading model from /home/sabona/Desktop/DesktopApp/models/llama/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf with n_gpu_layers=-1
+2025-12-24 15:34:19,929 - INFO - Model loaded successfully.
+2025-12-24 15:34:20,203 - CRITICAL - Unhandled app exception: EditorFrame.__init__() takes 2 positional arguments but 3 were given
+Traceback (most recent call last):
+  File "/home/sabona/Desktop/DesktopApp/main.py", line 51, in main
+    app = StoryBibleUI(ai_engine, db_mgr)
+  File "/home/sabona/Desktop/DesktopApp/src/ui/main_window.py", line 414, in __init__
+    self.editor = EditorFrame(self.center_area, lambda p: self.handle_ai_request(p, 'editor'))
+                  ~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: EditorFrame.__init__() takes 2 positional arguments but 3 were given
+2025-12-24 15:34:20,204 - INFO - Unloading model and freeing VRAM...
+2025-12-24 15:34:20,419 - INFO - App shutdown complete.
+2025-12-24 15:36:18,773 - INFO - Starting Story Bible App - Milestone 1.3
+2025-12-24 15:36:18,773 - INFO - Database initialized at /home/sabona/Desktop/DesktopApp/data/story_bible.db
+2025-12-24 15:36:18,774 - INFO - Loading model from /home/sabona/Desktop/DesktopApp/models/llama/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf with n_gpu_layers=-1
+2025-12-24 15:36:20,670 - INFO - Model loaded successfully.
+2025-12-24 15:36:21,429 - CRITICAL - Unhandled app exception: name 'AssistantPanel' is not defined
+Traceback (most recent call last):
+  File "/home/sabona/Desktop/DesktopApp/main.py", line 51, in main
+    app = StoryBibleUI(ai_engine, db_mgr)
+  File "/home/sabona/Desktop/DesktopApp/src/ui/main_window.py", line 482, in __init__
+    self.assistant = AssistantPanel(self, lambda p: self.handle_ai_request(p, 'assistant'))
+                     ^^^^^^^^^^^^^^
+NameError: name 'AssistantPanel' is not defined
+2025-12-24 15:36:21,430 - INFO - Unloading model and freeing VRAM...
+2025-12-24 15:36:21,643 - INFO - App shutdown complete.
+2025-12-24 15:36:32,034 - INFO - Starting Story Bible App - Milestone 1.3
+2025-12-24 15:36:32,035 - INFO - Database initialized at /home/sabona/Desktop/DesktopApp/data/story_bible.db
+2025-12-24 15:36:32,035 - INFO - Loading model from /home/sabona/Desktop/DesktopApp/models/llama/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf with n_gpu_layers=-1
+2025-12-24 15:36:34,006 - INFO - Model loaded successfully.
+2025-12-24 15:36:35,245 - CRITICAL - Unhandled app exception: name 'AssistantPanel' is not defined
+Traceback (most recent call last):
+  File "/home/sabona/Desktop/DesktopApp/main.py", line 51, in main
+    app = StoryBibleUI(ai_engine, db_mgr)
+  File "/home/sabona/Desktop/DesktopApp/src/ui/main_window.py", line 482, in __init__
+    self.assistant = AssistantPanel(self, lambda p: self.handle_ai_request(p, 'assistant'))
+                     ^^^^^^^^^^^^^^
+NameError: name 'AssistantPanel' is not defined
+2025-12-24 15:36:35,248 - INFO - Unloading model and freeing VRAM...
+2025-12-24 15:36:35,491 - INFO - App shutdown complete.
+2025-12-24 15:37:45,437 - INFO - Starting Story Bible App - Milestone 1.3
+2025-12-24 15:37:45,437 - INFO - Database initialized at /home/sabona/Desktop/DesktopApp/data/story_bible.db
+2025-12-24 15:37:45,438 - INFO - Loading model from /home/sabona/Desktop/DesktopApp/models/llama/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf with n_gpu_layers=-1
+2025-12-24 15:37:47,367 - INFO - Model loaded successfully.
+2025-12-24 15:38:05,212 - INFO - Unloading model and freeing VRAM...
+2025-12-24 15:38:05,601 - INFO - App shutdown complete.
+2025-12-24 15:38:34,816 - INFO - Starting Story Bible App - Milestone 1.3
+2025-12-24 15:38:34,818 - INFO - Database initialized at /home/sabona/Desktop/DesktopApp/data/story_bible.db
+2025-12-24 15:38:34,818 - INFO - Loading model from /home/sabona/Desktop/DesktopApp/models/llama/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf with n_gpu_layers=-1
+2025-12-24 15:38:36,602 - INFO - Model loaded successfully.
+2025-12-24 15:39:07,015 - INFO - Generating response for instruction: What makes love so powerful...
+2025-12-24 15:39:24,028 - INFO - Unloading model and freeing VRAM...
+2025-12-24 15:39:24,090 - INFO - App shutdown complete.
+2025-12-24 15:41:41,551 - INFO - Starting Story Bible App - Milestone 1.3
+2025-12-24 15:41:41,552 - INFO - Database initialized at /home/sabona/Desktop/DesktopApp/data/story_bible.db
+2025-12-24 15:41:41,552 - INFO - Loading model from /home/sabona/Desktop/DesktopApp/models/llama/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf with n_gpu_layers=-1
+2025-12-24 15:41:43,407 - INFO - Model loaded successfully.
+2025-12-24 15:41:56,596 - INFO - Generating response for instruction: What makes love so powerful...
+2025-12-24 15:44:10,414 - INFO - Generating response for instruction: Tell me more about other forces...
+2025-12-24 16:00:45,253 - INFO - Generating response for instruction: what was garrick style...
+2025-12-24 16:01:20,302 - INFO - Generating response for instruction: what was garrick traits...
+2025-12-24 16:08:59,283 - INFO - Unloading model and freeing VRAM...
+2025-12-24 16:08:59,681 - INFO - App shutdown complete.
+2025-12-24 16:09:05,635 - INFO - Starting Story Bible App - Milestone 1.3
+2025-12-24 16:09:05,635 - INFO - Database initialized at /home/sabona/Desktop/DesktopApp/data/story_bible.db
+2025-12-24 16:09:05,636 - INFO - Loading model from /home/sabona/Desktop/DesktopApp/models/llama/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf with n_gpu_layers=-1
+2025-12-24 16:09:12,579 - INFO - Model loaded successfully.
+2025-12-24 16:09:42,577 - INFO - Unloading model and freeing VRAM...
+2025-12-24 16:09:42,979 - INFO - App shutdown complete.
+2025-12-24 16:09:50,608 - INFO - Starting Story Bible App - Milestone 1.3
+2025-12-24 16:09:50,611 - INFO - Database initialized at /home/sabona/Desktop/DesktopApp/data/story_bible.db
+2025-12-24 16:09:50,612 - INFO - Loading model from /home/sabona/Desktop/DesktopApp/models/llama/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf with n_gpu_layers=-1
+2025-12-24 16:09:52,513 - INFO - Model loaded successfully.
+2025-12-24 16:10:45,189 - INFO - Generating AI response...
+2025-12-24 16:12:51,160 - INFO - KeyboardInterrupt caught. Shutting down...
+2025-12-24 16:12:51,168 - INFO - Unloading model and freeing VRAM...
+2025-12-24 16:12:51,187 - INFO - App shutdown complete.
+2025-12-24 16:13:26,711 - INFO - Starting Story Bible App - Milestone 1.3
+2025-12-24 16:13:26,712 - INFO - Database initialized at /home/sabona/Desktop/DesktopApp/data/story_bible.db
+2025-12-24 16:13:26,713 - INFO - Loading model from /home/sabona/Desktop/DesktopApp/models/llama/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf with n_gpu_layers=-1
+2025-12-24 16:13:30,383 - INFO - Model loaded successfully.
+2025-12-24 16:13:41,744 - INFO - Generating AI response...
+2025-12-24 16:14:05,777 - INFO - Unloading model and freeing VRAM...
+2025-12-24 16:14:05,839 - INFO - App shutdown complete.
+2025-12-24 16:14:11,453 - INFO - Starting Story Bible App - Milestone 1.3
+2025-12-24 16:14:11,454 - INFO - Database initialized at /home/sabona/Desktop/DesktopApp/data/story_bible.db
+2025-12-24 16:14:11,455 - INFO - Loading model from /home/sabona/Desktop/DesktopApp/models/llama/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf with n_gpu_layers=-1
+2025-12-24 16:14:12,994 - INFO - Model loaded successfully.
+2025-12-24 16:14:27,842 - INFO - Generating AI response...
+2025-12-24 16:17:41,121 - INFO - Unloading model and freeing VRAM...
+2025-12-24 16:17:41,468 - INFO - App shutdown complete.
+2025-12-24 16:21:13,458 - INFO - Starting Story Bible App - Milestone 1.3
+2025-12-24 16:21:13,459 - INFO - Database initialized at /home/sabona/Desktop/DesktopApp/data/story_bible.db
+2025-12-24 16:21:13,459 - INFO - Loading model from /home/sabona/Desktop/DesktopApp/models/llama/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf with n_gpu_layers=-1
+2025-12-24 16:21:15,261 - INFO - Model loaded successfully.
+2025-12-24 16:21:40,155 - INFO - Generating AI response...
+2025-12-24 16:31:14,163 - INFO - Unloading model and freeing VRAM...
+2025-12-24 16:31:14,558 - INFO - App shutdown complete.
+2025-12-24 16:34:18,704 - INFO - Starting Story Bible App - Milestone 1.3
+2025-12-24 16:34:18,717 - INFO - Database initialized at /home/sabona/Desktop/DesktopApp/data/story_bible.db
+2025-12-24 16:34:18,717 - INFO - Loading model from /home/sabona/Desktop/DesktopApp/models/llama/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf with n_gpu_layers=-1
+2025-12-24 16:34:20,465 - INFO - Model loaded successfully.
+2025-12-24 16:34:36,993 - INFO - DEBUG: ask_lore_assistant called. Memory len: 186
+2025-12-24 16:34:36,993 - INFO - Generating AI response...
+2025-12-24 16:35:21,532 - INFO - DEBUG: ask_lore_assistant called. Memory len: 232
+2025-12-24 16:35:21,532 - INFO - Generating AI response...
+2025-12-24 16:35:30,426 - INFO - Unloading model and freeing VRAM...
+2025-12-24 16:35:30,481 - INFO - App shutdown complete.
+2025-12-24 18:44:47,765 - INFO - Starting Story Bible App - Milestone 1.3
+2025-12-24 18:44:47,768 - INFO - Database initialized at /home/sabona/Desktop/DesktopApp/data/story_bible.db
+2025-12-24 18:44:47,769 - INFO - Loading model from /home/sabona/Desktop/DesktopApp/models/llama/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf with n_gpu_layers=-1
+2025-12-24 18:44:51,952 - INFO - Model loaded successfully.
+2025-12-24 18:45:15,393 - INFO - DEBUG: ask_lore_assistant called. Memory len: 734
+2025-12-24 18:45:15,394 - INFO - Generating AI response...
+2025-12-24 18:46:09,537 - INFO - DEBUG: ask_lore_assistant called. Memory len: 186
+2025-12-24 18:46:09,538 - INFO - Generating AI response...
+2025-12-24 18:54:05,508 - INFO - Generating AI response...
+2025-12-24 18:55:53,440 - INFO - Generating AI response...
+2025-12-24 18:58:41,629 - INFO - Generating AI response...
+2025-12-24 19:00:52,528 - INFO - DEBUG: ask_lore_assistant called. Memory len: 899
+2025-12-24 19:00:52,528 - INFO - Generating AI response...
+2025-12-24 19:02:20,281 - INFO - Starting Story Bible App - Milestone 1.3
+2025-12-24 19:02:20,282 - INFO - Database initialized at /home/sabona/Desktop/DesktopApp/data/story_bible.db
+2025-12-24 19:02:20,282 - INFO - Loading model from /home/sabona/Desktop/DesktopApp/models/llama/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf with n_gpu_layers=-1
+2025-12-24 19:02:21,904 - INFO - Model loaded successfully.
+2025-12-24 19:02:59,289 - INFO - DEBUG: ask_lore_assistant called. Memory len: 899
+2025-12-24 19:02:59,290 - INFO - Generating AI response...
+2025-12-24 19:32:13,186 - INFO - Starting Story Bible App - Milestone 1.3
+2025-12-24 19:32:13,188 - INFO - Database initialized at /home/sabona/Desktop/DesktopApp/data/story_bible.db
+2025-12-24 19:32:13,188 - INFO - Loading model from /home/sabona/Desktop/DesktopApp/models/llama/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf with n_gpu_layers=-1
+2025-12-24 19:32:16,095 - INFO - Model loaded successfully.
+2025-12-24 19:32:18,410 - INFO - Unloading model and freeing VRAM...
+2025-12-24 19:32:18,671 - INFO - App shutdown complete.
+2025-12-24 19:32:21,865 - INFO - Unloading model and freeing VRAM...
+2025-12-24 19:32:22,147 - INFO - App shutdown complete.
+2025-12-24 19:32:32,898 - INFO - Starting Story Bible App - Milestone 1.3
+2025-12-24 19:32:32,901 - INFO - Database initialized at /home/sabona/Desktop/DesktopApp/data/story_bible.db
+2025-12-24 19:32:32,902 - INFO - Loading model from /home/sabona/Desktop/DesktopApp/models/llama/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf with n_gpu_layers=-1
+2025-12-24 19:32:35,295 - INFO - Model loaded successfully.
+2025-12-24 19:35:49,004 - INFO - KeyboardInterrupt caught. Shutting down...
+2025-12-24 19:35:49,004 - INFO - Unloading model and freeing VRAM...
+2025-12-24 19:35:49,264 - INFO - App shutdown complete.
+2025-12-24 19:35:53,393 - INFO - Starting Story Bible App - Milestone 1.3
+2025-12-24 19:35:53,394 - INFO - Database initialized at /home/sabona/Desktop/DesktopApp/data/story_bible.db
+2025-12-24 19:35:53,394 - INFO - Loading model from /home/sabona/Desktop/DesktopApp/models/llama/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf with n_gpu_layers=-1
+2025-12-24 19:35:55,176 - INFO - Model loaded successfully.
+2025-12-24 19:38:04,283 - INFO - Unloading model and freeing VRAM...
+2025-12-24 19:38:04,398 - INFO - App shutdown complete.
+2025-12-24 19:41:49,121 - INFO - Starting Story Bible App - Milestone 1.3
+2025-12-24 19:41:49,123 - INFO - Database initialized at /home/sabona/Desktop/DesktopApp/data/story_bible.db
+2025-12-24 19:41:49,123 - INFO - Loading model from /home/sabona/Desktop/DesktopApp/models/llama/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf with n_gpu_layers=-1
+2025-12-24 19:41:50,851 - INFO - Model loaded successfully.
+2025-12-24 19:42:45,964 - INFO - DEBUG: ask_lore_assistant called. Memory len: 899
+2025-12-24 19:42:45,964 - INFO - Generating AI response...
+2025-12-24 19:44:01,236 - INFO - Unloading model and freeing VRAM...
+2025-12-24 19:44:01,543 - INFO - App shutdown complete.
+2025-12-24 19:44:06,025 - INFO - Starting Story Bible App - Milestone 1.3
+2025-12-24 19:44:06,026 - INFO - Database initialized at /home/sabona/Desktop/DesktopApp/data/story_bible.db
+2025-12-24 19:44:06,026 - INFO - Loading model from /home/sabona/Desktop/DesktopApp/models/llama/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf with n_gpu_layers=-1
+2025-12-24 19:44:07,772 - INFO - Model loaded successfully.
+2025-12-24 19:47:53,107 - INFO - KeyboardInterrupt caught. Shutting down...
+2025-12-24 19:47:53,107 - INFO - Unloading model and freeing VRAM...
+2025-12-24 19:47:53,413 - INFO - App shutdown complete.
+2025-12-24 19:47:58,547 - INFO - Starting Story Bible App - Milestone 1.3
+2025-12-24 19:47:58,548 - INFO - Database initialized at /home/sabona/Desktop/DesktopApp/data/story_bible.db
+2025-12-24 19:47:58,548 - INFO - Loading model from /home/sabona/Desktop/DesktopApp/models/llama/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf with n_gpu_layers=-1
+2025-12-24 19:48:00,332 - INFO - Model loaded successfully.
+2025-12-24 19:48:00,811 - CRITICAL - Unhandled app exception: type object 'ThemeEngine' has no attribute 'ACCENT_SECONDARY'
+Traceback (most recent call last):
+  File "/home/sabona/Desktop/DesktopApp/main.py", line 51, in main
+    app = StoryBibleUI(ai_engine, db_mgr)
+  File "/home/sabona/Desktop/DesktopApp/src/ui/main_window.py", line 646, in __init__
+    # Pass manual_summarize callback
+  File "/home/sabona/Desktop/DesktopApp/src/ui/main_window.py", line 271, in __init__
+    self._create_footer()
+    ~~~~~~~~~~~~~~~~~~~^^
+  File "/home/sabona/Desktop/DesktopApp/src/ui/main_window.py", line 325, in _create_footer
+    fg_color=ThemeEngine.ACCENT_SECONDARY,
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: type object 'ThemeEngine' has no attribute 'ACCENT_SECONDARY'
+2025-12-24 19:48:00,813 - INFO - Unloading model and freeing VRAM...
+2025-12-24 19:48:00,927 - INFO - App shutdown complete.
+2025-12-24 19:53:11,146 - INFO - Starting Story Bible App - Milestone 1.3
+2025-12-24 19:53:11,146 - INFO - Database initialized at /home/sabona/Desktop/DesktopApp/data/story_bible.db
+2025-12-24 19:53:11,147 - INFO - Loading model from /home/sabona/Desktop/DesktopApp/models/llama/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf with n_gpu_layers=-1
+2025-12-24 19:53:13,065 - INFO - Model loaded successfully.
+2025-12-24 19:53:13,141 - CRITICAL - Unhandled app exception: '_tkinter.tkapp' object has no attribute 'nav_select'
+Traceback (most recent call last):
+  File "/home/sabona/Desktop/DesktopApp/main.py", line 51, in main
+    app = StoryBibleUI(ai_engine, db_mgr)
+  File "/home/sabona/Desktop/DesktopApp/src/ui/main_window.py", line 635, in __init__
+    self.sidebar = SidebarFrame(self, db_manager, self.nav_select, self.load_chapter)
+                                                  ^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.13/tkinter/__init__.py", line 2552, in __getattr__
+    return getattr(self.tk, attr)
+AttributeError: '_tkinter.tkapp' object has no attribute 'nav_select'
+2025-12-24 19:53:13,143 - INFO - Unloading model and freeing VRAM...
+2025-12-24 19:53:13,253 - INFO - App shutdown complete.
+2025-12-24 19:54:11,796 - INFO - Starting Story Bible App - Milestone 1.3
+2025-12-24 19:54:11,797 - INFO - Database initialized at /home/sabona/Desktop/DesktopApp/data/story_bible.db
+2025-12-24 19:54:11,798 - INFO - Loading model from /home/sabona/Desktop/DesktopApp/models/llama/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf with n_gpu_layers=-1
+2025-12-24 19:54:13,561 - INFO - Model loaded successfully.
+2025-12-24 19:54:14,038 - CRITICAL - Unhandled app exception: type object 'ThemeEngine' has no attribute 'ACCENT_SECONDARY'
+Traceback (most recent call last):
+  File "/home/sabona/Desktop/DesktopApp/main.py", line 51, in main
+    app = StoryBibleUI(ai_engine, db_mgr)
+  File "/home/sabona/Desktop/DesktopApp/src/ui/main_window.py", line 647, in __init__
+    self.editor = EditorFrame(self.center_area, self.on_editor_instruction, self.manual_summarize)
+                  ~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/sabona/Desktop/DesktopApp/src/ui/main_window.py", line 271, in __init__
+    self._create_footer()
+    ~~~~~~~~~~~~~~~~~~~^^
+  File "/home/sabona/Desktop/DesktopApp/src/ui/main_window.py", line 325, in _create_footer
+    fg_color=ThemeEngine.ACCENT_SECONDARY,
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: type object 'ThemeEngine' has no attribute 'ACCENT_SECONDARY'
+2025-12-24 19:54:14,039 - INFO - Unloading model and freeing VRAM...
+2025-12-24 19:54:14,158 - INFO - App shutdown complete.
+2025-12-24 19:55:05,048 - INFO - Starting Story Bible App - Milestone 1.3
+2025-12-24 19:55:05,054 - INFO - Database initialized at /home/sabona/Desktop/DesktopApp/data/story_bible.db
+2025-12-24 19:55:05,055 - INFO - Loading model from /home/sabona/Desktop/DesktopApp/models/llama/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf with n_gpu_layers=-1
+2025-12-24 19:55:06,804 - INFO - Model loaded successfully.
+2025-12-24 19:55:07,823 - CRITICAL - Unhandled app exception: type object 'ThemeEngine' has no attribute 'FONT_H3'
+Traceback (most recent call last):
+  File "/home/sabona/Desktop/DesktopApp/main.py", line 51, in main
+    app = StoryBibleUI(ai_engine, db_mgr)
+  File "/home/sabona/Desktop/DesktopApp/src/ui/main_window.py", line 660, in __init__
+    self.assistant = AssistantPanel(self, lambda p: self.handle_ai_request(p, 'assistant'))
+                     ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/sabona/Desktop/DesktopApp/src/ui/main_window.py", line 547, in __init__
+    ctk.CTkLabel(self.tab("Sensory Lab"), text="Brainstorm Atmosphere", font=ThemeEngine.FONT_H3).pack(pady=10)
+                                                                             ^^^^^^^^^^^^^^^^^^^
+AttributeError: type object 'ThemeEngine' has no attribute 'FONT_H3'. Did you mean: 'FONT_UI'?
+2025-12-24 19:55:07,825 - INFO - Unloading model and freeing VRAM...
+2025-12-24 19:55:07,962 - INFO - App shutdown complete.
+2025-12-24 19:55:38,369 - INFO - Starting Story Bible App - Milestone 1.3
+2025-12-24 19:55:38,370 - INFO - Database initialized at /home/sabona/Desktop/DesktopApp/data/story_bible.db
+2025-12-24 19:55:38,370 - INFO - Loading model from /home/sabona/Desktop/DesktopApp/models/llama/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf with n_gpu_layers=-1
+2025-12-24 19:55:40,191 - INFO - Model loaded successfully.
+2025-12-24 19:56:02,350 - INFO - Unloading model and freeing VRAM...
+2025-12-24 19:56:02,696 - INFO - App shutdown complete.
+2025-12-24 19:56:09,365 - INFO - Starting Story Bible App - Milestone 1.3
+2025-12-24 19:56:09,366 - INFO - Database initialized at /home/sabona/Desktop/DesktopApp/data/story_bible.db
+2025-12-24 19:56:09,367 - INFO - Loading model from /home/sabona/Desktop/DesktopApp/models/llama/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf with n_gpu_layers=-1
+2025-12-24 19:56:10,993 - INFO - Model loaded successfully.
+2025-12-24 19:56:23,711 - INFO - Generating AI response...
+2025-12-24 19:58:21,857 - INFO - Generating AI response...
+2025-12-24 19:59:38,346 - ERROR - Generation error: llama_decode returned -1
+2025-12-24 20:02:40,555 - INFO - Starting Story Bible App - Milestone 1.3
+2025-12-24 20:02:40,556 - INFO - Database initialized at /home/sabona/Desktop/DesktopApp/data/story_bible.db
+2025-12-24 20:02:40,556 - INFO - Loading model from /home/sabona/Desktop/DesktopApp/models/llama/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf with n_gpu_layers=-1
+2025-12-24 20:02:42,355 - INFO - Model loaded successfully.
+2025-12-24 20:02:46,310 - INFO - Unloading model and freeing VRAM...
+2025-12-24 20:02:46,611 - INFO - App shutdown complete.
+2025-12-24 20:03:24,997 - INFO - Starting Story Bible App - Milestone 1.3
+2025-12-24 20:03:24,998 - INFO - Database initialized at /home/sabona/Desktop/DesktopApp/data/story_bible.db
+2025-12-24 20:03:24,998 - INFO - Loading model from /home/sabona/Desktop/DesktopApp/models/llama/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf with n_gpu_layers=-1
+2025-12-24 20:03:26,667 - INFO - Model loaded successfully.
+2025-12-24 20:03:47,549 - INFO - Generating AI response...
+2025-12-24 20:07:21,276 - INFO - DEBUG: ask_lore_assistant called. Memory len: 397
+2025-12-24 20:07:21,277 - INFO - Generating AI response...
+2025-12-24 20:09:31,487 - INFO - Starting Story Bible App - Milestone 1.3
+2025-12-24 20:09:31,488 - INFO - Database initialized at /home/sabona/Desktop/DesktopApp/data/story_bible.db
+2025-12-24 20:09:31,489 - INFO - Loading model from /home/sabona/Desktop/DesktopApp/models/llama/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf with n_gpu_layers=-1
+2025-12-24 20:09:33,347 - INFO - Model loaded successfully.
+2025-12-24 20:09:36,622 - INFO - Unloading model and freeing VRAM...
+2025-12-24 20:09:36,755 - INFO - App shutdown complete.
+2025-12-24 20:09:56,711 - INFO - Starting Story Bible App - Milestone 1.3
+2025-12-24 20:09:56,712 - INFO - Database initialized at /home/sabona/Desktop/DesktopApp/data/story_bible.db
+2025-12-24 20:09:56,713 - INFO - Loading model from /home/sabona/Desktop/DesktopApp/models/llama/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf with n_gpu_layers=-1
+2025-12-24 20:09:58,507 - INFO - Model loaded successfully.
+2025-12-24 20:10:27,398 - INFO - DEBUG: ask_lore_assistant called. Memory len: 397
+2025-12-24 20:10:27,399 - INFO - Generating AI response...
+2025-12-24 20:10:47,989 - ERROR - Summary generation error: llama_decode returned -1
+2025-12-24 20:13:27,249 - INFO - Starting Story Bible App - Milestone 1.3
+2025-12-24 20:13:27,250 - INFO - Database initialized at /home/sabona/Desktop/DesktopApp/data/story_bible.db
+2025-12-24 20:13:27,250 - INFO - Loading model from /home/sabona/Desktop/DesktopApp/models/llama/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf with n_gpu_layers=-1
+2025-12-24 20:13:29,055 - INFO - Model loaded successfully.
+2025-12-24 20:13:49,172 - INFO - Unloading model and freeing VRAM...
+2025-12-24 20:13:49,465 - INFO - App shutdown complete.
+2025-12-24 20:14:18,999 - INFO - Starting Story Bible App - Milestone 1.3
+2025-12-24 20:14:19,000 - INFO - Database initialized at /home/sabona/Desktop/DesktopApp/data/story_bible.db
+2025-12-24 20:14:19,001 - INFO - Loading model from /home/sabona/Desktop/DesktopApp/models/llama/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf with n_gpu_layers=-1
+2025-12-24 20:14:20,681 - INFO - Model loaded successfully.
+2025-12-24 20:14:35,977 - INFO - DEBUG: ask_lore_assistant called. Memory len: 429
+2025-12-24 20:14:35,978 - INFO - Generating AI response...
+2025-12-24 20:16:34,641 - INFO - DEBUG: ask_lore_assistant called. Memory len: 429
+2025-12-24 20:16:34,644 - INFO - Generating AI response...
+2025-12-24 20:22:29,947 - INFO - Starting Story Bible App - Milestone 1.3
+2025-12-24 20:22:29,948 - INFO - Database initialized at /home/sabona/Desktop/DesktopApp/data/story_bible.db
+2025-12-24 20:22:29,949 - INFO - Loading model from /home/sabona/Desktop/DesktopApp/models/llama/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf with n_gpu_layers=-1
+2025-12-24 20:22:33,285 - INFO - Model loaded successfully.
+2025-12-24 20:22:35,717 - INFO - Unloading model and freeing VRAM...
+2025-12-24 20:22:35,956 - INFO - App shutdown complete.
+2025-12-24 20:22:37,750 - INFO - Unloading model and freeing VRAM...
+2025-12-24 20:22:37,885 - INFO - App shutdown complete.
+2025-12-24 20:23:01,655 - INFO - Starting Story Bible App - Milestone 1.3
+2025-12-24 20:23:01,657 - INFO - Database initialized at /home/sabona/Desktop/DesktopApp/data/story_bible.db
+2025-12-24 20:23:01,658 - INFO - Loading model from /home/sabona/Desktop/DesktopApp/models/llama/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf with n_gpu_layers=-1
+2025-12-24 20:23:04,789 - INFO - Model loaded successfully.
+2025-12-24 20:24:18,209 - INFO - DEBUG: ask_lore_assistant called. Memory len: 1415
+2025-12-24 20:24:18,209 - INFO - Generating AI response...
+2025-12-24 20:39:50,973 - INFO - Unloading model and freeing VRAM...
+2025-12-24 20:39:51,267 - INFO - App shutdown complete.
+2025-12-24 20:39:58,523 - INFO - Starting Story Bible App - Milestone 1.3
+2025-12-24 20:39:58,525 - INFO - Database initialized at /home/sabona/Desktop/DesktopApp/data/story_bible.db
+2025-12-24 20:39:58,526 - INFO - Loading model from /home/sabona/Desktop/DesktopApp/models/llama/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf with n_gpu_layers=-1
+2025-12-24 20:40:00,272 - INFO - Model loaded successfully.
+2025-12-24 20:45:03,115 - INFO - KeyboardInterrupt caught. Shutting down...
+2025-12-24 20:45:03,116 - INFO - Unloading model and freeing VRAM...
+2025-12-24 20:45:03,381 - INFO - App shutdown complete.
+2025-12-24 20:45:09,327 - INFO - Starting Story Bible App - Milestone 1.3
+2025-12-24 20:45:09,328 - INFO - Database initialized at /home/sabona/Desktop/DesktopApp/data/story_bible.db
+2025-12-24 20:45:09,328 - INFO - Loading model from /home/sabona/Desktop/DesktopApp/models/llama/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf with n_gpu_layers=-1
+2025-12-24 20:45:10,889 - INFO - Model loaded successfully.
+2025-12-24 20:45:47,196 - INFO - Starting Story Bible App - Milestone 1.3
+2025-12-24 20:45:47,197 - INFO - Database initialized at /home/sabona/Desktop/DesktopApp/data/story_bible.db
+2025-12-24 20:45:47,198 - INFO - Loading model from /home/sabona/Desktop/DesktopApp/models/llama/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf with n_gpu_layers=-1
+2025-12-24 20:45:48,575 - INFO - Model loaded successfully.
+2025-12-24 20:46:48,051 - INFO - Generating AI response...
+2025-12-24 20:49:56,203 - INFO - KeyboardInterrupt caught. Shutting down...
+2025-12-24 20:49:56,204 - INFO - Unloading model and freeing VRAM...
+2025-12-24 20:49:56,239 - INFO - App shutdown complete.
+2025-12-24 20:50:06,659 - INFO - Starting Story Bible App - Milestone 1.3
+2025-12-24 20:50:06,660 - INFO - Database initialized at /home/sabona/Desktop/DesktopApp/data/story_bible.db
+2025-12-24 20:50:06,661 - INFO - Loading model from /home/sabona/Desktop/DesktopApp/models/llama/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf with n_gpu_layers=-1
+2025-12-24 20:50:08,343 - INFO - Model loaded successfully.
+2025-12-24 20:51:36,838 - INFO - Unloading model and freeing VRAM...
+2025-12-24 20:51:36,913 - INFO - App shutdown complete.
+2025-12-24 20:51:41,447 - INFO - Starting Story Bible App - Milestone 1.3
+2025-12-24 20:51:41,448 - INFO - Database initialized at /home/sabona/Desktop/DesktopApp/data/story_bible.db
+2025-12-24 20:51:41,448 - INFO - Loading model from /home/sabona/Desktop/DesktopApp/models/llama/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf with n_gpu_layers=-1
+2025-12-24 20:51:45,688 - INFO - Model loaded successfully.
+2025-12-24 20:53:56,286 - INFO - Unloading model and freeing VRAM...
+2025-12-24 20:53:56,331 - INFO - App shutdown complete.
+2025-12-24 20:54:08,008 - INFO - Starting Story Bible App - Milestone 1.3
+2025-12-24 20:54:08,009 - INFO - Database initialized at /home/sabona/Desktop/DesktopApp/data/story_bible.db
+2025-12-24 20:54:08,010 - INFO - Loading model from /home/sabona/Desktop/DesktopApp/models/llama/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf with n_gpu_layers=-1
+2025-12-24 20:54:14,855 - INFO - Model loaded successfully.
+2025-12-24 20:54:17,989 - INFO - Unloading model and freeing VRAM...
+2025-12-24 20:54:18,440 - INFO - App shutdown complete.
+2025-12-24 20:54:24,200 - INFO - Starting Story Bible App - Milestone 1.3
+2025-12-24 20:54:24,201 - INFO - Database initialized at /home/sabona/Desktop/DesktopApp/data/story_bible.db
+2025-12-24 20:54:24,201 - INFO - Loading model from /home/sabona/Desktop/DesktopApp/models/llama/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf with n_gpu_layers=-1
+2025-12-24 20:54:29,389 - INFO - Model loaded successfully.
+2025-12-24 21:57:52,040 - INFO - Generating AI response...
+2025-12-24 22:02:06,483 - INFO - Generating AI response...
+2025-12-24 22:29:32,113 - INFO - Unloading model and freeing VRAM...
+2025-12-24 22:29:32,587 - INFO - App shutdown complete.
+2025-12-24 23:10:10,459 - INFO - Starting Story Bible App - Milestone 1.3
+2025-12-24 23:10:10,465 - INFO - Database initialized at /home/sabona/Desktop/DesktopApp/data/story_bible.db
+2025-12-24 23:10:10,466 - INFO - Loading model from /home/sabona/Desktop/DesktopApp/models/llama/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf with n_gpu_layers=-1
+2025-12-24 23:10:14,610 - INFO - Model loaded successfully.
+2025-12-24 23:11:09,574 - INFO - Unloading model and freeing VRAM...
+2025-12-24 23:11:09,855 - INFO - App shutdown complete.
+2025-12-24 23:11:35,530 - INFO - Starting Story Bible App - Milestone 1.3
+2025-12-24 23:11:35,531 - INFO - Database initialized at /home/sabona/Desktop/DesktopApp/data/story_bible.db
+2025-12-24 23:11:35,531 - INFO - Loading model from /home/sabona/Desktop/DesktopApp/models/llama/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf with n_gpu_layers=-1
+2025-12-24 23:11:36,873 - INFO - Model loaded successfully.
+2025-12-24 23:11:39,053 - INFO - Unloading model and freeing VRAM...
+2025-12-24 23:11:39,330 - INFO - App shutdown complete.
+2025-12-24 23:11:47,863 - INFO - Starting Story Bible App - Milestone 1.3
+2025-12-24 23:11:47,864 - INFO - Database initialized at /home/sabona/Desktop/DesktopApp/data/story_bible.db
+2025-12-24 23:11:47,864 - INFO - Loading model from /home/sabona/Desktop/DesktopApp/models/llama/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf with n_gpu_layers=-1
+2025-12-24 23:11:49,360 - INFO - Model loaded successfully.
+2025-12-24 23:28:53,463 - INFO - Unloading model and freeing VRAM...
+2025-12-24 23:28:53,744 - INFO - App shutdown complete.
+2025-12-24 23:29:23,987 - INFO - Starting Story Bible App - Milestone 1.3
+2025-12-24 23:29:23,987 - INFO - Database initialized at /home/sabona/Desktop/DesktopApp/data/story_bible.db
+2025-12-24 23:29:23,988 - INFO - Loading model from /home/sabona/Desktop/DesktopApp/models/llama/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf with n_gpu_layers=-1
+2025-12-24 23:29:25,704 - INFO - Model loaded successfully.
+2025-12-24 23:29:46,482 - INFO - Unloading model and freeing VRAM...
+2025-12-24 23:29:46,782 - INFO - App shutdown complete.
+2025-12-24 23:30:05,227 - INFO - Starting Story Bible App - Milestone 1.3
+2025-12-24 23:30:05,228 - INFO - Database initialized at /home/sabona/Desktop/DesktopApp/data/story_bible.db
+2025-12-24 23:30:05,229 - INFO - Loading model from /home/sabona/Desktop/DesktopApp/models/llama/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf with n_gpu_layers=-1
+2025-12-24 23:30:06,548 - INFO - Model loaded successfully.
+2025-12-24 23:30:22,567 - INFO - Generating AI response...
+2025-12-24 23:37:30,380 - INFO - DEBUG: ask_lore_assistant called. Memory len: 5110
+2025-12-24 23:37:30,380 - INFO - Generating AI response...
+2025-12-24 23:40:54,464 - INFO - Unloading model and freeing VRAM...
+2025-12-24 23:40:54,753 - INFO - App shutdown complete.
+2025-12-24 23:41:12,542 - INFO - Starting Story Bible App - Milestone 1.3
+2025-12-24 23:41:12,543 - INFO - Database initialized at /home/sabona/Desktop/DesktopApp/data/story_bible.db
+2025-12-24 23:41:12,544 - INFO - Loading model from /home/sabona/Desktop/DesktopApp/models/llama/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf with n_gpu_layers=-1
+2025-12-24 23:41:13,900 - INFO - Model loaded successfully.
+2025-12-24 23:41:30,702 - INFO - DEBUG: ask_lore_assistant called. Memory len: 5110
+2025-12-24 23:41:30,703 - INFO - Generating AI response...
+2025-12-24 23:46:00,283 - INFO - KeyboardInterrupt caught. Shutting down...
+2025-12-24 23:46:00,284 - INFO - Unloading model and freeing VRAM...
+2025-12-24 23:46:00,546 - INFO - App shutdown complete.
+2025-12-24 23:46:03,885 - INFO - Starting Story Bible App - Milestone 1.3
+2025-12-24 23:46:03,886 - INFO - Database initialized at /home/sabona/Desktop/DesktopApp/data/story_bible.db
+2025-12-24 23:46:03,886 - INFO - Loading model from /home/sabona/Desktop/DesktopApp/models/llama/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf with n_gpu_layers=-1
+2025-12-24 23:46:05,343 - INFO - Model loaded successfully.
+2025-12-24 23:47:29,122 - INFO - DEBUG: ask_lore_assistant called. Memory len: 4002
+2025-12-24 23:47:29,123 - INFO - Generating AI response...
+2025-12-24 23:52:08,101 - INFO - KeyboardInterrupt caught. Shutting down...
+2025-12-24 23:52:08,102 - INFO - Unloading model and freeing VRAM...
+2025-12-24 23:52:08,354 - INFO - App shutdown complete.
+2025-12-24 23:52:21,120 - INFO - Starting Story Bible App - Milestone 1.3
+2025-12-24 23:52:21,122 - INFO - Database initialized at /home/sabona/Desktop/DesktopApp/data/story_bible.db
+2025-12-24 23:52:21,122 - INFO - Loading model from /home/sabona/Desktop/DesktopApp/models/llama/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf with n_gpu_layers=-1
+2025-12-24 23:52:22,665 - INFO - Model loaded successfully.
+2025-12-24 23:55:38,675 - INFO - KeyboardInterrupt caught. Shutting down...
+2025-12-24 23:55:38,675 - INFO - Unloading model and freeing VRAM...
+2025-12-24 23:55:38,919 - INFO - App shutdown complete.
+2025-12-24 23:55:54,518 - INFO - Starting Story Bible App - Milestone 1.3
+2025-12-24 23:55:54,519 - INFO - Database initialized at /home/sabona/Desktop/DesktopApp/data/story_bible.db
+2025-12-24 23:55:54,519 - INFO - Loading model from /home/sabona/Desktop/DesktopApp/models/llama/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf with n_gpu_layers=-1
+2025-12-24 23:55:55,907 - INFO - Model loaded successfully.
+2025-12-24 23:57:00,508 - INFO - DEBUG: ask_lore_assistant called. Memory len: 4569
+2025-12-24 23:57:00,508 - INFO - Generating AI response...
+2025-12-25 00:03:05,924 - INFO - Unloading model and freeing VRAM...
+2025-12-25 00:03:06,205 - INFO - App shutdown complete.
+2025-12-25 00:03:12,096 - INFO - Starting Story Bible App - Milestone 1.3
+2025-12-25 00:03:12,097 - INFO - Database initialized at /home/sabona/Desktop/DesktopApp/data/story_bible.db
+2025-12-25 00:03:12,098 - INFO - Loading model from /home/sabona/Desktop/DesktopApp/models/llama/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf with n_gpu_layers=-1
+2025-12-25 00:03:13,475 - INFO - Model loaded successfully.
+2025-12-25 00:03:52,769 - INFO - DEBUG: ask_lore_assistant called. Memory len: 4504
+2025-12-25 00:03:52,769 - INFO - Generating AI response...
+2025-12-25 00:18:11,977 - INFO - DEBUG: ask_lore_assistant called. Memory len: 4373
+2025-12-25 00:18:11,977 - INFO - Generating AI response...
+2025-12-25 00:19:10,430 - INFO - Unloading model and freeing VRAM...
+2025-12-25 00:19:10,521 - INFO - App shutdown complete.
+2025-12-25 00:19:14,494 - INFO - Starting Story Bible App - Milestone 1.3
+2025-12-25 00:19:14,495 - INFO - Database initialized at /home/sabona/Desktop/DesktopApp/data/story_bible.db
+2025-12-25 00:19:14,495 - INFO - Loading model from /home/sabona/Desktop/DesktopApp/models/llama/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf with n_gpu_layers=-1
+2025-12-25 00:19:15,854 - INFO - Model loaded successfully.
+2025-12-25 00:19:50,836 - INFO - Generating AI response...
+2025-12-25 00:27:49,160 - INFO - DEBUG: ask_lore_assistant called. Memory len: 5311
+2025-12-25 00:27:49,161 - INFO - Generating AI response...
+2025-12-25 00:32:39,882 - INFO - DEBUG: ask_lore_assistant called. Memory len: 5311
+2025-12-25 00:32:39,883 - INFO - Generating AI response...
+2025-12-25 00:33:11,914 - INFO - Unloading model and freeing VRAM...
+2025-12-25 00:33:12,190 - INFO - App shutdown complete.
+2025-12-25 00:33:16,349 - INFO - Starting Story Bible App - Milestone 1.3
+2025-12-25 00:33:16,350 - INFO - Database initialized at /home/sabona/Desktop/DesktopApp/data/story_bible.db
+2025-12-25 00:33:16,350 - INFO - Loading model from /home/sabona/Desktop/DesktopApp/models/llama/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf with n_gpu_layers=-1
+2025-12-25 00:33:17,745 - INFO - Model loaded successfully.
+2025-12-25 00:34:02,477 - INFO - DEBUG: ask_lore_assistant called. Memory len: 4809
+2025-12-25 00:34:02,477 - INFO - Generating AI response...
+2025-12-25 00:40:36,130 - INFO - Unloading model and freeing VRAM...
+2025-12-25 00:40:36,339 - INFO - App shutdown complete.
+2025-12-25 00:53:14,750 - INFO - Starting Story Bible App - Milestone 1.3
+2025-12-25 00:53:14,751 - INFO - Database initialized at /home/sabona/Desktop/DesktopApp/data/story_bible.db
+2025-12-25 00:53:14,752 - INFO - Loading model from /home/sabona/Desktop/DesktopApp/models/llama/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf with n_gpu_layers=-1
+2025-12-25 00:53:16,582 - INFO - Model loaded successfully.
+2025-12-25 00:53:25,911 - INFO - Generating AI response...
+2025-12-25 00:57:55,495 - INFO - Generating AI response...
+2025-12-25 01:15:00,933 - INFO - KeyboardInterrupt caught. Shutting down...
+2025-12-25 01:15:00,934 - INFO - Unloading model and freeing VRAM...
+2025-12-25 01:15:01,278 - INFO - App shutdown complete.
+2025-12-25 01:15:17,182 - INFO - Starting Story Bible App - Milestone 1.3
+2025-12-25 01:15:17,182 - INFO - Database initialized at /home/sabona/Desktop/DesktopApp/data/story_bible.db
+2025-12-25 01:15:17,183 - INFO - Loading model from /home/sabona/Desktop/DesktopApp/models/llama/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf with n_gpu_layers=-1
+2025-12-25 01:15:18,630 - INFO - Model loaded successfully.
+2025-12-25 01:15:19,782 - CRITICAL - Unhandled app exception: 'SidebarFrame' object has no attribute 'on_generate_from_beats'
+Traceback (most recent call last):
+  File "/home/sabona/Desktop/DesktopApp/main.py", line 51, in main
+    app = StoryBibleUI(ai_engine, db_mgr)
+  File "/home/sabona/Desktop/DesktopApp/src/ui/main_window.py", line 942, in __init__
+    self.load_session()
+    ~~~~~~~~~~~~~~~~~^^
+  File "/home/sabona/Desktop/DesktopApp/src/ui/main_window.py", line 1220, in load_session
+    self.sidebar.refresh_tree()
+    ~~~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "/home/sabona/Desktop/DesktopApp/src/ui/main_window.py", line 224, in refresh_tree
+    command=self.on_generate_from_beats
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'SidebarFrame' object has no attribute 'on_generate_from_beats'
+2025-12-25 01:15:19,787 - INFO - Unloading model and freeing VRAM...
+2025-12-25 01:15:20,028 - INFO - App shutdown complete.
+2025-12-25 01:20:21,414 - INFO - Starting Story Bible App - Milestone 1.3
+2025-12-25 01:20:21,415 - INFO - Database initialized at /home/sabona/Desktop/DesktopApp/data/story_bible.db
+2025-12-25 01:20:21,415 - INFO - Loading model from /home/sabona/Desktop/DesktopApp/models/llama/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf with n_gpu_layers=-1
+2025-12-25 01:20:22,789 - INFO - Model loaded successfully.
+2025-12-25 01:44:17,269 - INFO - Unloading model and freeing VRAM...
+2025-12-25 01:44:17,398 - INFO - App shutdown complete.
+2025-12-25 10:11:18,296 - INFO - Starting Story Bible App - Milestone 1.3
+2025-12-25 10:11:18,306 - INFO - Added beats column to chapters table
+2025-12-25 10:11:18,307 - INFO - Database initialized at /home/sabona/Desktop/DesktopApp/data/story_bible.db
+2025-12-25 10:11:18,308 - INFO - Loading model from /home/sabona/Desktop/DesktopApp/models/llama/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf with n_gpu_layers=-1
+2025-12-25 10:11:22,395 - INFO - Model loaded successfully.
+2025-12-25 10:13:56,725 - INFO - Extracted 12 beats from prose
+2025-12-25 12:03:16,028 - INFO - Suggested beats for new chapter
+2025-12-25 12:42:29,101 - INFO - Unloading model and freeing VRAM...
+2025-12-25 12:42:29,448 - INFO - App shutdown complete.
+2025-12-25 13:14:36,161 - INFO - Starting Story Bible App - Milestone 1.3
+2025-12-25 13:14:36,173 - INFO - Database initialized at /home/sabona/Desktop/DesktopApp/data/story_bible.db
+2025-12-25 13:14:36,174 - INFO - Loading model from /home/sabona/Desktop/DesktopApp/models/llama/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf with n_gpu_layers=-1
+2025-12-25 13:14:38,646 - INFO - Model loaded successfully.
+2025-12-25 13:14:41,218 - CRITICAL - Unhandled app exception: cannot use geometry manager pack inside .!sidebarframe which already has slaves managed by grid
+Traceback (most recent call last):
+  File "/home/sabona/Desktop/DesktopApp/main.py", line 51, in main
+    app = StoryBibleUI(ai_engine, db_mgr)
+  File "/home/sabona/Desktop/DesktopApp/src/ui/main_window.py", line 1100, in __init__
+    self.sidebar.add_bible_button(self.toggle_bible_panel)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/sabona/Desktop/DesktopApp/src/ui/main_window.py", line 379, in add_bible_button
+    btn.pack(side="bottom", fill="x", padx=15, pady=15)
+    ~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/sabona/Desktop/DesktopApp/deskapp/lib/python3.13/site-packages/customtkinter/windows/widgets/core_widget_classes/ctk_base_class.py", line 298, in pack
+    return super().pack(**self._apply_argument_scaling(kwargs))
+           ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.13/tkinter/__init__.py", line 2602, in pack_configure
+    self.tk.call(
+    ~~~~~~~~~~~~^
+          ('pack', 'configure', self._w)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+          + self._options(cnf, kw))
+          ^^^^^^^^^^^^^^^^^^^^^^^^^
+_tkinter.TclError: cannot use geometry manager pack inside .!sidebarframe which already has slaves managed by grid
+2025-12-25 13:14:41,233 - INFO - Unloading model and freeing VRAM...
+2025-12-25 13:14:41,513 - INFO - App shutdown complete.
+2025-12-25 13:18:13,377 - INFO - Starting Story Bible App - Milestone 1.3
+2025-12-25 13:18:13,378 - INFO - Database initialized at /home/sabona/Desktop/DesktopApp/data/story_bible.db
+2025-12-25 13:18:13,379 - INFO - Loading model from /home/sabona/Desktop/DesktopApp/models/llama/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf with n_gpu_layers=-1
+2025-12-25 13:18:15,560 - INFO - Model loaded successfully.
+2025-12-25 13:25:41,607 - INFO - KeyboardInterrupt caught. Shutting down...
+2025-12-25 13:25:41,615 - INFO - Unloading model and freeing VRAM...
+2025-12-25 13:25:41,963 - INFO - App shutdown complete.
+2025-12-25 13:25:47,455 - INFO - Starting Story Bible App - Milestone 1.3
+2025-12-25 13:25:47,458 - INFO - Database initialized at /home/sabona/Desktop/DesktopApp/data/story_bible.db
+2025-12-25 13:25:47,459 - INFO - Loading model from /home/sabona/Desktop/DesktopApp/models/llama/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf with n_gpu_layers=-1
+2025-12-25 13:25:49,494 - INFO - Model loaded successfully.
+2025-12-25 13:28:20,517 - INFO - KeyboardInterrupt caught. Shutting down...
+2025-12-25 13:28:20,518 - INFO - Unloading model and freeing VRAM...
+2025-12-25 13:28:20,860 - INFO - App shutdown complete.
+2025-12-25 13:28:28,269 - INFO - Starting Story Bible App - Milestone 1.3
+2025-12-25 13:28:28,270 - INFO - Database initialized at /home/sabona/Desktop/DesktopApp/data/story_bible.db
+2025-12-25 13:28:28,271 - INFO - Loading model from /home/sabona/Desktop/DesktopApp/models/llama/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf with n_gpu_layers=-1
+2025-12-25 13:28:30,089 - INFO - Model loaded successfully.
+2025-12-25 13:29:33,497 - INFO - KeyboardInterrupt caught. Shutting down...
+2025-12-25 13:29:33,497 - INFO - Unloading model and freeing VRAM...
+2025-12-25 13:29:33,786 - INFO - App shutdown complete.
+2025-12-25 13:55:34,477 - INFO - Starting Story Bible App - Milestone 1.3
+2025-12-25 13:55:34,485 - INFO - Database initialized at /home/sabona/Desktop/DesktopApp/data/story_bible.db
+2025-12-25 13:55:34,486 - INFO - Loading model from /home/sabona/Desktop/DesktopApp/models/llama/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf with n_gpu_layers=-1
+2025-12-25 13:55:36,805 - INFO - Model loaded successfully.
+2025-12-25 13:55:37,562 - CRITICAL - Unhandled app exception: StoryBibleDrawer.__init__() missing 1 required positional argument: 'project_id'
+Traceback (most recent call last):
+  File "/home/sabona/Desktop/DesktopApp/main.py", line 51, in main
+    app = StoryBibleUI(ai_engine, db_mgr)
+  File "/home/sabona/Desktop/DesktopApp/src/ui/main_window.py", line 968, in __init__
+    self.story_bible = StoryBibleDrawer(self, db_manager)
+                       ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^
+TypeError: StoryBibleDrawer.__init__() missing 1 required positional argument: 'project_id'
+2025-12-25 13:55:37,564 - INFO - Unloading model and freeing VRAM...
+2025-12-25 13:55:37,838 - INFO - App shutdown complete.
+2025-12-25 13:58:14,395 - INFO - Starting Story Bible App - Milestone 1.3
+2025-12-25 13:58:14,396 - INFO - Database initialized at /home/sabona/Desktop/DesktopApp/data/story_bible.db
+2025-12-25 13:58:14,396 - INFO - Loading model from /home/sabona/Desktop/DesktopApp/models/llama/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf with n_gpu_layers=-1
+2025-12-25 13:58:16,460 - INFO - Model loaded successfully.
+2025-12-25 13:58:17,279 - CRITICAL - Unhandled app exception: StoryBibleDrawer.__init__() missing 1 required positional argument: 'project_id'
+Traceback (most recent call last):
+  File "/home/sabona/Desktop/DesktopApp/main.py", line 51, in main
+    app = StoryBibleUI(ai_engine, db_mgr)
+  File "/home/sabona/Desktop/DesktopApp/src/ui/main_window.py", line 968, in __init__
+    self.story_bible = StoryBibleDrawer(self, db_manager)
+                       ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^
+TypeError: StoryBibleDrawer.__init__() missing 1 required positional argument: 'project_id'
+2025-12-25 13:58:17,280 - INFO - Unloading model and freeing VRAM...
+2025-12-25 13:58:17,458 - INFO - App shutdown complete.
+2025-12-25 13:58:51,657 - INFO - Starting Story Bible App - Milestone 1.3
+2025-12-25 13:58:51,658 - INFO - Database initialized at /home/sabona/Desktop/DesktopApp/data/story_bible.db
+2025-12-25 13:58:51,658 - INFO - Loading model from /home/sabona/Desktop/DesktopApp/models/llama/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf with n_gpu_layers=-1
+2025-12-25 13:58:53,372 - INFO - Model loaded successfully.
+2025-12-25 13:58:54,057 - CRITICAL - Unhandled app exception: StoryBibleDrawer.__init__() missing 1 required positional argument: 'project_id'
+Traceback (most recent call last):
+  File "/home/sabona/Desktop/DesktopApp/main.py", line 51, in main
+    app = StoryBibleUI(ai_engine, db_mgr)
+  File "/home/sabona/Desktop/DesktopApp/src/ui/main_window.py", line 968, in __init__
+    self.story_bible = StoryBibleDrawer(self, db_manager)
+                       ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^
+TypeError: StoryBibleDrawer.__init__() missing 1 required positional argument: 'project_id'
+2025-12-25 13:58:54,063 - INFO - Unloading model and freeing VRAM...
+2025-12-25 13:58:54,338 - INFO - App shutdown complete.
+2025-12-25 14:07:34,228 - INFO - Starting Story Bible App - Milestone 1.3
+2025-12-25 14:07:34,229 - INFO - Database initialized at /home/sabona/Desktop/DesktopApp/data/story_bible.db
+2025-12-25 14:07:34,230 - INFO - Loading model from /home/sabona/Desktop/DesktopApp/models/llama/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf with n_gpu_layers=-1
+2025-12-25 14:07:35,900 - INFO - Model loaded successfully.
+2025-12-25 18:36:10,568 - INFO - Starting Story Bible App - Milestone 1.3
+2025-12-25 18:36:10,571 - INFO - Database initialized at /home/sabona/Desktop/DesktopApp/data/story_bible.db
+2025-12-25 18:36:10,572 - INFO - Loading model from /home/sabona/Desktop/DesktopApp/models/llama/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf with n_gpu_layers=-1
+2025-12-25 18:36:14,865 - INFO - Model loaded successfully.
+2025-12-25 18:58:43,688 - INFO - Unloading model and freeing VRAM...
+2025-12-25 18:58:43,983 - INFO - App shutdown complete.
+2025-12-25 19:03:24,071 - INFO - Starting Story Bible App - Milestone 1.3
+2025-12-25 19:03:24,072 - INFO - Database initialized at /home/sabona/Desktop/DesktopApp/data/story_bible.db
+2025-12-25 19:03:24,072 - INFO - Loading model from /home/sabona/Desktop/DesktopApp/models/llama/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf with n_gpu_layers=-1
+2025-12-25 19:03:25,886 - INFO - Model loaded successfully.
+2025-12-25 19:03:27,001 - CRITICAL - Unhandled app exception: type object 'ThemeEngine' has no attribute 'BG_INPUT'
+Traceback (most recent call last):
+  File "/home/sabona/Desktop/DesktopApp/main.py", line 51, in main
+    app = StoryBibleUI(ai_engine, db_mgr)
+  File "/home/sabona/Desktop/DesktopApp/src/ui/main_window.py", line 955, in __init__
+    self.bible_view = StoryBibleView(self.center_area, db_manager)
+                      ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/sabona/Desktop/DesktopApp/src/ui/story_bible_view.py", line 54, in __init__
+    fg_color=ThemeEngine.BG_INPUT,
+             ^^^^^^^^^^^^^^^^^^^^
+AttributeError: type object 'ThemeEngine' has no attribute 'BG_INPUT'
+2025-12-25 19:03:27,009 - INFO - Unloading model and freeing VRAM...
+2025-12-25 19:03:27,191 - INFO - App shutdown complete.
+2025-12-25 19:06:14,257 - INFO - Starting Story Bible App - Milestone 1.3
+2025-12-25 19:06:14,258 - INFO - Database initialized at /home/sabona/Desktop/DesktopApp/data/story_bible.db
+2025-12-25 19:06:14,259 - INFO - Loading model from /home/sabona/Desktop/DesktopApp/models/llama/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf with n_gpu_layers=-1
+2025-12-25 19:06:15,987 - INFO - Model loaded successfully.
+2025-12-25 19:08:21,516 - INFO - Auto-saved Bible field: characters
+2025-12-25 19:08:29,923 - INFO - Auto-saved Bible field: characters
+2025-12-25 19:09:06,903 - INFO - Auto-saved Bible field: characters
+2025-12-25 19:10:23,480 - INFO - Auto-saved Bible field: characters
+2025-12-25 19:10:24,535 - INFO - Auto-saved Bible field: characters
+2025-12-25 19:10:27,015 - INFO - Auto-saved Bible field: characters
+2025-12-25 19:11:25,600 - INFO - Auto-saved Bible field: characters
+2025-12-25 19:12:43,366 - INFO - Auto-saved Bible field: characters
+2025-12-25 19:12:48,247 - INFO - KeyboardInterrupt caught. Shutting down...
+2025-12-25 19:12:48,248 - INFO - Unloading model and freeing VRAM...
+2025-12-25 19:12:48,544 - INFO - App shutdown complete.
+2025-12-25 19:22:19,853 - INFO - Starting Story Bible App - Milestone 1.3
+2025-12-25 19:22:19,855 - INFO - Database initialized at /home/sabona/Desktop/DesktopApp/data/story_bible.db
+2025-12-25 19:22:19,855 - INFO - Loading model from /home/sabona/Desktop/DesktopApp/models/llama/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf with n_gpu_layers=-1
+2025-12-25 19:22:21,930 - INFO - Model loaded successfully.
+2025-12-25 19:22:22,716 - CRITICAL - Unhandled app exception: bad option "-px": must be -after, -anchor, -before, -expand, -fill, -in, -ipadx, -ipady, -padx, -pady, or -side
+Traceback (most recent call last):
+  File "/home/sabona/Desktop/DesktopApp/main.py", line 51, in main
+    app = StoryBibleUI(ai_engine, db_mgr)
+  File "/home/sabona/Desktop/DesktopApp/src/ui/main_window.py", line 886, in __init__
+    self.bible_view = StoryBibleView(self.center_area, db_manager)
+                      ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/sabona/Desktop/DesktopApp/src/ui/story_bible_view.py", line 37, in __init__
+    self.buttons_frame.pack(fill="x", px=10)
+    ~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "/home/sabona/Desktop/DesktopApp/deskapp/lib/python3.13/site-packages/customtkinter/windows/widgets/core_widget_classes/ctk_base_class.py", line 298, in pack
+    return super().pack(**self._apply_argument_scaling(kwargs))
+           ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.13/tkinter/__init__.py", line 2602, in pack_configure
+    self.tk.call(
+    ~~~~~~~~~~~~^
+          ('pack', 'configure', self._w)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+          + self._options(cnf, kw))
+          ^^^^^^^^^^^^^^^^^^^^^^^^^
+_tkinter.TclError: bad option "-px": must be -after, -anchor, -before, -expand, -fill, -in, -ipadx, -ipady, -padx, -pady, or -side
+2025-12-25 19:22:22,731 - INFO - Unloading model and freeing VRAM...
+2025-12-25 19:22:23,007 - INFO - App shutdown complete.
+2025-12-25 19:24:31,594 - INFO - Starting Story Bible App - Milestone 1.3
+2025-12-25 19:24:31,595 - INFO - Database initialized at /home/sabona/Desktop/DesktopApp/data/story_bible.db
+2025-12-25 19:24:31,595 - INFO - Loading model from /home/sabona/Desktop/DesktopApp/models/llama/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf with n_gpu_layers=-1
+2025-12-25 19:24:33,662 - INFO - Model loaded successfully.
+2025-12-25 19:24:52,670 - INFO - Unloading model and freeing VRAM...
+2025-12-25 19:24:52,997 - INFO - App shutdown complete.
+2025-12-25 19:25:00,256 - INFO - Starting Story Bible App - Milestone 1.3
+2025-12-25 19:25:00,257 - INFO - Database initialized at /home/sabona/Desktop/DesktopApp/data/story_bible.db
+2025-12-25 19:25:00,258 - INFO - Loading model from /home/sabona/Desktop/DesktopApp/models/llama/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf with n_gpu_layers=-1
+2025-12-25 19:25:02,053 - INFO - Model loaded successfully.
+2025-12-25 19:25:26,225 - INFO - Auto-saved Bible field: braindump
+2025-12-25 19:31:08,038 - INFO - Auto-saved Bible field: outline
+2025-12-25 19:31:45,371 - INFO - Auto-saved Bible field: outline
+2025-12-25 19:31:46,925 - INFO - Auto-saved Bible field: outline
+2025-12-25 19:31:47,991 - INFO - Auto-saved Bible field: outline
+2025-12-25 19:32:04,824 - INFO - Auto-saved Bible field: outline
+2025-12-25 19:32:54,461 - INFO - Auto-saved Bible field: outline
+2025-12-25 19:36:30,577 - INFO - Unloading model and freeing VRAM...
+2025-12-25 19:36:30,898 - INFO - App shutdown complete.
+2025-12-25 19:45:33,689 - INFO - Starting Story Bible App - Milestone 1.3
+2025-12-25 19:45:33,691 - INFO - Database initialized at /home/sabona/Desktop/DesktopApp/data/story_bible.db
+2025-12-25 19:45:33,692 - INFO - Loading model from /home/sabona/Desktop/DesktopApp/models/llama/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf with n_gpu_layers=-1
+2025-12-25 19:45:35,358 - INFO - Model loaded successfully.
+2025-12-25 19:47:49,341 - INFO - Auto-saved Bible field: braindump
+2025-12-25 19:51:55,678 - INFO - KeyboardInterrupt caught. Shutting down...
+2025-12-25 19:51:55,678 - INFO - Unloading model and freeing VRAM...
+2025-12-25 19:51:55,944 - INFO - App shutdown complete.
+2025-12-25 20:10:39,464 - INFO - Starting Story Bible App - Milestone 1.3
+2025-12-25 20:10:39,466 - INFO - Database initialized at /home/sabona/Desktop/DesktopApp/data/story_bible.db
+2025-12-25 20:10:39,467 - INFO - Loading model from /home/sabona/Desktop/DesktopApp/models/llama/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf with n_gpu_layers=-1
+2025-12-25 20:10:41,715 - INFO - Model loaded successfully.
+2025-12-25 20:13:31,588 - INFO - Unloading model and freeing VRAM...
+2025-12-25 20:13:31,885 - INFO - App shutdown complete.
+2025-12-25 20:13:52,013 - INFO - Starting Story Bible App - Milestone 1.3
+2025-12-25 20:13:52,014 - INFO - Database initialized at /home/sabona/Desktop/DesktopApp/data/story_bible.db
+2025-12-25 20:13:52,014 - INFO - Loading model from /home/sabona/Desktop/DesktopApp/models/llama/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf with n_gpu_layers=-1
+2025-12-25 20:13:53,751 - INFO - Model loaded successfully.
+2025-12-25 20:14:03,512 - INFO - Unloading model and freeing VRAM...
+2025-12-25 20:14:03,811 - INFO - App shutdown complete.
+2025-12-25 20:14:09,706 - INFO - Starting Story Bible App - Milestone 1.3
+2025-12-25 20:14:09,707 - INFO - Database initialized at /home/sabona/Desktop/DesktopApp/data/story_bible.db
+2025-12-25 20:14:09,711 - INFO - Loading model from /home/sabona/Desktop/DesktopApp/models/llama/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf with n_gpu_layers=-1
+2025-12-25 20:14:11,594 - INFO - Model loaded successfully.
+2025-12-25 20:23:09,469 - INFO - Auto-saved Bible field: outline
+2025-12-25 20:27:37,637 - INFO - Auto-saved Bible field: outline
+2025-12-25 20:43:32,418 - INFO - Unloading model and freeing VRAM...
+2025-12-25 20:43:32,716 - INFO - App shutdown complete.
+2025-12-25 21:03:31,301 - INFO - Starting Story Bible App - Milestone 1.3
+2025-12-25 21:03:31,302 - INFO - Database initialized at /home/sabona/Desktop/DesktopApp/data/story_bible.db
+2025-12-25 21:03:31,302 - INFO - Loading model from /home/sabona/Desktop/DesktopApp/models/llama/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf with n_gpu_layers=-1
+2025-12-25 21:03:32,661 - INFO - Model loaded successfully.
+2025-12-25 21:03:53,561 - INFO - Auto-saved Bible field: genre
+2025-12-25 21:03:57,993 - INFO - Auto-saved Bible field: genre
+2025-12-25 21:04:23,349 - INFO - Auto-saved Bible field: genre
+2025-12-25 21:04:25,752 - INFO - Auto-saved Bible field: genre
+2025-12-25 21:04:35,950 - INFO - Auto-saved Bible field: style
+2025-12-25 21:04:39,306 - INFO - Auto-saved Bible field: style
+2025-12-25 21:04:41,811 - INFO - Auto-saved Bible field: genre
+2025-12-25 21:04:53,923 - INFO - Auto-saved Bible field: braindump
+2025-12-25 21:05:04,497 - INFO - Auto-saved Bible field: braindump
+2025-12-25 21:05:16,677 - INFO - Auto-saved Bible field: braindump
+2025-12-25 21:07:30,915 - INFO - Unloading model and freeing VRAM...
+2025-12-25 21:07:31,206 - INFO - App shutdown complete.
+2025-12-25 21:31:51,150 - INFO - Starting Story Bible App - Milestone 1.3
+2025-12-25 21:31:51,152 - INFO - Database initialized at /home/sabona/Desktop/DesktopApp/data/story_bible.db
+2025-12-25 21:31:51,153 - INFO - Loading model from /home/sabona/Desktop/DesktopApp/models/llama/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf with n_gpu_layers=-1
+2025-12-25 21:31:52,860 - INFO - Model loaded successfully.
+2025-12-25 21:31:55,160 - INFO - Unloading model and freeing VRAM...
+2025-12-25 21:31:55,563 - INFO - App shutdown complete.
+2025-12-25 21:32:00,110 - INFO - Starting Story Bible App - Milestone 1.3
+2025-12-25 21:32:00,111 - INFO - Database initialized at /home/sabona/Desktop/DesktopApp/data/story_bible.db
+2025-12-25 21:32:00,112 - INFO - Loading model from /home/sabona/Desktop/DesktopApp/models/llama/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf with n_gpu_layers=-1
+2025-12-25 21:32:01,697 - INFO - Model loaded successfully.
+2025-12-25 21:32:36,635 - INFO - Auto-saved Bible field: genre
+2025-12-25 21:32:44,117 - INFO - Auto-saved Bible field: genre
+2025-12-25 21:32:54,398 - INFO - Auto-saved Bible field: genre
+2025-12-25 21:32:56,951 - INFO - Auto-saved Bible field: genre
+2025-12-25 21:32:59,115 - INFO - Auto-saved Bible field: genre
+2025-12-25 21:33:07,459 - INFO - Auto-saved Bible field: genre
+2025-12-25 21:33:45,099 - INFO - KeyboardInterrupt caught. Shutting down...
+2025-12-25 21:33:45,100 - INFO - Unloading model and freeing VRAM...
+2025-12-25 21:33:45,224 - INFO - App shutdown complete.
+2025-12-25 21:33:49,197 - INFO - Starting Story Bible App - Milestone 1.3
+2025-12-25 21:33:49,198 - INFO - Database initialized at /home/sabona/Desktop/DesktopApp/data/story_bible.db
+2025-12-25 21:33:49,199 - INFO - Loading model from /home/sabona/Desktop/DesktopApp/models/llama/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf with n_gpu_layers=-1
+2025-12-25 21:33:50,575 - INFO - Model loaded successfully.
+2025-12-25 21:34:02,586 - INFO - Auto-saved Bible field: genre
+2025-12-25 21:39:15,774 - INFO - KeyboardInterrupt caught. Shutting down...
+2025-12-25 21:39:15,774 - INFO - Unloading model and freeing VRAM...
+2025-12-25 21:39:16,103 - INFO - App shutdown complete.
+2025-12-25 21:39:19,659 - INFO - Starting Story Bible App - Milestone 1.3
+2025-12-25 21:39:19,659 - INFO - Database initialized at /home/sabona/Desktop/DesktopApp/data/story_bible.db
+2025-12-25 21:39:19,660 - INFO - Loading model from /home/sabona/Desktop/DesktopApp/models/llama/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf with n_gpu_layers=-1
+2025-12-25 21:39:20,982 - INFO - Model loaded successfully.
+2025-12-25 21:39:30,741 - INFO - Auto-saved Bible field: genre
+2025-12-25 21:39:32,147 - INFO - Auto-saved Bible field: genre
+2025-12-25 21:39:37,754 - INFO - Auto-saved Bible field: genre
+2025-12-25 21:39:41,461 - INFO - Force-saved Bible field: genre
+2025-12-25 21:39:44,908 - INFO - Force-saved Bible field: genre
+2025-12-25 21:39:46,443 - INFO - Force-saved Bible field: genre
+2025-12-25 21:39:47,291 - INFO - Force-saved Bible field: braindump
+2025-12-25 21:39:49,395 - INFO - Force-saved Bible field: style
+2025-12-25 21:39:50,380 - INFO - Force-saved Bible field: synopsis
+2025-12-25 21:39:51,321 - INFO - Force-saved Bible field: worldbuilding
+2025-12-25 21:39:52,672 - INFO - Force-saved Bible field: outline
+2025-12-25 21:39:53,871 - INFO - Force-saved Bible field: style
+2025-12-25 21:39:55,259 - INFO - Force-saved Bible field: braindump
+2025-12-25 21:39:59,149 - INFO - Force-saved Bible field: braindump
+2025-12-25 21:40:00,313 - INFO - Force-saved Bible field: genre
+2025-12-25 21:40:02,495 - INFO - Force-saved Bible field: style
+2025-12-25 21:40:03,691 - INFO - Force-saved Bible field: genre
+2025-12-25 21:40:04,584 - INFO - Force-saved Bible field: style
+2025-12-25 21:40:06,015 - INFO - Force-saved Bible field: synopsis
+2025-12-25 21:40:06,920 - INFO - Force-saved Bible field: genre
+2025-12-25 21:40:07,720 - INFO - Force-saved Bible field: braindump
+2025-12-25 21:40:10,918 - INFO - Auto-saved Bible field: braindump
+2025-12-25 21:40:12,499 - INFO - Auto-saved Bible field: braindump
+2025-12-25 21:40:14,604 - INFO - Auto-saved Bible field: braindump
+2025-12-25 21:40:14,974 - INFO - Force-saved Bible field: braindump
+2025-12-25 21:40:15,954 - INFO - Force-saved Bible field: genre
+2025-12-25 21:40:17,012 - INFO - Force-saved Bible field: style
+2025-12-25 21:40:17,833 - INFO - Force-saved Bible field: synopsis
+2025-12-25 21:40:18,602 - INFO - Force-saved Bible field: worldbuilding
+2025-12-25 21:40:19,458 - INFO - Force-saved Bible field: style
+2025-12-25 21:40:20,216 - INFO - Force-saved Bible field: genre
+2025-12-25 21:40:21,369 - INFO - Force-saved Bible field: braindump
+2025-12-25 21:40:24,530 - INFO - Force-saved Bible field: braindump
+2025-12-25 21:40:27,338 - INFO - Auto-saved Bible field: genre
+2025-12-25 21:40:29,111 - INFO - Force-saved Bible field: genre
+2025-12-25 21:40:30,217 - INFO - Force-saved Bible field: braindump
+2025-12-25 21:40:31,417 - INFO - Force-saved Bible field: genre
+2025-12-25 21:40:34,066 - INFO - Force-saved Bible field: braindump
+2025-12-25 21:40:35,036 - INFO - Force-saved Bible field: genre
+2025-12-25 21:40:35,950 - INFO - Force-saved Bible field: style
+2025-12-25 21:40:36,687 - INFO - Force-saved Bible field: synopsis
+2025-12-25 21:40:37,611 - INFO - Force-saved Bible field: worldbuilding
+2025-12-25 21:40:55,589 - INFO - Force-saved Bible field: outline
+2025-12-25 21:40:56,779 - INFO - Force-saved Bible field: worldbuilding
+2025-12-25 21:40:58,972 - INFO - Force-saved Bible field: synopsis
+2025-12-25 21:41:03,003 - INFO - Force-saved Bible field: braindump
+2025-12-25 21:41:04,406 - INFO - Force-saved Bible field: genre
+2025-12-25 21:41:07,265 - INFO - Auto-saved Bible field: braindump
+2025-12-25 21:41:11,082 - INFO - Auto-saved Bible field: braindump
+2025-12-25 21:41:11,115 - INFO - Force-saved Bible field: braindump
+2025-12-25 21:41:12,086 - INFO - Force-saved Bible field: genre
+2025-12-25 21:41:13,547 - INFO - Force-saved Bible field: braindump
+2025-12-25 21:42:48,453 - INFO - Unloading model and freeing VRAM...
+2025-12-25 21:42:48,766 - INFO - App shutdown complete.
+2025-12-25 22:07:40,524 - INFO - Starting Story Bible App - Milestone 1.3
+2025-12-25 22:07:40,525 - INFO - Database initialized at /home/sabona/Desktop/DesktopApp/data/story_bible.db
+2025-12-25 22:07:40,526 - INFO - Loading model from /home/sabona/Desktop/DesktopApp/models/llama/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf with n_gpu_layers=-1
+2025-12-25 22:07:44,316 - INFO - Model loaded successfully.
+2025-12-25 22:07:55,594 - INFO - Force-saved Bible field: braindump
+2025-12-25 22:07:56,790 - INFO - Force-saved Bible field: genre
+2025-12-25 22:07:57,768 - INFO - Force-saved Bible field: style
+2025-12-25 22:07:58,705 - INFO - Force-saved Bible field: synopsis
+2025-12-25 22:08:00,205 - INFO - Force-saved Bible field: worldbuilding
+2025-12-25 22:08:01,969 - INFO - Force-saved Bible field: outline
+2025-12-25 22:08:06,682 - INFO - Auto-saved Bible field: outline
+2025-12-25 22:14:54,566 - INFO - Auto-saved Bible field: outline
+2025-12-25 22:14:55,153 - INFO - Unloading model and freeing VRAM...
+2025-12-25 22:14:55,294 - INFO - App shutdown complete.
+2025-12-25 22:40:24,490 - INFO - Starting Story Bible App - Milestone 1.3
+2025-12-25 22:40:24,491 - INFO - Database initialized at /home/sabona/Desktop/DesktopApp/data/story_bible.db
+2025-12-25 22:40:24,491 - INFO - Loading model from /home/sabona/Desktop/DesktopApp/models/llama/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf with n_gpu_layers=-1
+2025-12-25 22:40:26,722 - INFO - Model loaded successfully.
+2025-12-25 22:40:41,362 - INFO - Force-saved Bible field: genre
+2025-12-25 22:40:58,268 - INFO - Force-saved Bible field: style
+2025-12-25 22:40:59,340 - INFO - Force-saved Bible field: braindump
+2025-12-25 22:41:00,338 - INFO - Force-saved Bible field: genre
+2025-12-25 22:41:01,135 - INFO - Force-saved Bible field: style
+2025-12-25 22:41:18,712 - INFO - Force-saved Bible field: synopsis
+2025-12-25 22:41:19,744 - INFO - Force-saved Bible field: braindump
+2025-12-25 22:41:21,168 - INFO - Force-saved Bible field: genre
+2025-12-25 22:41:22,243 - INFO - Force-saved Bible field: synopsis
+2025-12-25 22:43:51,961 - INFO - Unloading model and freeing VRAM...
+2025-12-25 22:43:52,305 - INFO - App shutdown complete.
