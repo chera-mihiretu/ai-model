@@ -1,7 +1,9 @@
 import customtkinter as ctk
+import tkinter as tk
 import threading
 import queue
 import time
+import logging
 from .theme_engine import ThemeEngine
 
 # --- CUSTOM COMPONENTS ---
@@ -67,14 +69,14 @@ class SidebarButton(ctk.CTkFrame):
 
 
 class SidebarFrame(ctk.CTkFrame):
-    """
-    Left Column: Premium Editorial Navigator (260px)
-    """
-    def __init__(self, master, db_manager, on_nav_select, on_chapter_select):
-        super().__init__(master, width=ThemeEngine.SIDEBAR_WIDTH, corner_radius=0, fg_color=ThemeEngine.BG_SIDEBAR)
+    """Left Sidebar: Navigation + Project Tree (250px)."""
+    def __init__(self, master, db_manager, on_nav_select, on_chapter_select, on_generate_from_beats=None, on_auto_generate_beats=None):
+        super().__init__(master, width=250, fg_color=ThemeEngine.BG_SIDEBAR, corner_radius=0)
         self.db_manager = db_manager
         self.on_nav_select = on_nav_select
         self.on_chapter_select = on_chapter_select
+        self.on_generate_from_beats = on_generate_from_beats or (lambda: None)
+        self.on_auto_generate_beats = on_auto_generate_beats or (lambda: None)
         self.nav_buttons = {}
         
         # Layout
@@ -193,6 +195,52 @@ class SidebarFrame(ctk.CTkFrame):
                     command=lambda cid=ch['id'], pid=p['id']: self.on_chapter_select(cid, pid)
                 )
                 ch_btn.pack(fill="x", padx=(10, 5), pady=1)
+        
+        # Chapter Beats Section
+        beats_header = ctk.CTkLabel(
+            self.project_tree, 
+            text="📝 Chapter Beats",
+            font=("Inter", 13, "bold"),
+            text_color=ThemeEngine.TEXT_PRIMARY
+        )
+        beats_header.pack(fill="x", padx=15, pady=(15, 5))
+        
+        self.beats_textbox = ctk.CTkTextbox(
+            self.project_tree,
+            height=150,
+            fg_color=ThemeEngine.BG_SIDEBAR,
+            border_color=ThemeEngine.BORDER_COLOR,
+            border_width=1,
+            wrap="word"
+        )
+        self.beats_textbox.pack(fill="x", padx=15, pady=5)
+        self.beats_textbox.insert("1.0", "Enter beats:\n1. \n2. \n3. ")
+        
+        # Smart Auto-Generate Button (changes based on context)
+        self.auto_gen_btn = ctk.CTkButton(
+            self.project_tree,
+            text="🪄 Auto-Generate from Prose",
+            fg_color=ThemeEngine.ACCENT_SECONDARY,
+            hover_color=ThemeEngine.ACCENT_HOVER,
+            command=self.on_auto_generate_beats
+        )
+        self.auto_gen_btn.pack(fill="x", padx=15, pady=(5, 0))
+        
+        generate_btn = ctk.CTkButton(
+            self.project_tree,
+            text="🔥 Generate Full Scene",
+            fg_color=ThemeEngine.ACCENT_PRIMARY,
+            hover_color=ThemeEngine.ACCENT_HOVER,
+            command=self.on_generate_from_beats
+        )
+        generate_btn.pack(fill="x", padx=15, pady=5)
+
+    def update_auto_gen_button(self, has_content):
+        """Update button text based on whether chapter has content."""
+        if has_content:
+            self.auto_gen_btn.configure(text="🪄 Auto-Generate from Prose")
+        else:
+            self.auto_gen_btn.configure(text="🪄 Suggest Beats for this Chapter")
 
     def create_new_project_dialog(self):
         dialog = ctk.CTkInputDialog(text="Project Name:", title="New Project")
@@ -215,15 +263,30 @@ class EditorFrame(ctk.CTkFrame):
     """
     Center Column: Zen Writing Mode (750px)
     """
-    def __init__(self, master, on_send_instruction):
+    def __init__(self, master, on_send_instruction, on_summarize=None):
         super().__init__(master, corner_radius=0, fg_color=ThemeEngine.BG_MAIN)
         self.on_send_instruction = on_send_instruction
+        self.on_summarize = on_summarize
         
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(1, weight=1) 
         
         # 1. Header (Breadcrumbs)
         self._create_header()
+        
+        # Add Summarize Button to Header
+        self.shrinkray_btn = ctk.CTkButton(
+            self.header,
+            text="🧠 Summarize",
+            width=80,
+            height=24,
+            fg_color="transparent",
+            border_width=1,
+            border_color=ThemeEngine.BORDER_COLOR,
+            text_color=ThemeEngine.TEXT_MUTED,
+            command=lambda: self.on_summarize() if self.on_summarize else None
+        )
+        self.shrinkray_btn.pack(side="right", padx=20, pady=10)
         
         # 2. Zen Editor (Centered)
         self.center_container = ctk.CTkFrame(self, fg_color="transparent")
@@ -242,10 +305,22 @@ class EditorFrame(ctk.CTkFrame):
             text_color=ThemeEngine.TEXT_PRIMARY,
             wrap="word",
             undo=True,
-            spacing3=10 # Line spacing 1.6 approx
+            spacing3=10
         )
         self.textbox.grid(row=0, column=1, sticky="nsew", pady=(60, 20)) 
         self.textbox.bind("<KeyRelease>", self.on_text_change)
+        
+        # Bind Right Click
+        self._create_context_menu()
+        self.textbox.bind("<Button-3>", self.show_context_menu)
+        
+        # Ghost Text Configuration
+        self.textbox.tag_config("ghost_text", foreground="#666666")
+        self.ghost_text_indices = None
+        
+        # Keyboard Shortcuts
+        self.textbox.bind("<Alt-w>", self.trigger_write_next)
+        self.textbox.bind("<Tab>", self.accept_ghost_text)
         
         # 3. Footer (Input & Status)
         self._create_footer()
@@ -260,7 +335,7 @@ class EditorFrame(ctk.CTkFrame):
             font=ThemeEngine.FONT_HEADER, 
             text_color=ThemeEngine.TEXT_MUTED
         )
-        self.breadcrumb.pack(pady=10)
+        self.breadcrumb.pack(side="left", padx=20, pady=10)
         
         # Border Bottom
         border = ctk.CTkFrame(self, height=1, fg_color=ThemeEngine.BORDER_COLOR)
@@ -294,6 +369,19 @@ class EditorFrame(ctk.CTkFrame):
         )
         self.input_entry.pack(side="left", fill="x", expand=True, padx=(0, 10))
         self.input_entry.bind("<Return>", self.send_action)
+
+        # Expand Scene Button
+        self.expand_btn = ctk.CTkButton(
+            self.footer,
+            text="✨ Expand",
+            width=80,
+            height=40,
+            corner_radius=20,
+            fg_color=ThemeEngine.ACCENT_SECONDARY,
+            hover_color=ThemeEngine.ACCENT_HOVER,
+            command=self.expand_action
+        )
+        self.expand_btn.pack(side="left", padx=(0, 10))
         
         # Send Button
         self.send_btn = ctk.CTkButton(
@@ -311,6 +399,51 @@ class EditorFrame(ctk.CTkFrame):
             text_color=ThemeEngine.TEXT_MUTED
         )
         self.word_count_lbl.pack(side="right", padx=15)
+
+    def _create_context_menu(self):
+        """Creates the Nested Right-Click Context Menu."""
+        self.context_menu = tk.Menu(self, tearoff=0, bg="#2b2b2b", fg="white", activebackground="#404040", activeforeground="white")
+        
+        # 1. Describe Sub-Menu
+        describe_menu = tk.Menu(self.context_menu, tearoff=0, bg="#2b2b2b", fg="white")
+        self.context_menu.add_cascade(label="👁️ Describe", menu=describe_menu)
+        
+        describe_menu.add_command(label="Sight", command=lambda: self.on_plugin("describe_sight"))
+        describe_menu.add_command(label="Sound", command=lambda: self.on_plugin("describe_sound"))
+        describe_menu.add_command(label="Smell", command=lambda: self.on_plugin("describe_smell"))
+        describe_menu.add_command(label="Taste", command=lambda: self.on_plugin("describe_taste"))
+        describe_menu.add_command(label="Touch", command=lambda: self.on_plugin("describe_touch"))
+        describe_menu.add_separator()
+        describe_menu.add_command(label="Metaphor", command=lambda: self.on_plugin("describe_metaphor"))
+
+        # 2. Rewrite Sub-Menu
+        rewrite_menu = tk.Menu(self.context_menu, tearoff=0, bg="#2b2b2b", fg="white")
+        self.context_menu.add_cascade(label="🎭 Rewrite", menu=rewrite_menu)
+        
+        rewrite_menu.add_command(label="Show Don't Tell", command=lambda: self.on_plugin("rewrite_show_dont_tell"))
+        rewrite_menu.add_command(label="Dramatic", command=lambda: self.on_plugin("rewrite_dramatic"))
+        rewrite_menu.add_command(label="Gritty", command=lambda: self.on_plugin("rewrite_gritty"))
+        rewrite_menu.add_command(label="Elegant", command=lambda: self.on_plugin("rewrite_elegant"))
+        rewrite_menu.add_command(label="Concise", command=lambda: self.on_plugin("rewrite_concise"))
+
+    def show_context_menu(self, event):
+        try:
+            self.context_menu.tk_popup(event.x_root, event.y_root)
+        finally:
+            self.context_menu.grab_release()
+
+    def on_plugin(self, plugin_type):
+        """Trigger AI Plugin via callback."""
+        try:
+            selection = self.textbox.get("sel.first", "sel.last")
+            if selection:
+                self.on_send_instruction(f"PLUGIN::{plugin_type}::{selection}")
+        except:
+             pass # No selection
+
+    def expand_action(self):
+        """Triggers the expansion of the scene."""
+        self.on_send_instruction("PLUGIN::expand_scene::")
 
     def load_content(self, title, content):
         self.breadcrumb.configure(text=f"{title}")
@@ -339,8 +472,53 @@ class EditorFrame(ctk.CTkFrame):
         if prompt:
             self.on_send_instruction(prompt)
             self.input_entry.delete(0, 'end')
-            # Return 'break' to stop any default event handling if invoked via key binding
             return 'break'
+
+    def get_selection_indices(self):
+        """Returns the start and end indices of the current selection."""
+        try:
+            return self.textbox.tag_ranges("sel")
+        except:
+            return None
+
+    def replace_section(self, indices, new_text):
+        """Replaces text at the given indices with new_text."""
+        if indices and len(indices) == 2:
+            start, end = indices
+            self.textbox.delete(start, end)
+            self.textbox.insert(start, new_text)
+            self.update_counts()
+
+    def trigger_write_next(self, event=None):
+        """Triggered by Alt+W - requests RAG-enhanced AI writing."""
+        self.on_send_instruction("WRITE_NEXT")
+        return "break"
+
+    def accept_ghost_text(self, event=None):
+        """Triggered by Tab - accepts ghost text and makes it permanent."""
+        if self.ghost_text_indices:
+            # Remove ghost_text tag to make it permanent
+            start, end = self.ghost_text_indices
+            self.textbox.tag_remove("ghost_text", start, end)
+            self.ghost_text_indices = None
+            return "break"
+        # If no ghost text, allow Tab to pass through normally
+        return None
+
+    def insert_ghost_token(self, token):
+        """Inserts a token with ghost_text styling."""
+        if not self.ghost_text_indices:
+            # First token - mark starting position
+            start = self.textbox.index("insert")
+            self.textbox.insert("insert", token, "ghost_text")
+            end = self.textbox.index("insert")
+            self.ghost_text_indices = (start, end)
+        else:
+            # Subsequent tokens - extend the range
+            self.textbox.insert("insert", token, "ghost_text")
+            start, _ = self.ghost_text_indices
+            end = self.textbox.index("insert")
+            self.ghost_text_indices = (start, end)
 
     def set_generating(self, is_gen):
         if is_gen:
@@ -434,88 +612,142 @@ class SettingsFrame(ctk.CTkFrame):
         ctk.CTkLabel(self, text="Coming Soon...", text_color=ThemeEngine.TEXT_MUTED).pack()
 
 
-class AssistantPanel(ctk.CTkFrame):
+class AssistantPanel(ctk.CTkTabview):
     """
-    Right Column: Assistant / Chat (300px)
+    Right Sidebar: Lore Assistant & Sensory Lab.
     """
-    def __init__(self, master, on_send_instruction):
+    def __init__(self, master, on_request_lore):
         super().__init__(master, width=ThemeEngine.ASSISTANT_WIDTH, corner_radius=0, fg_color=ThemeEngine.BG_MAIN)
-        self.on_send_instruction = on_send_instruction
+        self.on_request_lore = on_request_lore
         
-        # Border Left
-        border = ctk.CTkFrame(self, width=1, fg_color=ThemeEngine.BORDER_COLOR)
-        border.pack(side="left", fill="y")
+        # Create Tabs
+        self.add("Lore Chat")
+        self.add("Sensory Lab")
         
-        # Container
-        self.container = ctk.CTkFrame(self, fg_color="transparent")
-        self.container.pack(side="left", fill="both", expand=True, padx=20, pady=20)
+        # --- TAB 1: LORE CHAT ---
+        self.tab("Lore Chat").grid_columnconfigure(0, weight=1)
+        self.tab("Lore Chat").grid_rowconfigure(0, weight=1)
         
-        # Empty State
-        self.empty_state_lbl = ctk.CTkLabel(
-            self.container,
-            text="Start a conversation\n\nAsk questions about your project,\nget writing suggestions,\nor paste long text for analysis.",
-            font=("Inter", 13),
-            text_color=ThemeEngine.TEXT_MUTED,
-            justify="center"
-        )
-        self.empty_state_lbl.pack(pady=(100, 20))
-        
-        # Chat History (Placeholder for now, could be a scrollable frame)
+        # Chat History
         self.chat_history = ctk.CTkTextbox(
-            self.container, 
-            fg_color="transparent", 
-            text_color=ThemeEngine.TEXT_MUTED, 
-            font=("Inter", 13),
+            self.tab("Lore Chat"),
+            font=ThemeEngine.FONT_UI,
+            fg_color="transparent",
+            text_color=ThemeEngine.TEXT_PRIMARY,
             wrap="word",
             state="disabled"
         )
-        # For now, hiding history until interaction
-        # self.chat_history.pack(fill="both", expand=True, pady=(0, 20))
+        self.chat_history.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
         
-        # Input Area (Bottom)
-        self.input_entry = ctk.CTkEntry(
-            self.container,
-            placeholder_text="Ask AI...",
-            height=40,
-            corner_radius=20,
-            border_width=1,
-            border_color=ThemeEngine.BORDER_COLOR,
-            fg_color=ThemeEngine.BG_SIDEBAR,
-            text_color=ThemeEngine.TEXT_PRIMARY
+        # Input Area (Chat)
+        self.chat_input = ctk.CTkEntry(
+            self.tab("Lore Chat"),
+            placeholder_text="Ask about lore...",
+            fg_color=ThemeEngine.BG_MAIN
         )
-        self.input_entry.pack(side="bottom", fill="x", pady=(20, 0))
-        self.input_entry.bind("<Return>", lambda e: self.send_action())
+        self.chat_input.grid(row=1, column=0, sticky="ew", padx=10, pady=(0, 10))
+        self.chat_input.bind("<Return>", self.send_chat_action)
+        
+        # Empty State
+        self.empty_state_lbl = ctk.CTkLabel(
+            self.tab("Lore Chat"), 
+            text="Ask anything about\nyour story world.",
+            font=ThemeEngine.FONT_UI,
+            text_color=ThemeEngine.TEXT_MUTED
+        )
+        # Initially visible
+        self.empty_state_lbl.place(relx=0.5, rely=0.4, anchor="center")
 
-    def send_action(self):
-        prompt = self.input_entry.get().strip()
-        if prompt:
-            self.on_send_instruction(prompt)
-            self.input_entry.delete(0, 'end')
-            # Hide empty state, show log
-            self.empty_state_lbl.pack_forget()
-            self.chat_history.pack(fill="both", expand=True, pady=(0, 20), side="top")
-            self.append_log(f"You: {prompt}\n")
+        # --- TAB 2: SENSORY LAB ---
+        self.tab("Sensory Lab").grid_columnconfigure(0, weight=1)
+        
+        # Header
+        ctk.CTkLabel(self.tab("Sensory Lab"), text="Brainstorm Atmosphere", font=ThemeEngine.FONT_H3).pack(pady=10)
+        
+        # Input
+        self.sensory_input = ctk.CTkEntry(
+            self.tab("Sensory Lab"), 
+            placeholder_text="E.g., A rainy street at night...",
+            fg_color=ThemeEngine.BG_MAIN
+        )
+        self.sensory_input.pack(fill="x", padx=10, pady=5)
+        self.sensory_input.bind("<Return>", self.send_sensory_action)
+        
+        # Button
+        ctk.CTkButton(
+            self.tab("Sensory Lab"),
+            text="Generate Details",
+            fg_color=ThemeEngine.ACCENT_SECONDARY,
+            command=self.send_sensory_action
+        ).pack(pady=5)
+        
+        # Output Area
+        self.sensory_output = ctk.CTkTextbox(
+            self.tab("Sensory Lab"),
+            font=ThemeEngine.FONT_UI,
+            fg_color="transparent", 
+            wrap="word",
+            height=300
+        )
+        self.sensory_output.pack(fill="both", expand=True, padx=10, pady=10)
+
+    def send_chat_action(self, event=None):
+        query = self.chat_input.get().strip()
+        if query:
+            self.on_request_lore(query)
+            self.chat_input.delete(0, 'end')
+            
+    def send_sensory_action(self, event=None):
+        setting = self.sensory_input.get().strip()
+        if setting:
+             self.on_request_lore(f"SENSORY::{setting}")
+             self.sensory_input.delete(0, 'end')
+             self.sensory_output.delete("1.0", "end")
+             self.sensory_output.insert("end", "Generating sensory details...\n\n")
+
+    def show_replacement_options(self, on_replace_callback):
+        """Shows Replace buttons instead of Chat Input."""
+        self.chat_input.grid_forget()
+        
+        self.replace_frame = ctk.CTkFrame(self.tab("Lore Chat"), fg_color="transparent")
+        self.replace_frame.grid(row=1, column=0, sticky="ew", padx=10, pady=(0, 10))
+        
+        ctk.CTkLabel(self.replace_frame, text="Select Variation:", font=("Inter", 12, "bold")).pack(side="top", pady=(0, 5))
+        
+        btn_frame = ctk.CTkFrame(self.replace_frame, fg_color="transparent")
+        btn_frame.pack(side="top")
+        
+        ctk.CTkButton(btn_frame, text="1", width=40, command=lambda: on_replace_callback(0)).pack(side="left", padx=2)
+        ctk.CTkButton(btn_frame, text="2", width=40, command=lambda: on_replace_callback(1)).pack(side="left", padx=2)
+        ctk.CTkButton(btn_frame, text="3", width=40, command=lambda: on_replace_callback(2)).pack(side="left", padx=2)
+        ctk.CTkButton(btn_frame, text="Cancel", width=60, fg_color=ThemeEngine.BG_HOVER, command=lambda: on_replace_callback(-1)).pack(side="left", padx=10)
+
+    def hide_replacement_options(self):
+        """Restores Chat Input."""
+        if hasattr(self, 'replace_frame'):
+            self.replace_frame.destroy()
+        self.chat_input.grid(row=1, column=0, sticky="ew", padx=10, pady=(0, 10))
 
     def append_log(self, text):
+        self.empty_state_lbl.place_forget()
         self.chat_history.configure(state="normal")
         self.chat_history.insert("end", text)
         self.chat_history.configure(state="disabled")
         self.chat_history.see("end")
-        
-    def set_thinking(self, is_thinking):
-        if is_thinking:
-            self.input_entry.configure(placeholder_text="AI Thinking...", state="disabled")
-        else:
-            self.input_entry.configure(placeholder_text="Ask AI...", state="normal")
 
+    def append_sensory(self, text):
+        self.sensory_output.insert("end", text)
+        self.sensory_output.see("end")
 
     def clear_log(self):
         self.chat_history.configure(state="normal")
         self.chat_history.delete("1.0", "end")
         self.chat_history.configure(state="disabled")
-        # Pack back the empty state
-        self.chat_history.pack_forget()
-        self.empty_state_lbl.pack(pady=(100, 20))
+        self.empty_state_lbl.place(relx=0.5, rely=0.4, anchor="center")
+        self.sensory_output.delete("1.0", "end")
+
+    def set_thinking(self, is_thinking):
+        pass # Optional loading state
 
 
 class StoryBibleUI(ctk.CTk):
@@ -552,7 +784,8 @@ class StoryBibleUI(ctk.CTk):
         
         # Pages for Center Area
         self.pages = {}
-        self.editor = EditorFrame(self.center_area, lambda p: self.handle_ai_request(p, 'editor'))
+        # Pass manual_summarize callback
+        self.editor = EditorFrame(self.center_area, self.on_editor_instruction, self.manual_summarize)
         self.pages["Writing"] = self.editor
         
         self.char_page = CharacterFrame(self.center_area, db_manager)
@@ -591,6 +824,17 @@ class StoryBibleUI(ctk.CTk):
         elif name == "Writing":
             self.update_mimic_list()
 
+    def on_editor_instruction(self, prompt):
+        self.handle_ai_request(prompt, 'editor')
+
+    def manual_summarize(self):
+        """Force a summary update for the current chapter."""
+        if self.current_project_id and self.current_chapter_id:
+             content = self.editor.get_content()
+             if content:
+                 threading.Thread(target=self._update_beat_summary, args=(content,), daemon=True).start()
+                 self.assistant.append_log("System: Chapter summary updated.")
+
     def handle_ai_request(self, prompt, target):
         if self.is_generating: return
         
@@ -600,63 +844,298 @@ class StoryBibleUI(ctk.CTk):
         project_memory = ""
         project_name = "Current Project"
         
+        # --- ROUTING LOGIC ---
+        plugin_type = None
+        
         if target == 'editor':
-            # Writing Mode
             current_text = self.editor.get_content()
             self.editor.set_generating(True)
-            selection = self.editor.get_mimic_selection()
-            if selection.startswith("Mimic: "):
-                char_name = selection.replace("Mimic: ", "")
-                char_context = self.db_manager.get_character_details(char_name)
+            
+            # Check for Plugins
+            if prompt.startswith("PLUGIN::"):
+                parts = prompt.split("::")
+                plugin_type = parts[1]
+                # If selection exists, it's in parts[2], else empty
+                selection_text = parts[2] if len(parts) > 2 else ""
+                
+                if plugin_type == 'expand_scene':
+                    # Special handling for expansion
+                    prompt = "" # Prompt is implicit
+                else:
+                    # For rewrite/describe, prompt is the text to act on
+                    prompt = selection_text
+            
+            else:
+                # Normal writing instruction
+                selection = self.editor.get_mimic_selection()
+                if selection.startswith("Mimic: "):
+                    char_name = selection.replace("Mimic: ", "")
+                    char_context = self.db_manager.get_character_details(char_name)
 
         elif target == 'assistant':
-            # Lore Assistant Mode (Deep Search)
-            self.assistant.set_thinking(True)
-            self.assistant.append_log(f"AI: ")
+             # Check for Sensory Lab
+             if prompt.startswith("SENSORY::"):
+                 self.target_panel = 'sensory'
+                 plugin_type = "sensory_lab"
+                 prompt = prompt.replace("SENSORY::", "")
+             else:
+                 # Lore Assistant Mode (Deep Search)
+                 self.target_panel = 'assistant'
+                 self.assistant.set_thinking(True)
+                 self.assistant.append_log(f"AI: ")
             
-            if self.current_project_id:
-                # Get Project Name
-                # Small optimization: could cache this
-                projects = self.db_manager.get_projects_with_chapters()
-                for p in projects:
-                    if p['id'] == self.current_project_id:
-                        project_name = p['name']
-                        break
-                
-                # Fetch DEEP Memory based on prompt query
-                project_memory = self.db_manager.get_deep_memory(self.current_project_id, prompt)
-            else:
-                project_memory = "No project selected."
+                 if self.current_project_id:
+                    # Get Project Name
+                    projects = self.db_manager.get_projects_with_chapters()
+                    for p in projects:
+                        if p['id'] == self.current_project_id:
+                            project_name = p['name']
+                            break
+                    project_memory = self.db_manager.get_deep_memory(self.current_project_id, prompt)
+                 else:
+                    project_memory = "No project selected."
 
         self.is_generating = True
         threading.Thread(
             target=self._ai_thread,
-            args=(prompt, target, current_text, char_context, project_memory, project_name),
+            args=(prompt, target, current_text, char_context, project_memory, project_name, plugin_type),
             daemon=True
         ).start()
 
-    def _ai_thread(self, prompt, target, context, char_context, memory, project_name):
+
+class StoryBibleUI(ctk.CTk):
+    def __init__(self, ai_engine, db_manager):
+        super().__init__()
+        self.ai_engine = ai_engine
+        self.db_manager = db_manager
+        
+        self.current_project_id = None
+        self.current_chapter_id = None
+        self.is_generating = False
+        self.response_queue = queue.Queue()
+        self.target_panel = None  # 'editor' or 'assistant'
+        
+        # Setup Window
+        ctk.set_appearance_mode("Dark")
+        self.title("Story Bible Pro")
+        self.geometry("1400x900")
+        self.configure(fg_color=ThemeEngine.BG_MAIN)
+        
+        # Grid Layout (3 Columns)
+        self.grid_columnconfigure(1, weight=1)
+        self.grid_rowconfigure(0, weight=1)
+        
+        # Col 0: Sidebar
+        self.sidebar = SidebarFrame(self, db_manager, self.nav_select, self.load_chapter, self.on_generate_from_beats, self.on_auto_generate_beats)
+        self.sidebar.grid(row=0, column=0, sticky="nsew")
+        
+        # Col 1: Center Area (Swappable)
+        self.center_area = ctk.CTkFrame(self, fg_color=ThemeEngine.BG_MAIN, corner_radius=0)
+        self.center_area.grid(row=0, column=1, sticky="nsew")
+        self.center_area.grid_rowconfigure(0, weight=1)
+        self.center_area.grid_columnconfigure(0, weight=1)
+        
+        # Pages for Center Area
+        self.pages = {}
+        # Pass manual_summarize callback
+        self.editor = EditorFrame(self.center_area, self.on_editor_instruction, self.manual_summarize)
+        self.pages["Writing"] = self.editor
+        
+        self.char_page = CharacterFrame(self.center_area, db_manager)
+        self.pages["Characters"] = self.char_page
+        
+        self.settings_page = SettingsFrame(self.center_area)
+        self.pages["Settings"] = self.settings_page
+        
+        # Show default
+        self.pages["Writing"].grid(row=0, column=0, sticky="nsew")
+        
+        # Col 2: Assistant (Always visible)
+        self.assistant = AssistantPanel(self, lambda p: self.handle_ai_request(p, 'assistant'))
+        self.assistant.grid(row=0, column=2, sticky="nsew")
+
+        # Load Data
+        self.sidebar.select_nav("Writing")
+        self.load_session()
+        self.update_mimic_list()
+        
+        # Event Loops
+        self.after(100, self.check_queue)
+        self.after(30000, self.auto_save_loop)
+        self.protocol("WM_DELETE_WINDOW", self.on_close)
+
+    def nav_select(self, name):
+        # Swap Center Page
+        for page in self.pages.values():
+            page.grid_forget()
+        
+        if name in self.pages:
+            self.pages[name].grid(row=0, column=0, sticky="nsew")
+            
+        if name == "Characters":
+            self.char_page.load_list()
+        elif name == "Writing":
+            self.update_mimic_list()
+
+    def on_editor_instruction(self, prompt):
+        self.handle_ai_request(prompt, 'editor')
+
+    def manual_summarize(self):
+        """Force a summary update for the current chapter."""
+        if self.current_project_id and self.current_chapter_id:
+             content = self.editor.get_content()
+             if content:
+                 self.target_panel = 'assistant'
+                 self.is_generating = True
+                 self.assistant.append_log("Generating Summary...\n")
+                 threading.Thread(target=self._update_beat_summary, args=(content, True), daemon=True).start()
+
+    def handle_ai_request(self, prompt, target):
+        if self.is_generating: return
+        
+        self.target_panel = target
+        current_text = ""
+        char_context = None
+        project_memory = ""
+        project_name = "Current Project"
+        context_data = {}
+        
+        # --- ROUTING LOGIC ---
+        plugin_type = None
+        self.accumulated_response = ""
+        self.current_variations = []
+        
+        if target == 'editor':
+            current_text = self.editor.get_content()
+            self.editor.set_generating(True)
+            
+            # Check for WRITE_NEXT (Alt+W RAG-Enhanced Writing)
+            if prompt == "WRITE_NEXT":
+                if self.current_project_id and self.current_chapter_id:
+                    rag_context = self.db_manager.get_context_window(
+                        self.current_project_id, 
+                        self.current_chapter_id,
+                        char_limit=3000
+                    )
+                    if rag_context:
+                        self.is_generating = True
+                        self.target_panel = 'editor_ghost'
+                        threading.Thread(
+                            target=self._write_next_thread,
+                            args=(current_text, rag_context),
+                            daemon=True
+                        ).start()
+                        return
+            
+            # Check for Plugins
+            if prompt.startswith("PLUGIN::"):
+                parts = prompt.split("::")
+                plugin_type = parts[1]
+                # If selection exists, it's in parts[2], else empty
+                selection_text = parts[2] if len(parts) > 2 else ""
+                
+                # Fetch Context Data (Genre)
+                if self.current_project_id:
+                    settings = self.db_manager.get_project_settings(self.current_project_id)
+                    if settings:
+                         context_data['genre'] = settings['genre']
+                
+                # Store Logic for Replacement
+                self.current_plugin_type = plugin_type
+                if plugin_type != 'expand_scene':
+                     self.current_selection_indices = self.editor.get_selection_indices()
+
+                if plugin_type == 'expand_scene':
+                    # Special handling for expansion
+                    prompt = "" # Prompt is implicit
+                else:
+                    # For rewrite/describe, prompt is the text to act on
+                    prompt = selection_text
+            
+            else:
+                # Normal writing instruction
+                selection = self.editor.get_mimic_selection()
+                if selection.startswith("Mimic: "):
+                    char_name = selection.replace("Mimic: ", "")
+                    char_context = self.db_manager.get_character_details(char_name)
+
+        elif target == 'assistant':
+             # Check for Sensory Lab
+             if prompt.startswith("SENSORY::"):
+                 self.target_panel = 'sensory'
+                 plugin_type = "sensory_lab"
+                 prompt = prompt.replace("SENSORY::", "")
+             else:
+                 # Lore Assistant Mode (Deep Search)
+                 self.assistant.set_thinking(True)
+                 self.assistant.append_log(f"AI: ")
+            
+                 if self.current_project_id:
+                    # Get Project Name
+                    projects = self.db_manager.get_projects_with_chapters()
+                    for p in projects:
+                        if p['id'] == self.current_project_id:
+                            project_name = p['name']
+                            break
+                    project_memory = self.db_manager.get_deep_memory(self.current_project_id, prompt)
+                 else:
+                    project_memory = "No project selected."
+
+        self.is_generating = True
+        threading.Thread(
+            target=self._ai_thread,
+            args=(prompt, target, current_text, char_context, project_memory, project_name, plugin_type),
+            daemon=True
+        ).start()
+
+    def _ai_thread(self, prompt, target, context, char_context, memory, project_name, plugin_type=None):
         try:
             if target == 'editor':
-                self.ai_engine.stream_response(prompt, self.response_queue, "", context, char_context)
-                
-                # After writing, trigger beat summary update if content is substantial (simple heuristic)
-                if len(context) > 100 and self.current_project_id and self.current_chapter_id:
-                     # Fire and forget summary update
-                     threading.Thread(target=self._update_beat_summary, args=(context,), daemon=True).start()
+                if plugin_type == 'expand_scene':
+                    self.ai_engine.expand_scene(context, self.response_queue)
+                elif plugin_type:
+                    # Specialized plugin generation (Describe/Rewrite)
+                    self.ai_engine.generate_plugin_response(prompt, plugin_type, self.response_queue, context_data)
+                else:
+                    # Normal Prose
+                    self.ai_engine.stream_response(prompt, self.response_queue, "", context, char_context)
+                    
+                    if len(context) > 100 and self.current_project_id and self.current_chapter_id:
+                         threading.Thread(target=self._update_beat_summary, args=(context,), daemon=True).start()
 
             elif target == 'assistant':
-                self.ai_engine.ask_lore_assistant(prompt, self.response_queue, memory, project_name)
+                if plugin_type == 'sensory_lab':
+                    self.ai_engine.generate_plugin_response(prompt, 'sensory_lab', self.response_queue)
+                else:
+                    self.ai_engine.ask_lore_assistant(prompt, self.response_queue, memory, project_name)
+                    
         except Exception as e:
             self.response_queue.put(f"Error: {e}")
             self.response_queue.put("[[END]]")
 
-    def _update_beat_summary(self, text):
+    def _write_next_thread(self, current_text, rag_context):
+        """Special thread for RAG-enhanced writing (Alt+W)."""
+        try:
+            self.ai_engine.stream_response(
+                instruction="",
+                response_queue=self.response_queue,
+                current_text=current_text,
+                rag_context=rag_context
+            )
+        except Exception as e:
+            self.response_queue.put(f"Error: {e}")
+            self.response_queue.put("[[END]]")
+
+    def _update_beat_summary(self, text, show_output=False):
         """Background task to generate and save story beat."""
         summary = self.ai_engine.generate_beat_summary(text)
         if summary and self.current_project_id and self.current_chapter_id:
             self.db_manager.save_beat(self.current_project_id, self.current_chapter_id, summary)
             print(f"[DEBUG] Beat saved for Ch {self.current_chapter_id}: {summary}")
+            
+            if show_output:
+                self.response_queue.put(f"**Chapter Summary:**\n{summary}")
+                self.response_queue.put("[[END]]")
 
     def check_queue(self):
         try:
@@ -668,13 +1147,56 @@ class StoryBibleUI(ctk.CTk):
                     self.assistant.set_thinking(False)
                     if self.target_panel == 'assistant':
                         self.assistant.append_log("\n\n")
+                        # Trigger Prose Cards ONLY for editor-based plugins, not lore chat
+                        # (Replacement UI is only for right-click context menu operations on selected editor text)
+                            
+                    elif self.target_panel == 'sensory':
+                        self.assistant.append_sensory("\n\n")
                 else:
                     if self.target_panel == 'editor':
                         self.editor.insert_token(token)
+                    elif self.target_panel == 'editor_ghost':
+                        self.editor.insert_ghost_token(token)
                     elif self.target_panel == 'assistant':
                         self.assistant.append_log(token)
+                    elif self.target_panel == 'sensory':
+                        self.assistant.append_sensory(token)
         except queue.Empty: pass
         finally: self.after(50, self.check_queue)
+
+    def trigger_replacement_ui(self):
+        """Parses response and shows replacement options."""
+        # Simple parsing by "---" separator
+        raw_text = self.accumulated_response
+        # Remove any system prompts/artifacts if leaks (basic clean)
+        cleaned = raw_text.replace("Here are 3 variations:", "").strip()
+        
+        self.current_variations = [v.strip() for v in cleaned.split("---") if v.strip()]
+        
+        if self.current_variations:
+            logging.info(f"Parsed {len(self.current_variations)} variations.")
+            self.assistant.show_replacement_options(self.on_replace_selected)
+        else:
+            self.assistant.append_log("\n[System: Could not parse variations.]")
+
+    def on_replace_selected(self, index):
+        """Callback from Assistant Panel."""
+        try:
+            if index >= 0 and index < len(self.current_variations):
+                new_text = self.current_variations[index]
+                if self.current_selection_indices:
+                    self.editor.replace_section(self.current_selection_indices, new_text)
+                    self.assistant.append_log(f"\n[System: Applied Variation {index+1}]")
+            else:
+                self.assistant.append_log("\n[System: Cancelled replacement.]")
+        except Exception as e:
+            logging.error(f"Replacement error: {e}")
+            self.assistant.append_log(f"\n[Error: {e}]")
+        
+        self.assistant.hide_replacement_options()
+        self.current_plugin_type = None
+        self.accumulated_response = ""
+        self.current_selection_indices = None
 
     def load_chapter(self, chapter_id, project_id):
         self.save_current()
@@ -701,6 +1223,90 @@ class StoryBibleUI(ctk.CTk):
         self.sidebar.refresh_tree(active_chapter_id=chapter_id)
         # Ensure we switch back to writing view
         self.sidebar.select_nav("Writing")
+
+    def on_generate_from_beats(self):
+        """Triggered by Generate Full Scene button."""
+        if not self.current_project_id or not self.current_chapter_id:
+            return
+        
+        beats_text = self.sidebar.beats_textbox.get("1.0", "end").strip()
+        beats_list = [l.strip() for l in beats_text.split("\n") if l.strip() and "Enter" not in l]
+        
+        if not beats_list:
+            return
+        
+        lore_package = self.db_manager.fetch_omni_context(self.current_project_id, self.current_chapter_id, beats_list)
+        if not lore_package:
+            return
+        
+        is_valid, conflict_msg = self.ai_engine.check_continuity(beats_list, lore_package)
+        
+        if not is_valid:
+            from tkinter import messagebox
+            proceed = messagebox.askyesno("⚠️ Continuity Conflict", f"{conflict_msg}\n\nProceed?")
+            if not proceed:
+                return
+        
+        self.is_generating = True
+        self.target_panel = 'editor'
+        self.editor.set_generating(True)
+        
+        threading.Thread(target=self._generate_prose_thread, args=(beats_list, lore_package), daemon=True).start()
+
+    def _generate_prose_thread(self, beats, lore_package):
+        try:
+            self.ai_engine.generate_omniscient_prose(beats, lore_package, self.response_queue)
+        except Exception as e:
+            self.response_queue.put(f"Error: {e}")
+            self.response_queue.put("[[END]]")
+
+    def on_auto_generate_beats(self):
+        """Smart button: Extract beats from prose OR suggest beats for new chapter."""
+        if not self.current_chapter_id:
+            return
+        
+        # Check if editor has content
+        prose = self.editor.get_content().strip()
+        
+        if len(prose) > 100:
+            # Extract beats from existing prose
+            beats = self.ai_engine.generate_beats_from_prose(prose)
+            self.sidebar.beats_textbox.delete("1.0", "end")
+            self.sidebar.beats_textbox.insert("1.0", beats)
+            # Save to database
+            self.db_manager.update_chapter_beats(self.current_chapter_id, beats)
+            logging.info(f"Extracted {len(beats.splitlines())} beats from prose")
+        else:
+            # Suggest beats for new chapter
+            if not self.current_project_id:
+                return
+            
+           # Get previous chapter beats
+            prev_beats = ""
+            if self.current_chapter_id:
+                # Find previous chapter
+                chapters = self.db_manager.get_projects_with_chapters()
+                for p in chapters:
+                    if p['id'] == self.current_project_id:
+                        ch_list = [(c['id'], idx) for idx, c in enumerate(p['chapters'])]
+                        for cid, idx in ch_list:
+                            if cid == self.current_chapter_id and idx > 0:
+                                prev_id = p['chapters'][idx - 1]['id']
+                                prev_beats = self.db_manager.get_chapter_beats(prev_id)
+                                break
+            
+            # Fetch lore package
+            lore_package = self.db_manager.fetch_omni_context(self.current_project_id, self.current_chapter_id, [])
+            if not lore_package:
+               lore_package = {'characters': [], 'story_so_far': [], 'genre': 'fiction', 'world_rules': ''}
+            
+            # Generate suggestions
+            suggested_beats = self.ai_engine.suggest_next_beats(prev_beats, lore_package)
+            self.sidebar.beats_textbox.delete("1.0", "end")
+            self.sidebar.beats_textbox.insert("1.0", suggested_beats)
+            # Save to database
+            self.db_manager.update_chapter_beats(self.current_chapter_id, suggested_beats)
+            logging.info(f"Suggested beats for new chapter")
 
     def save_current(self):
         if self.current_chapter_id:
@@ -734,3 +1340,214 @@ class StoryBibleUI(ctk.CTk):
         if hasattr(self.ai_engine, "unload_model"):
             self.ai_engine.unload_model()
         self.destroy()
+class StoryBibleDrawer(ctk.CTkFrame):
+    """Right drawer with 7-tab story bible (Sudowrite style)."""
+    def __init__(self, master, db_manager, project_id):
+        super().__init__(master, width=350, corner_radius=0, fg_color=ThemeEngine.BG_SIDEBAR)
+        self.db_manager = db_manager
+        self.project_id = project_id
+        self.save_timers = {}  # field_name -> after_id
+        
+        # Header
+        header = ctk.CTkLabel(
+            self, 
+            text="📖 Story Bible",
+            font=("Inter", 16, "bold"),
+            text_color=ThemeEngine.TEXT_PRIMARY
+        )
+        header.pack(pady=(15, 10))
+        
+        # Tab View
+        self.tabview = ctk.CTkTabview(self, fg_color=ThemeEngine.BG_MAIN)
+        self.tabview.pack(fill="both", expand=True, padx=10, pady=(0, 10))
+        
+        # Create 7 tabs
+        self.tabview.add("🧠 Braindump")
+        self.tabview.add("🎭 Genre")
+        self.tabview.add("🖋️ Style")
+        self.tabview.add("📜 Synopsis")
+        self.tabview.add("👥 Characters")
+        self.tabview.add("🌍 World")
+        self.tabview.add("🗺️ Outline")
+        
+        self._create_tab_contents()
+        self.load_data()
+    
+    def _create_tab_contents(self):
+        """Create content for each tab."""
+        # Tab 1: Braindump
+        self.braindump_text = ctk.CTkTextbox(
+            self.tabview.tab("🧠 Braindump"),
+            height=400,
+            wrap="word",
+            fg_color=ThemeEngine.BG_SIDEBAR,
+            border_width=1,
+            border_color=ThemeEngine.BORDER_COLOR
+        )
+        self.braindump_text.pack(fill="both", expand=True, padx=15, pady=15)
+        self.braindump_text.insert("1.0", "Dump your raw ideas here...")
+        self.braindump_text.bind("<KeyRelease>", lambda e: self.on_text_change("braindump"))
+        
+        # Tab 2: Genre
+        genre_label = ctk.CTkLabel(
+            self.tabview.tab("🎭 Genre"),
+            text="e.g., Gritty Noir, Epic Fantasy, Cozy Mystery",
+            font=("Inter", 11),
+            text_color=ThemeEngine.TEXT_MUTED
+        )
+        genre_label.pack(pady=(15, 5))
+        
+        self.genre_entry = ctk.CTkEntry(
+            self.tabview.tab("🎭 Genre"),
+            placeholder_text="Enter genre...",
+            height=40,
+            fg_color=ThemeEngine.BG_SIDEBAR,
+            border_width=1,
+            border_color=ThemeEngine.BORDER_COLOR
+        )
+        self.genre_entry.pack(fill="x", padx=15, pady=5)
+        self.genre_entry.bind("<KeyRelease>", lambda e: self.on_text_change("genre"))
+        
+        # Tab 3: Style
+        self.style_text = ctk.CTkTextbox(
+            self.tabview.tab("🖋️ Style"),
+            height=200,
+            wrap="word",
+            fg_color=ThemeEngine.BG_SIDEBAR,
+            border_width=1,
+            border_color=ThemeEngine.BORDER_COLOR
+        )
+        self.style_text.pack(fill="both", expand=True, padx=15, pady=15)
+        self.style_text.insert("1.0", "e.g., Gritty, Noir, First Person, Short sentences, Dry humor...")
+        self.style_text.bind("<KeyRelease>", lambda e: self.on_text_change("style"))
+        
+        # Tab 4: Synopsis
+        self.synopsis_text = ctk.CTkTextbox(
+            self.tabview.tab("📜 Synopsis"),
+            height=300,
+            wrap="word",
+            fg_color=ThemeEngine.BG_SIDEBAR,
+            border_width=1,
+            border_color=ThemeEngine.BORDER_COLOR
+        )
+        self.synopsis_text.pack(fill="both", expand=True, padx=15, pady=15)
+        self.synopsis_text.insert("1.0", "What is the main conflict and how does it resolve?")
+        self.synopsis_text.bind("<KeyRelease>", lambda e: self.on_text_change("synopsis"))
+        
+        # Tab 5: Characters
+        self.characters_text = ctk.CTkTextbox(
+            self.tabview.tab("👥 Characters"),
+            height=400,
+            wrap="word",
+            fg_color=ThemeEngine.BG_SIDEBAR,
+            border_width=1,
+            border_color=ThemeEngine.BORDER_COLOR
+        )
+        self.characters_text.pack(fill="both", expand=True, padx=15, pady=15)
+        self.characters_text.insert("1.0", "Quick character notes and relationships...")
+        self.characters_text.bind("<KeyRelease>", lambda e: self.on_text_change("characters"))
+        
+        # Tab 6: World
+        self.world_text = ctk.CTkTextbox(
+            self.tabview.tab("🌍 World"),
+            height=400,
+            wrap="word",
+            fg_color=ThemeEngine.BG_SIDEBAR,
+            border_width=1,
+            border_color=ThemeEngine.BORDER_COLOR
+        )
+        self.world_text.pack(fill="both", expand=True, padx=15, pady=15)
+        self.world_text.insert("1.0", "Setting, world rules, technology level, magic system...")
+        self.world_text.bind("<KeyRelease>", lambda e: self.on_text_change("worldbuilding"))
+        
+        # Tab 7: Outline
+        self.outline_text = ctk.CTkTextbox(
+            self.tabview.tab("🗺️ Outline"),
+            height=400,
+            wrap="word",
+            fg_color=ThemeEngine.BG_SIDEBAR,
+            border_width=1,
+            border_color=ThemeEngine.BORDER_COLOR
+        )
+        self.outline_text.pack(fill="both", expand=True, padx=15, pady=15)
+        self.outline_text.insert("1.0", "Chapter-by-chapter structure and major plot points...")
+        self.outline_text.bind("<KeyRelease>", lambda e: self.on_text_change("outline"))
+    
+    def on_text_change(self, field_name):
+        """Debounced auto-save on text change."""
+        # Cancel existing timer
+        if field_name in self.save_timers:
+            self.after_cancel(self.save_timers[field_name])
+        
+        # Set new timer (1500ms = 1.5s)
+        self.save_timers[field_name] = self.after(1500, lambda: self.save_field(field_name))
+    
+    def save_field(self, field_name):
+        """Save a single field to database."""
+        value = self.get_field_value(field_name)
+        self.db_manager.update_story_bible_field(self.project_id, field_name, value)
+        logging.info(f"Auto-saved story bible field: {field_name}")
+    
+    def get_field_value(self, field_name):
+        """Get current value of a field."""
+        field_map = {
+            'braindump': self.braindump_text,
+            'genre': self.genre_entry,
+            'style': self.style_text,
+            'synopsis': self.synopsis_text,
+            'characters': self.characters_text,
+            'worldbuilding': self.world_text,
+            'outline': self.outline_text
+        }
+        
+        widget = field_map.get(field_name)
+        if isinstance(widget, ctk.CTkEntry):
+            return widget.get()
+        elif isinstance(widget, ctk.CTkTextbox):
+            return widget.get("1.0", "end-1c")
+        return ""
+    
+    def load_data(self):
+        """Load bible data from database."""
+        if not self.project_id:
+            return
+        
+        data = self.db_manager.get_story_bible(self.project_id)
+        if not data:
+            return
+        
+        # Clear placeholders and load data
+        if data['braindump']:
+            self.braindump_text.delete("1.0", "end")
+            self.braindump_text.insert("1.0", data['braindump'])
+        
+        if data['genre']:
+            self.genre_entry.delete(0, "end")
+            self.genre_entry.insert(0, data['genre'])
+        
+        if data['style']:
+            self.style_text.delete("1.0", "end")
+            self.style_text.insert("1.0", data['style'])
+        
+        if data['synopsis']:
+            self.synopsis_text.delete("1.0", "end")
+            self.synopsis_text.insert("1.0", data['synopsis'])
+        
+        if data['characters']:
+            self.characters_text.delete("1.0", "end")
+            self.characters_text.insert("1.0", data['characters'])
+        
+        if data['worldbuilding']:
+            self.world_text.delete("1.0", "end")
+            self.world_text.insert("1.0", data['worldbuilding'])
+        
+        if data['outline']:
+            self.outline_text.delete("1.0", "end")
+            self.outline_text.insert("1.0", data['outline'])
+    
+    def update_project(self, project_id):
+        """Switch to a different project."""
+        self.project_id = project_id
+        self.load_data()
+
+

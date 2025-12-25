@@ -47,10 +47,16 @@ class DatabaseManager:
                         project_id INTEGER NOT NULL,
                         title TEXT NOT NULL,
                         content TEXT,
-                        chapter_order INTEGER,
-                        FOREIGN KEY (project_id) REFERENCES projects (id)
+                        chapter_order INTEGER
                     )
                 """)
+                
+                # Migration: Add beats column if it doesn't exist
+                cursor.execute("PRAGMA table_info(chapters)")
+                columns = [row[1] for row in cursor.fetchall()]
+                if 'beats' not in columns:
+                    cursor.execute("ALTER TABLE chapters ADD COLUMN beats TEXT")
+                    logging.info("Added beats column to chapters table")
                 
                 cursor.execute("""
                     CREATE TABLE IF NOT EXISTS app_state (
@@ -88,6 +94,19 @@ class DatabaseManager:
             logging.error(f"Create project error: {e}")
             return None
 
+    def get_project_settings(self, project_id: int):
+        """Fetch project settings including genre."""
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("SELECT name, genre FROM projects WHERE id = ?", (project_id,))
+                row = cursor.fetchone()
+                if row:
+                    return {'name': row[0], 'genre': row[1]}
+        except sqlite3.Error as e:
+            logging.error(f"Get settings error: {e}")
+        return None
+
     def get_projects_with_chapters(self):
         """Returns a list of projects, each with a 'chapters' list."""
         try:
@@ -106,6 +125,140 @@ class DatabaseManager:
         except sqlite3.Error as e:
             logging.error(f"Get projects error: {e}")
             return []
+
+    def get_context_window(self, project_id: int, chapter_id: int, char_limit: int = 3000):
+        """
+        Retrieves context for RAG-enhanced writing:
+        - Last N characters from current chapter
+        - Previous chapter's summary
+        - Character dossiers for names mentioned in recent text
+        """
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                
+                # 1. Get current chapter content and extract last N chars
+                cursor.execute("SELECT content, chapter_order FROM chapters WHERE id = ?", (chapter_id,))
+                row = cursor.fetchone()
+                if not row:
+                    return None
+                
+                current_content = row[0] or ""
+                current_order = row[1]
+                recent_text = current_content[-char_limit:] if len(current_content) > char_limit else current_content
+                
+                # 2. Get previous chapter summary
+                prev_summary = ""
+                if current_order and current_order > 1:
+                    cursor.execute("""
+                        SELECT c.id FROM chapters c 
+                        WHERE c.project_id = ? AND c.chapter_order = ?
+                    """, (project_id, current_order - 1))
+                    prev_chapter = cursor.fetchone()
+                    
+                    if prev_chapter:
+                        cursor.execute("""
+                            SELECT summary FROM story_beats 
+                            WHERE project_id = ? AND chapter_id = ?
+                            ORDER BY id DESC LIMIT 1
+                        """, (project_id, prev_chapter[0]))
+                        beat = cursor.fetchone()
+                        if beat:
+                            prev_summary = beat[0]
+                
+                # 3. Get all character names and check which appear in recent text
+                cursor.execute("SELECT name FROM characters")
+                all_chars = [row[0] for row in cursor.fetchall()]
+                
+                mentioned_characters = []
+                for char_name in all_chars:
+                    if char_name.lower() in recent_text.lower():
+                        char_details = self.get_character_details(char_name)
+                        if char_details:
+                            mentioned_characters.append(char_details)
+                
+                return {
+                    'recent_text': recent_text,
+                    'prev_summary': prev_summary,
+                    'mentioned_characters': mentioned_characters
+                }
+                
+        except sqlite3.Error as e:
+            logging.error(f"Get context window error: {e}")
+            return None
+
+    def fetch_omni_context(self, project_id: int, chapter_id: int, beats_list: list):
+        """
+        Fetches comprehensive lore package for omniscient prose generation.
+        Extracts proper nouns from beats, queries character DB, fetches chapter summaries.
+        Returns: {characters, story_so_far, genre, world_rules}
+        """
+        import re
+        
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                
+                # 1. Extract proper nouns from beats (capitalized words)
+                beats_text = " ".join(beats_list)
+                # Regex for capitalized words (potential names)
+                potential_names = re.findall(r'\b[A-Z][a-z]+\b', beats_text)
+                # Filter common words
+                common_words = {'The', 'A', 'An', 'Chapter', 'Scene', 'Then', 'When', 'They', 'He', 'She', 'This', 'That'}
+                potential_names = [n for n in set(potential_names) if n not in common_words]
+                
+                # 2. Query characters table for mentioned names
+                characters = []
+                if potential_names:
+                    placeholders = ','.join(['?'] * len(potential_names))
+                    cursor.execute(f"SELECT name, personality_traits, speech_pattern, backstory FROM characters WHERE name IN ({placeholders})", potential_names)
+                    for row in cursor.fetchall():
+                        characters.append({
+                            'name': row[0],
+                            'traits': row[1],
+                            'speech': row[2],
+                            'backstory': row[3]
+                        })
+                
+                # 3. Get last 3 chapter summaries for story context
+                cursor.execute("SELECT chapter_order FROM chapters WHERE id = ?", (chapter_id,))
+                current_order_row = cursor.fetchone()
+                current_order = current_order_row[0] if current_order_row else 0
+                
+                story_so_far = []
+                for i in range(1, 4):  # Last 3 chapters
+                    prev_order = current_order - i
+                    if prev_order >= 1:
+                        cursor.execute("""
+                            SELECT c.id FROM chapters c 
+                            WHERE c.project_id = ? AND c.chapter_order = ?
+                        """, (project_id, prev_order))
+                        prev_ch = cursor.fetchone()
+                        if prev_ch:
+                            cursor.execute("""
+                                SELECT summary FROM story_beats 
+                                WHERE project_id = ? AND chapter_id = ?
+                                ORDER BY id DESC LIMIT 1
+                            """, (project_id, prev_ch[0]))
+                            summary_row = cursor.fetchone()
+                            if summary_row:
+                                story_so_far.insert(0, f"Chapter {prev_order}: {summary_row[0]}")
+                
+                # 4. Get project settings (genre, world rules)
+                settings = self.get_project_settings(project_id)
+                genre = settings.get('genre', 'fiction') if settings else 'fiction'
+                world_rules = settings.get('world_rules', 'No specific rules') if settings else 'No specific rules'
+                
+                return {
+                    'characters': characters,
+                    'story_so_far': story_so_far,
+                    'genre': genre,
+                    'world_rules': world_rules
+                }
+                
+        except sqlite3.Error as e:
+            logging.error(f"Fetch omni context error: {e}")
+            return None
 
     # --- Chapter Methods ---
     def create_chapter(self, project_id: int, title: str):
@@ -137,6 +290,29 @@ class DatabaseManager:
         except sqlite3.Error as e:
             logging.error(f"Update chapter error: {e}")
             return False
+
+    def update_chapter_beats(self, chapter_id: int, beats_text: str):
+        """Save extracted or suggested beats for a chapter."""
+        try:
+            with self.get_connection() as conn:
+                conn.execute("UPDATE chapters SET beats = ? WHERE id = ?", (beats_text, chapter_id))
+                conn.commit()
+                return True
+        except sqlite3.Error as e:
+            logging.error(f"Update chapter beats error: {e}")
+            return False
+
+    def get_chapter_beats(self, chapter_id: int):
+        """Retrieve saved beats for a chapter."""
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("SELECT beats FROM chapters WHERE id = ?", (chapter_id,))
+                row = cursor.fetchone()
+                return row[0] if row and row[0] else ""
+        except sqlite3.Error as e:
+            logging.error(f"Get chapter beats error: {e}")
+            return ""
 
     def get_chapter_content(self, chapter_id: int):
         try:

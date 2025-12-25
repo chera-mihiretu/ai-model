@@ -6,6 +6,7 @@ class ThemeEngine:
     
     ACCENT_PRIMARY = "#4F46E5" # Electric Indigo
     ACCENT_HOVER = "#4338ca"
+    ACCENT_SECONDARY = "#8B5CF6" # Violet
     
     TEXT_PRIMARY = "#F3F4F6"  # Off-White
     TEXT_MUTED = "#9CA3AF"    # Cool Grey
@@ -16,6 +17,7 @@ class ThemeEngine:
     # Sidebar / UI
     FONT_UI = ("Inter", 14)
     FONT_HEADER = ("Inter", 11, "bold") # Breadcrumbs
+    FONT_H3 = ("Inter", 13, "bold") # Sub-headers
     
     # Writing Zen Mode
     FONT_PROSE = ("Georgia", 17)

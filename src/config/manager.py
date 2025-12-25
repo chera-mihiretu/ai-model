@@ -6,7 +6,8 @@ from typing import Optional
 @dataclass
 class AIConfig:
     model_path: str
-    n_ctx: int = 2048
+    n_ctx: int = 4096
+    n_batch: int = 512
     temperature: float = 0.7
     n_gpu_layers: int = -1
 
@@ -29,7 +30,8 @@ class ConfigManager:
         
         self.ai_config = AIConfig(
             model_path=model_path,
-            n_ctx=2048,
+            n_ctx=4096,
+            n_batch=512,
             temperature=0.7,
             n_gpu_layers=-1
         )
