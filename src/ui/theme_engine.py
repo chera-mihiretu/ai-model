@@ -3,6 +3,7 @@ class ThemeEngine:
     BG_MAIN = "#0B0E11"       # Deep Obsidian
     BG_SIDEBAR = "#15191E"    # Steel Charcoal
     BG_HOVER = "#1E293B"      # Active/Hover State
+    BG_INPUT = "#0F1216"      # Input Background (Slightly lighter than Main)
     
     ACCENT_PRIMARY = "#4F46E5" # Electric Indigo
     ACCENT_HOVER = "#4338ca"

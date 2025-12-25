@@ -699,3 +699,87 @@ _tkinter.TclError: cannot use geometry manager pack inside .!sidebarframe which 
 2025-12-25 13:29:33,497 - INFO - KeyboardInterrupt caught. Shutting down...
 2025-12-25 13:29:33,497 - INFO - Unloading model and freeing VRAM...
 2025-12-25 13:29:33,786 - INFO - App shutdown complete.
+2025-12-25 13:55:34,477 - INFO - Starting Story Bible App - Milestone 1.3
+2025-12-25 13:55:34,485 - INFO - Database initialized at /home/sabona/Desktop/DesktopApp/data/story_bible.db
+2025-12-25 13:55:34,486 - INFO - Loading model from /home/sabona/Desktop/DesktopApp/models/llama/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf with n_gpu_layers=-1
+2025-12-25 13:55:36,805 - INFO - Model loaded successfully.
+2025-12-25 13:55:37,562 - CRITICAL - Unhandled app exception: StoryBibleDrawer.__init__() missing 1 required positional argument: 'project_id'
+Traceback (most recent call last):
+  File "/home/sabona/Desktop/DesktopApp/main.py", line 51, in main
+    app = StoryBibleUI(ai_engine, db_mgr)
+  File "/home/sabona/Desktop/DesktopApp/src/ui/main_window.py", line 968, in __init__
+    self.story_bible = StoryBibleDrawer(self, db_manager)
+                       ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^
+TypeError: StoryBibleDrawer.__init__() missing 1 required positional argument: 'project_id'
+2025-12-25 13:55:37,564 - INFO - Unloading model and freeing VRAM...
+2025-12-25 13:55:37,838 - INFO - App shutdown complete.
+2025-12-25 13:58:14,395 - INFO - Starting Story Bible App - Milestone 1.3
+2025-12-25 13:58:14,396 - INFO - Database initialized at /home/sabona/Desktop/DesktopApp/data/story_bible.db
+2025-12-25 13:58:14,396 - INFO - Loading model from /home/sabona/Desktop/DesktopApp/models/llama/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf with n_gpu_layers=-1
+2025-12-25 13:58:16,460 - INFO - Model loaded successfully.
+2025-12-25 13:58:17,279 - CRITICAL - Unhandled app exception: StoryBibleDrawer.__init__() missing 1 required positional argument: 'project_id'
+Traceback (most recent call last):
+  File "/home/sabona/Desktop/DesktopApp/main.py", line 51, in main
+    app = StoryBibleUI(ai_engine, db_mgr)
+  File "/home/sabona/Desktop/DesktopApp/src/ui/main_window.py", line 968, in __init__
+    self.story_bible = StoryBibleDrawer(self, db_manager)
+                       ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^
+TypeError: StoryBibleDrawer.__init__() missing 1 required positional argument: 'project_id'
+2025-12-25 13:58:17,280 - INFO - Unloading model and freeing VRAM...
+2025-12-25 13:58:17,458 - INFO - App shutdown complete.
+2025-12-25 13:58:51,657 - INFO - Starting Story Bible App - Milestone 1.3
+2025-12-25 13:58:51,658 - INFO - Database initialized at /home/sabona/Desktop/DesktopApp/data/story_bible.db
+2025-12-25 13:58:51,658 - INFO - Loading model from /home/sabona/Desktop/DesktopApp/models/llama/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf with n_gpu_layers=-1
+2025-12-25 13:58:53,372 - INFO - Model loaded successfully.
+2025-12-25 13:58:54,057 - CRITICAL - Unhandled app exception: StoryBibleDrawer.__init__() missing 1 required positional argument: 'project_id'
+Traceback (most recent call last):
+  File "/home/sabona/Desktop/DesktopApp/main.py", line 51, in main
+    app = StoryBibleUI(ai_engine, db_mgr)
+  File "/home/sabona/Desktop/DesktopApp/src/ui/main_window.py", line 968, in __init__
+    self.story_bible = StoryBibleDrawer(self, db_manager)
+                       ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^
+TypeError: StoryBibleDrawer.__init__() missing 1 required positional argument: 'project_id'
+2025-12-25 13:58:54,063 - INFO - Unloading model and freeing VRAM...
+2025-12-25 13:58:54,338 - INFO - App shutdown complete.
+2025-12-25 14:07:34,228 - INFO - Starting Story Bible App - Milestone 1.3
+2025-12-25 14:07:34,229 - INFO - Database initialized at /home/sabona/Desktop/DesktopApp/data/story_bible.db
+2025-12-25 14:07:34,230 - INFO - Loading model from /home/sabona/Desktop/DesktopApp/models/llama/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf with n_gpu_layers=-1
+2025-12-25 14:07:35,900 - INFO - Model loaded successfully.
+2025-12-25 18:36:10,568 - INFO - Starting Story Bible App - Milestone 1.3
+2025-12-25 18:36:10,571 - INFO - Database initialized at /home/sabona/Desktop/DesktopApp/data/story_bible.db
+2025-12-25 18:36:10,572 - INFO - Loading model from /home/sabona/Desktop/DesktopApp/models/llama/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf with n_gpu_layers=-1
+2025-12-25 18:36:14,865 - INFO - Model loaded successfully.
+2025-12-25 18:58:43,688 - INFO - Unloading model and freeing VRAM...
+2025-12-25 18:58:43,983 - INFO - App shutdown complete.
+2025-12-25 19:03:24,071 - INFO - Starting Story Bible App - Milestone 1.3
+2025-12-25 19:03:24,072 - INFO - Database initialized at /home/sabona/Desktop/DesktopApp/data/story_bible.db
+2025-12-25 19:03:24,072 - INFO - Loading model from /home/sabona/Desktop/DesktopApp/models/llama/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf with n_gpu_layers=-1
+2025-12-25 19:03:25,886 - INFO - Model loaded successfully.
+2025-12-25 19:03:27,001 - CRITICAL - Unhandled app exception: type object 'ThemeEngine' has no attribute 'BG_INPUT'
+Traceback (most recent call last):
+  File "/home/sabona/Desktop/DesktopApp/main.py", line 51, in main
+    app = StoryBibleUI(ai_engine, db_mgr)
+  File "/home/sabona/Desktop/DesktopApp/src/ui/main_window.py", line 955, in __init__
+    self.bible_view = StoryBibleView(self.center_area, db_manager)
+                      ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/sabona/Desktop/DesktopApp/src/ui/story_bible_view.py", line 54, in __init__
+    fg_color=ThemeEngine.BG_INPUT,
+             ^^^^^^^^^^^^^^^^^^^^
+AttributeError: type object 'ThemeEngine' has no attribute 'BG_INPUT'
+2025-12-25 19:03:27,009 - INFO - Unloading model and freeing VRAM...
+2025-12-25 19:03:27,191 - INFO - App shutdown complete.
+2025-12-25 19:06:14,257 - INFO - Starting Story Bible App - Milestone 1.3
+2025-12-25 19:06:14,258 - INFO - Database initialized at /home/sabona/Desktop/DesktopApp/data/story_bible.db
+2025-12-25 19:06:14,259 - INFO - Loading model from /home/sabona/Desktop/DesktopApp/models/llama/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf with n_gpu_layers=-1
+2025-12-25 19:06:15,987 - INFO - Model loaded successfully.
+2025-12-25 19:08:21,516 - INFO - Auto-saved Bible field: characters
+2025-12-25 19:08:29,923 - INFO - Auto-saved Bible field: characters
+2025-12-25 19:09:06,903 - INFO - Auto-saved Bible field: characters
+2025-12-25 19:10:23,480 - INFO - Auto-saved Bible field: characters
+2025-12-25 19:10:24,535 - INFO - Auto-saved Bible field: characters
+2025-12-25 19:10:27,015 - INFO - Auto-saved Bible field: characters
+2025-12-25 19:11:25,600 - INFO - Auto-saved Bible field: characters
+2025-12-25 19:12:43,366 - INFO - Auto-saved Bible field: characters
+2025-12-25 19:12:48,247 - INFO - KeyboardInterrupt caught. Shutting down...
+2025-12-25 19:12:48,248 - INFO - Unloading model and freeing VRAM...
+2025-12-25 19:12:48,544 - INFO - App shutdown complete.

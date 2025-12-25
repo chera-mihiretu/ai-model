@@ -5,6 +5,8 @@ import queue
 import time
 import logging
 from .theme_engine import ThemeEngine
+from src.ui.story_bible_view import StoryBibleView
+from src.ui.story_bible_controls import StoryBibleControls
 
 # --- CUSTOM COMPONENTS ---
 
@@ -234,6 +236,8 @@ class SidebarFrame(ctk.CTkFrame):
             command=self.on_generate_from_beats
         )
         generate_btn.pack(fill="x", padx=15, pady=5)
+        
+
 
     def update_auto_gen_button(self, has_content):
         """Update button text based on whether chapter has content."""
@@ -947,8 +951,20 @@ class StoryBibleUI(ctk.CTk):
         self.settings_page = SettingsFrame(self.center_area)
         self.pages["Settings"] = self.settings_page
         
+        # Story Bible View (Hidden by default)
+        self.bible_view = StoryBibleView(self.center_area, db_manager)
+        
         # Show default
         self.pages["Writing"].grid(row=0, column=0, sticky="nsew")
+        
+        # Bible Controls (Floating Bottom-Left)
+        # We pass on_tab_select and on_back methods (defined below)
+        self.bible_controls = StoryBibleControls(
+            self.center_area, 
+            on_tab_select=self.open_bible_section,
+            on_back_to_writing=self.back_to_writing
+        )
+        self.bible_controls.place(relx=0.01, rely=0.99, anchor="sw")
         
         # Col 2: Assistant (Always visible)
         self.assistant = AssistantPanel(self, lambda p: self.handle_ai_request(p, 'assistant'))
@@ -964,8 +980,32 @@ class StoryBibleUI(ctk.CTk):
         self.after(30000, self.auto_save_loop)
         self.protocol("WM_DELETE_WINDOW", self.on_close)
 
+    def open_bible_section(self, tab_name):
+        """Swaps Editor for Bible View and shows specific tab."""
+        # Hide Editor (and other pages)
+        for page in self.pages.values():
+            page.grid_forget()
+        
+        # Show Bible View
+        self.bible_view.grid(row=0, column=0, sticky="nsew")
+        
+        # Load Data
+        if self.current_project_id:
+             self.bible_view.load_project(self.current_project_id)
+             
+        # Switch to section
+        self.bible_view.show_section(tab_name)
+
+    def back_to_writing(self):
+        """Return to Editor."""
+        self.bible_view.grid_forget()
+        self.sidebar.select_nav("Writing")
+
     def nav_select(self, name):
         # Swap Center Page
+        if hasattr(self, 'bible_view'):
+            self.bible_view.grid_forget()
+            
         for page in self.pages.values():
             page.grid_forget()
         
@@ -1340,214 +1380,7 @@ class StoryBibleUI(ctk.CTk):
         if hasattr(self.ai_engine, "unload_model"):
             self.ai_engine.unload_model()
         self.destroy()
-class StoryBibleDrawer(ctk.CTkFrame):
-    """Right drawer with 7-tab story bible (Sudowrite style)."""
-    def __init__(self, master, db_manager, project_id):
-        super().__init__(master, width=350, corner_radius=0, fg_color=ThemeEngine.BG_SIDEBAR)
-        self.db_manager = db_manager
-        self.project_id = project_id
-        self.save_timers = {}  # field_name -> after_id
-        
-        # Header
-        header = ctk.CTkLabel(
-            self, 
-            text="📖 Story Bible",
-            font=("Inter", 16, "bold"),
-            text_color=ThemeEngine.TEXT_PRIMARY
-        )
-        header.pack(pady=(15, 10))
-        
-        # Tab View
-        self.tabview = ctk.CTkTabview(self, fg_color=ThemeEngine.BG_MAIN)
-        self.tabview.pack(fill="both", expand=True, padx=10, pady=(0, 10))
-        
-        # Create 7 tabs
-        self.tabview.add("🧠 Braindump")
-        self.tabview.add("🎭 Genre")
-        self.tabview.add("🖋️ Style")
-        self.tabview.add("📜 Synopsis")
-        self.tabview.add("👥 Characters")
-        self.tabview.add("🌍 World")
-        self.tabview.add("🗺️ Outline")
-        
-        self._create_tab_contents()
-        self.load_data()
-    
-    def _create_tab_contents(self):
-        """Create content for each tab."""
-        # Tab 1: Braindump
-        self.braindump_text = ctk.CTkTextbox(
-            self.tabview.tab("🧠 Braindump"),
-            height=400,
-            wrap="word",
-            fg_color=ThemeEngine.BG_SIDEBAR,
-            border_width=1,
-            border_color=ThemeEngine.BORDER_COLOR
-        )
-        self.braindump_text.pack(fill="both", expand=True, padx=15, pady=15)
-        self.braindump_text.insert("1.0", "Dump your raw ideas here...")
-        self.braindump_text.bind("<KeyRelease>", lambda e: self.on_text_change("braindump"))
-        
-        # Tab 2: Genre
-        genre_label = ctk.CTkLabel(
-            self.tabview.tab("🎭 Genre"),
-            text="e.g., Gritty Noir, Epic Fantasy, Cozy Mystery",
-            font=("Inter", 11),
-            text_color=ThemeEngine.TEXT_MUTED
-        )
-        genre_label.pack(pady=(15, 5))
-        
-        self.genre_entry = ctk.CTkEntry(
-            self.tabview.tab("🎭 Genre"),
-            placeholder_text="Enter genre...",
-            height=40,
-            fg_color=ThemeEngine.BG_SIDEBAR,
-            border_width=1,
-            border_color=ThemeEngine.BORDER_COLOR
-        )
-        self.genre_entry.pack(fill="x", padx=15, pady=5)
-        self.genre_entry.bind("<KeyRelease>", lambda e: self.on_text_change("genre"))
-        
-        # Tab 3: Style
-        self.style_text = ctk.CTkTextbox(
-            self.tabview.tab("🖋️ Style"),
-            height=200,
-            wrap="word",
-            fg_color=ThemeEngine.BG_SIDEBAR,
-            border_width=1,
-            border_color=ThemeEngine.BORDER_COLOR
-        )
-        self.style_text.pack(fill="both", expand=True, padx=15, pady=15)
-        self.style_text.insert("1.0", "e.g., Gritty, Noir, First Person, Short sentences, Dry humor...")
-        self.style_text.bind("<KeyRelease>", lambda e: self.on_text_change("style"))
-        
-        # Tab 4: Synopsis
-        self.synopsis_text = ctk.CTkTextbox(
-            self.tabview.tab("📜 Synopsis"),
-            height=300,
-            wrap="word",
-            fg_color=ThemeEngine.BG_SIDEBAR,
-            border_width=1,
-            border_color=ThemeEngine.BORDER_COLOR
-        )
-        self.synopsis_text.pack(fill="both", expand=True, padx=15, pady=15)
-        self.synopsis_text.insert("1.0", "What is the main conflict and how does it resolve?")
-        self.synopsis_text.bind("<KeyRelease>", lambda e: self.on_text_change("synopsis"))
-        
-        # Tab 5: Characters
-        self.characters_text = ctk.CTkTextbox(
-            self.tabview.tab("👥 Characters"),
-            height=400,
-            wrap="word",
-            fg_color=ThemeEngine.BG_SIDEBAR,
-            border_width=1,
-            border_color=ThemeEngine.BORDER_COLOR
-        )
-        self.characters_text.pack(fill="both", expand=True, padx=15, pady=15)
-        self.characters_text.insert("1.0", "Quick character notes and relationships...")
-        self.characters_text.bind("<KeyRelease>", lambda e: self.on_text_change("characters"))
-        
-        # Tab 6: World
-        self.world_text = ctk.CTkTextbox(
-            self.tabview.tab("🌍 World"),
-            height=400,
-            wrap="word",
-            fg_color=ThemeEngine.BG_SIDEBAR,
-            border_width=1,
-            border_color=ThemeEngine.BORDER_COLOR
-        )
-        self.world_text.pack(fill="both", expand=True, padx=15, pady=15)
-        self.world_text.insert("1.0", "Setting, world rules, technology level, magic system...")
-        self.world_text.bind("<KeyRelease>", lambda e: self.on_text_change("worldbuilding"))
-        
-        # Tab 7: Outline
-        self.outline_text = ctk.CTkTextbox(
-            self.tabview.tab("🗺️ Outline"),
-            height=400,
-            wrap="word",
-            fg_color=ThemeEngine.BG_SIDEBAR,
-            border_width=1,
-            border_color=ThemeEngine.BORDER_COLOR
-        )
-        self.outline_text.pack(fill="both", expand=True, padx=15, pady=15)
-        self.outline_text.insert("1.0", "Chapter-by-chapter structure and major plot points...")
-        self.outline_text.bind("<KeyRelease>", lambda e: self.on_text_change("outline"))
-    
-    def on_text_change(self, field_name):
-        """Debounced auto-save on text change."""
-        # Cancel existing timer
-        if field_name in self.save_timers:
-            self.after_cancel(self.save_timers[field_name])
-        
-        # Set new timer (1500ms = 1.5s)
-        self.save_timers[field_name] = self.after(1500, lambda: self.save_field(field_name))
-    
-    def save_field(self, field_name):
-        """Save a single field to database."""
-        value = self.get_field_value(field_name)
-        self.db_manager.update_story_bible_field(self.project_id, field_name, value)
-        logging.info(f"Auto-saved story bible field: {field_name}")
-    
-    def get_field_value(self, field_name):
-        """Get current value of a field."""
-        field_map = {
-            'braindump': self.braindump_text,
-            'genre': self.genre_entry,
-            'style': self.style_text,
-            'synopsis': self.synopsis_text,
-            'characters': self.characters_text,
-            'worldbuilding': self.world_text,
-            'outline': self.outline_text
-        }
-        
-        widget = field_map.get(field_name)
-        if isinstance(widget, ctk.CTkEntry):
-            return widget.get()
-        elif isinstance(widget, ctk.CTkTextbox):
-            return widget.get("1.0", "end-1c")
-        return ""
-    
-    def load_data(self):
-        """Load bible data from database."""
-        if not self.project_id:
-            return
-        
-        data = self.db_manager.get_story_bible(self.project_id)
-        if not data:
-            return
-        
-        # Clear placeholders and load data
-        if data['braindump']:
-            self.braindump_text.delete("1.0", "end")
-            self.braindump_text.insert("1.0", data['braindump'])
-        
-        if data['genre']:
-            self.genre_entry.delete(0, "end")
-            self.genre_entry.insert(0, data['genre'])
-        
-        if data['style']:
-            self.style_text.delete("1.0", "end")
-            self.style_text.insert("1.0", data['style'])
-        
-        if data['synopsis']:
-            self.synopsis_text.delete("1.0", "end")
-            self.synopsis_text.insert("1.0", data['synopsis'])
-        
-        if data['characters']:
-            self.characters_text.delete("1.0", "end")
-            self.characters_text.insert("1.0", data['characters'])
-        
-        if data['worldbuilding']:
-            self.world_text.delete("1.0", "end")
-            self.world_text.insert("1.0", data['worldbuilding'])
-        
-        if data['outline']:
-            self.outline_text.delete("1.0", "end")
-            self.outline_text.insert("1.0", data['outline'])
-    
-    def update_project(self, project_id):
-        """Switch to a different project."""
-        self.project_id = project_id
-        self.load_data()
+
+
 
 

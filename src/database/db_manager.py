@@ -76,10 +76,87 @@ class DatabaseManager:
                     )
                 """)
                 
+                
+                cursor.execute("""
+                    CREATE TABLE IF NOT EXISTS story_beats (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        project_id INTEGER NOT NULL,
+                        chapter_id INTEGER NOT NULL,
+                        summary TEXT,
+                        FOREIGN KEY (project_id) REFERENCES projects (id),
+                        FOREIGN KEY (chapter_id) REFERENCES chapters (id)
+                    )
+                """)
+
+                # Milestone 3.1: Story Bible Table
+                cursor.execute("""
+                    CREATE TABLE IF NOT EXISTS story_bible (
+                        project_id INTEGER PRIMARY KEY,
+                        braindump TEXT,
+                        genre TEXT,
+                        style TEXT,
+                        synopsis TEXT,
+                        characters TEXT,
+                        worldbuilding TEXT,
+                        outline TEXT,
+                        FOREIGN KEY (project_id) REFERENCES projects (id)
+                    )
+                """)
+                # Create Index for fast loading
+                cursor.execute("CREATE INDEX IF NOT EXISTS idx_story_bible_project_id ON story_bible (project_id)")
+                
                 conn.commit()
                 logging.info(f"Database initialized at {self.db_path}")
         except sqlite3.Error as e:
             logging.error(f"Database initialization error: {e}")
+
+    # --- Story Bible Methods ---
+    def save_bible_field(self, project_id: str, field_name: str, content: str) -> None:
+        """
+        Atomically update exactly ONE Story Bible field.
+        Must not overwrite other fields.
+        Must be safe for rapid debounce-triggered calls.
+        Must fail silently.
+        """
+        allowed_fields = {'braindump', 'genre', 'style', 'synopsis', 'characters', 'worldbuilding', 'outline'}
+        if field_name not in allowed_fields:
+            logging.error(f"Invalid Story Bible field: {field_name}")
+            return
+
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                # Ensure record exists
+                cursor.execute("INSERT OR IGNORE INTO story_bible (project_id) VALUES (?)", (project_id,))
+                # Update specific field
+                cursor.execute(f"UPDATE story_bible SET {field_name} = ? WHERE project_id = ?", (content, project_id))
+                conn.commit()
+        except sqlite3.Error:
+            pass # Fail silently as requested
+
+    def get_story_bible(self, project_id: int):
+        """Fetch all story bible fields for a project."""
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("SELECT * FROM story_bible WHERE project_id = ?", (project_id,))
+                row = cursor.fetchone()
+                if row:
+                    # Convert to dict. Row order depends on table create order
+                    # Columns: project_id, braindump, genre, style, synopsis, characters, worldbuilding, outline
+                    return {
+                        'braindump': row[1] or "",
+                        'genre': row[2] or "",
+                        'style': row[3] or "",
+                        'synopsis': row[4] or "",
+                        'characters': row[5] or "",
+                        'worldbuilding': row[6] or "",
+                        'outline': row[7] or ""
+                    }
+                return {k: "" for k in ['braindump', 'genre', 'style', 'synopsis', 'characters', 'worldbuilding', 'outline']}
+        except sqlite3.Error as e:
+            logging.error(f"Get story bible error: {e}")
+            return None
 
     # --- Project Methods ---
     def create_project(self, name: str, genre: str = ""):
