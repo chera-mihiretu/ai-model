@@ -21,7 +21,12 @@ class ConfigManager:
         return cls._instance
 
     def _init_config(self):
-        self.base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        import sys
+        if getattr(sys, 'frozen', False):
+            self.base_dir = os.path.dirname(sys.executable)
+        else:
+            self.base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+            
         self.models_dir = os.path.join(self.base_dir, "models", "llama")
         
         # Auto-detect first .gguf file

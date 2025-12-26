@@ -11,6 +11,18 @@ from src.database.db_manager import DatabaseManager
 from src.services.ai_engine import AIEngine
 from src.ui.main_window import StoryBibleUI
 
+import os
+
+if getattr(sys, 'frozen', False):
+    base_path = sys._MEIPASS  # PyInstaller bundled path
+else:
+    base_path = os.path.dirname(__file__)
+
+MODEL_PATH = os.path.join(base_path, 'models', 'llama', 'Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf')
+
+# load your model here using MODEL_PATH
+
+
 def setup_logging():
     log_dir = Path(__file__).parent / "logs"
     log_dir.mkdir(exist_ok=True)

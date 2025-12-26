@@ -29,6 +29,22 @@ class ThemeEngine:
     ASSISTANT_WIDTH = 320
     CORNER_RADIUS = 20
     
+    # Sudowrite-style Layout
+    TOOLBAR_HEIGHT = 60
+    LEFT_PANEL_PCT = 0.18   # 18% of window width
+    CENTER_PANEL_PCT = 0.60 # 60% of window width
+    RIGHT_PANEL_PCT = 0.22  # 22% of window width
+    
+    # Story Bible Cards
+    CARD_BG = "#1A1F2E"           # Light background for cards
+    CARD_CORNER_RADIUS = 12
+    CARD_PADDING = 20
+    CARD_SPACING = 15             # Space between cards
+    
+    # Gradients
+    GRADIENT_START = "#4F46E5"
+    GRADIENT_END = "#8B5CF6"
+    
     @staticmethod
     def get_prose_font():
         return ThemeEngine.FONT_PROSE
