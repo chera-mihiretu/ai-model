@@ -4,7 +4,12 @@ from pathlib import Path
 
 class DatabaseManager:
     def __init__(self, db_name="story_bible.db"):
-        self.base_dir = Path(__file__).resolve().parent.parent.parent
+        import sys
+        if getattr(sys, 'frozen', False):
+            self.base_dir = Path(sys.executable).parent
+        else:
+            self.base_dir = Path(__file__).resolve().parent.parent.parent
+            
         self.db_path = self.base_dir / "data" / db_name
         self.setup_database()
 
@@ -57,13 +62,68 @@ class DatabaseManager:
                 if 'beats' not in columns:
                     cursor.execute("ALTER TABLE chapters ADD COLUMN beats TEXT")
                     logging.info("Added beats column to chapters table")
+
+                # Migration: Add project_id to characters AND fix unique constraint
+                # We need to recreate the table to change the UNIQUE constraint to (name, project_id)
+                cursor.execute("PRAGMA index_list(characters)")
+                indexes = cursor.fetchall()
+                # Check if we have a composite index or just name
+                needs_rebuild = True
+                for idx in indexes:
+                    if idx[2] == 1: # Unique
+                        cursor.execute(f"PRAGMA index_info({idx[1]})")
+                        cols = sorted([r[2] for r in cursor.fetchall()])
+                        if cols == ['name', 'project_id'] or cols == ['project_id', 'name']:
+                            needs_rebuild = False
+                            break
+                            
+                if needs_rebuild:
+                    logging.info("Migrating characters table to scope by project_id...")
+                    conn.execute("ALTER TABLE characters RENAME TO characters_old")
+                    
+                    conn.execute("""
+                        CREATE TABLE characters (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            project_id INTEGER DEFAULT 0,
+                            name TEXT NOT NULL,
+                            role TEXT,
+                            personality_traits TEXT,
+                            speech_pattern TEXT,
+                            relationship_to_author TEXT,
+                            backstory TEXT,
+                            continuity_notes TEXT,
+                            UNIQUE(name, project_id)
+                        )
+                    """)
+                    
+                    # Copy data. If original didn't have project_id, it defaults to 0.
+                    # We need to check columns of old table to copy correctly
+                    cursor.execute("PRAGMA table_info(characters_old)")
+                    old_cols = [c[1] for c in cursor.fetchall()]
+                    
+                    # Build dynamic insert
+                    # We map old columns to new. 'project_id' might exist in old if we ran previous migration, or not.
+                    insert_cols = [c for c in old_cols if c != 'id']  # Skip ID to let autoincrement work or keep it? Keep it for safety.
+                    insert_cols = ['id', 'name', 'role', 'personality_traits', 'speech_pattern', 'relationship_to_author', 'backstory', 'continuity_notes']
+                    if 'project_id' in old_cols:
+                        insert_cols.append('project_id')
+                        
+                    col_str = ", ".join(insert_cols)
+                    qs = ", ".join(["?"] * len(insert_cols))
+                    
+                    cursor.execute(f"INSERT INTO characters ({col_str}) SELECT {col_str} FROM characters_old")
+                    conn.execute("DROP TABLE characters_old")
+                    conn.commit()
+                    logging.info("Characters table migration complete.")
                 
                 cursor.execute("""
                     CREATE TABLE IF NOT EXISTS app_state (
                         key TEXT PRIMARY KEY,
                         value TEXT
                     )
-                """)
+                """) # ... (rest of function)
+
+
                 
                 cursor.execute("""
                     CREATE TABLE IF NOT EXISTS story_beats (
@@ -76,17 +136,7 @@ class DatabaseManager:
                     )
                 """)
                 
-                
-                cursor.execute("""
-                    CREATE TABLE IF NOT EXISTS story_beats (
-                        id INTEGER PRIMARY KEY AUTOINCREMENT,
-                        project_id INTEGER NOT NULL,
-                        chapter_id INTEGER NOT NULL,
-                        summary TEXT,
-                        FOREIGN KEY (project_id) REFERENCES projects (id),
-                        FOREIGN KEY (chapter_id) REFERENCES chapters (id)
-                    )
-                """)
+
 
                 # Milestone 3.1: Story Bible Table
                 cursor.execute("""
@@ -142,16 +192,16 @@ class DatabaseManager:
                 cursor.execute("SELECT * FROM story_bible WHERE project_id = ?", (project_id,))
                 row = cursor.fetchone()
                 if row:
-                    # Convert to dict. Row order depends on table create order
-                    # Columns: project_id, braindump, genre, style, synopsis, characters, worldbuilding, outline
+                    # Convert to dict. 
+                    # Columns: 0=id, 1=project_id, 2=braindump, 3=genre, 4=style, 5=synopsis, 6=characters, 7=worldbuilding, 8=outline
                     return {
-                        'braindump': row[1] or "",
-                        'genre': row[2] or "",
-                        'style': row[3] or "",
-                        'synopsis': row[4] or "",
-                        'characters': row[5] or "",
-                        'worldbuilding': row[6] or "",
-                        'outline': row[7] or ""
+                        'braindump': row[2] or "",
+                        'genre': row[3] or "",
+                        'style': row[4] or "",
+                        'synopsis': row[5] or "",
+                        'characters': row[6] or "",
+                        'worldbuilding': row[7] or "",
+                        'outline': row[8] or ""
                     }
                 return {k: "" for k in ['braindump', 'genre', 'style', 'synopsis', 'characters', 'worldbuilding', 'outline']}
         except sqlite3.Error as e:
@@ -183,6 +233,33 @@ class DatabaseManager:
         except sqlite3.Error as e:
             logging.error(f"Get settings error: {e}")
         return None
+
+    def rename_project(self, project_id: int, new_name: str):
+        """Rename a project."""
+        try:
+            with self.get_connection() as conn:
+                conn.execute("UPDATE projects SET name = ? WHERE id = ?", (new_name, project_id))
+                conn.commit()
+                return True
+        except sqlite3.Error as e:
+            logging.error(f"Rename project error: {e}")
+            return False
+
+    def delete_project(self, project_id: int):
+        """Delete a project and all its chapters."""
+        try:
+            with self.get_connection() as conn:
+                # Delete all chapters first
+                conn.execute("DELETE FROM chapters WHERE project_id = ?", (project_id,))
+                # Delete story bible data
+                conn.execute("DELETE FROM story_bible WHERE project_id = ?", (project_id,))
+                # Delete the project
+                conn.execute("DELETE FROM projects WHERE id = ?", (project_id,))
+                conn.commit()
+                return True
+        except sqlite3.Error as e:
+            logging.error(f"Delete project error: {e}")
+            return False
 
     def get_projects_with_chapters(self):
         """Returns a list of projects, each with a 'chapters' list."""
@@ -376,6 +453,96 @@ class DatabaseManager:
             logging.error(f"Update chapter error: {e}")
             return False
 
+    def rename_chapter(self, chapter_id: int, new_title: str):
+        """Rename a chapter."""
+        try:
+            with self.get_connection() as conn:
+                conn.execute("UPDATE chapters SET title = ? WHERE id = ?", (new_title, chapter_id))
+                conn.commit()
+                return True
+        except sqlite3.Error as e:
+            logging.error(f"Rename chapter error: {e}")
+            return False
+
+    def delete_chapter(self, chapter_id: int):
+        """Delete a chapter."""
+        try:
+            with self.get_connection() as conn:
+                conn.execute("DELETE FROM chapters WHERE id = ?", (chapter_id,))
+                conn.commit()
+                return True
+        except sqlite3.Error as e:
+            logging.error(f"Delete chapter error: {e}")
+            return False
+
+    def move_chapter_up(self, chapter_id: int):
+        """Move a chapter up in order (swap with previous)."""
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                # Get current chapter info
+                cursor.execute("SELECT project_id, chapter_order FROM chapters WHERE id = ?", (chapter_id,))
+                row = cursor.fetchone()
+                if not row:
+                    return False
+                
+                project_id, current_order = row
+                if current_order <= 1:
+                    return False  # Already at top
+                
+                # Find previous chapter
+                cursor.execute(
+                    "SELECT id FROM chapters WHERE project_id = ? AND chapter_order = ?",
+                    (project_id, current_order - 1)
+                )
+                prev_row = cursor.fetchone()
+                if not prev_row:
+                    return False
+                
+                prev_id = prev_row[0]
+                
+                # Swap orders
+                cursor.execute("UPDATE chapters SET chapter_order = ? WHERE id = ?", (current_order, prev_id))
+                cursor.execute("UPDATE chapters SET chapter_order = ? WHERE id = ?", (current_order - 1, chapter_id))
+                conn.commit()
+                return True
+        except sqlite3.Error as e:
+            logging.error(f"Move chapter up error: {e}")
+            return False
+
+    def move_chapter_down(self, chapter_id: int):
+        """Move a chapter down in order (swap with next)."""
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                # Get current chapter info
+                cursor.execute("SELECT project_id, chapter_order FROM chapters WHERE id = ?", (chapter_id,))
+                row = cursor.fetchone()
+                if not row:
+                    return False
+                
+                project_id, current_order = row
+                
+                # Find next chapter
+                cursor.execute(
+                    "SELECT id FROM chapters WHERE project_id = ? AND chapter_order = ?",
+                    (project_id, current_order + 1)
+                )
+                next_row = cursor.fetchone()
+                if not next_row:
+                    return False  # Already at bottom
+                
+                next_id = next_row[0]
+                
+                # Swap orders
+                cursor.execute("UPDATE chapters SET chapter_order = ? WHERE id = ?", (current_order, next_id))
+                cursor.execute("UPDATE chapters SET chapter_order = ? WHERE id = ?", (current_order + 1, chapter_id))
+                conn.commit()
+                return True
+        except sqlite3.Error as e:
+            logging.error(f"Move chapter down error: {e}")
+            return False
+
     def update_chapter_beats(self, chapter_id: int, beats_text: str):
         """Save extracted or suggested beats for a chapter."""
         try:
@@ -510,22 +677,26 @@ class DatabaseManager:
             logging.error(f"Get state error: {e}")
             return None
 
-    # --- Character Methods (Existing) ---
+    # --- Character Methods ---
     def save_character(self, data: dict):
         try:
             with self.get_connection() as conn:
                 cursor = conn.cursor()
+                pid = data.get('project_id', 0)
+                
                 cursor.execute("""
                     INSERT OR REPLACE INTO characters 
-                    (name, role, personality_traits, speech_pattern, relationship_to_author, backstory)
-                    VALUES (?, ?, ?, ?, ?, ?)
+                    (project_id, name, role, personality_traits, speech_pattern, relationship_to_author, backstory, continuity_notes)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 """, (
+                    pid,
                     data['name'], 
                     data.get('role', ''),
                     data.get('personality_traits', ''),
                     data.get('speech_pattern', ''),
                     data.get('relationship_to_author', ''),
-                    data.get('backstory', '')
+                    data.get('backstory', ''),
+                    data.get('continuity_notes', '')
                 ))
                 conn.commit()
                 return True
@@ -533,25 +704,27 @@ class DatabaseManager:
             logging.error(f"Save character error: {e}")
             return False
 
-    def get_all_characters(self):
+    def get_all_characters(self, project_id: int):
         try:
             with self.get_connection() as conn:
                 cursor = conn.cursor()
-                cursor.execute("SELECT name FROM characters ORDER BY name")
-                return [row[0] for row in cursor.fetchall()]
+                cursor.execute("SELECT name, backstory FROM characters WHERE project_id = ? ORDER BY name", (project_id,))
+                return [{'name': row[0], 'backstory': row[1]} for row in cursor.fetchall()]
         except sqlite3.Error as e:
             logging.error(f"Get characters error: {e}")
             return []
 
-    def get_character_details(self, name: str):
+    def get_character_details(self, name: str, project_id: int):
         try:
             with self.get_connection() as conn:
                 cursor = conn.cursor()
-                cursor.execute("SELECT * FROM characters WHERE name = ?", (name,))
+                cursor.execute("SELECT * FROM characters WHERE name = ? AND project_id = ?", (name, project_id))
                 row = cursor.fetchone()
                 if row:
-                    cols = ['id', 'name', 'role', 'personality_traits', 'speech_pattern', 'relationship_to_author', 'backstory', 'continuity_notes']
-                    return dict(zip(cols, row))
+                    # Map based on schema. 
+                    # Schema: id, project_id, name, role, traits, speech, rel, back, cont
+                    keys = ['id', 'project_id', 'name', 'role', 'personality_traits', 'speech_pattern', 'relationship_to_author', 'backstory', 'continuity_notes']
+                    return dict(zip(keys, row))
                 return None
         except sqlite3.Error as e:
             logging.error(f"Get details error: {e}")

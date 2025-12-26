@@ -273,7 +273,7 @@ class AIEngine:
             "style_notes": "Maintain consistency with established tone and voice."
         }
 
-    def stream_response(self, instruction: str, response_queue: queue.Queue, bible_data: str = "", current_text: str = "", character_context: dict = None, rag_context: dict = None, genre: str = None) -> None:
+    def stream_response(self, instruction: str, response_queue: queue.Queue, bible_data: str = "", current_text: str = "", character_context: dict = None, rag_context: dict = None, genre: str = None, style: str = None, synopsis: str = None, worldbuilding: str = None, outline: str = None) -> None:
         """
         Streams response tokens into the provided queue.
         Uses Llama 3 Header format.
@@ -306,6 +306,18 @@ APPROPRIATE ELEMENTS: {', '.join(genre_ctx['narrative_elements'])}
 AVOID: {', '.join(genre_ctx['avoid_elements']) if genre_ctx['avoid_elements'] else 'None'}
 STYLE NOTES: {genre_ctx['style_notes']}
 """
+            # Inject Usage Style context if available
+            if style:
+                genre_guidance += f"\nUSER STYLE PREFERENCE: {style}\n"
+            # Inject Synopsis context if available
+            if synopsis:
+                genre_guidance += f"\nSTORY SYNOPSIS (High-Level Plot): {synopsis}\n"
+            # Inject Worldbuilding context if available
+            if worldbuilding:
+                genre_guidance += f"\nWORLDBUILDING (Setting Rules): {worldbuilding}\n"
+            # Inject Outline context if available
+            if outline:
+                genre_guidance += f"\nOUTLINE (Sequential Roadmap): The story must progress through the following beats in order: {outline}\nAdvance the narrative actively towards the next beat."
             
             system_prompt = PROMPT_WRITER_GODMODE.format(
                 genre=genre_ctx['genre'],
@@ -334,6 +346,18 @@ STYLE NOTES: {genre_ctx['style_notes']}
                 speech=character_context.get('speech_pattern', 'Standard')
             )
             
+            # Inject Contexts
+            if genre:
+                system_prompt += f"\nCONTEXT NOTE: The user describes this story as a [{genre}] story. Use this context to inform tone and style."
+            if style:
+                system_prompt += f"\nSTYLE NOTE: The user wants this story written in the following style: [{style}]. Use this to inform narrative voice and pacing."
+            if synopsis:
+                system_prompt += f"\nSYNOPSIS NOTE: The story follows this high-level plot: [{synopsis}]. Use this to inform character goals and key conflicts."
+            if worldbuilding:
+                system_prompt += f"\nWORLDBUILDING NOTE: The story is set in the following world: [{worldbuilding}]. Ensure settings, physics, and cultures align with this."
+            if outline:
+                system_prompt += f"\nOUTLINE NOTE: The story follows the structure outlined here: [{outline}]. Generate text starting with the first beat, and progress toward subsequent beats naturally."
+
             full_prompt = (
                 f"{system_prompt}"
                 f"<|start_header_id|>user<|end_header_id|>\n"
@@ -346,6 +370,25 @@ STYLE NOTES: {genre_ctx['style_notes']}
         else:
             system_prompt = PROSE_SYSTEM_PROMPT
             
+            # Inject Contexts
+            context_string = ""
+            if genre:
+                 context_string += f"CONTEXT NOTE: The user describes this story as a [{genre}] story. Use this context to inform tone and style.\n"
+            if style:
+                 context_string += f"STYLE NOTE: The user wants this story written in the following style: [{style}]. Use this to inform narrative voice and pacing.\n"
+            if synopsis:
+                 context_string += f"SYNOPSIS NOTE: The story follows this high-level plot: [{synopsis}]. Use this to inform character goals and key conflicts.\n"
+            if worldbuilding:
+                 context_string += f"WORLDBUILDING NOTE: The story is set in the following world: [{worldbuilding}]. Ensure settings, physics, and cultures align with this.\n"
+            if outline:
+                 context_string += f"OUTLINE NOTE: The story follows the structure outlined here: [{outline}]. Generate text starting with the first beat, and progress toward subsequent beats naturally.\n"
+            
+            if context_string:
+                system_prompt = system_prompt.replace(
+                    "<|eot_id|>", 
+                    f"{context_string}<|eot_id|>"
+                )
+
             full_prompt = (
                 f"{system_prompt}"
                 f"<|start_header_id|>user<|end_header_id|>\n"

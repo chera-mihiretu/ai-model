@@ -5,6 +5,7 @@ class CharacterFrame(ctk.CTkFrame):
     def __init__(self, master, db_manager):
         super().__init__(master, corner_radius=0, fg_color=ThemeEngine.BG_MAIN)
         self.db_manager = db_manager
+        self.project_id = None
         
         self.grid_columnconfigure(0, weight=1) # List
         self.grid_columnconfigure(1, weight=3) # Form
@@ -44,12 +45,15 @@ class CharacterFrame(ctk.CTkFrame):
 
     def load_list(self):
         for w in self.char_scroll.winfo_children(): w.destroy()
-        chars = self.db_manager.get_all_characters()
+        if not self.project_id: return
+        
+        chars = self.db_manager.get_all_characters(self.project_id)
         for name in chars:
             ctk.CTkButton(self.char_scroll, text=name, fg_color="transparent", text_color=ThemeEngine.TEXT_PRIMARY, anchor="w", command=lambda n=name: self.load_details(n)).pack(fill="x", pady=2)
 
     def load_details(self, name):
-        details = self.db_manager.get_character_details(name)
+        if not self.project_id: return
+        details = self.db_manager.get_character_details(name, self.project_id)
         if not details: return
         for key, widget in self.entries.items():
             val = details.get(key, "")
@@ -61,7 +65,8 @@ class CharacterFrame(ctk.CTkFrame):
                 widget.insert("1.0", str(val))
 
     def save_character(self):
-        data = {}
+        if not self.project_id: return
+        data = {'project_id': self.project_id}
         for key, widget in self.entries.items():
             if isinstance(widget, ctk.CTkEntry): data[key] = widget.get()
             elif isinstance(widget, ctk.CTkTextbox): data[key] = widget.get("1.0", "end-1c")
