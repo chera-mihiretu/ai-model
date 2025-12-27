@@ -21,11 +21,11 @@ class StoryBibleDrawer(ctk.CTkFrame):
         
         # 7 Bible Tabs
         self.tabs = [
-            "Characters",
             "Braindump",
             "Genre", 
             "Style",
             "Synopsis",
+            "Characters",
             "World Building",
             "Outline"
         ]

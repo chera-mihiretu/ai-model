@@ -456,7 +456,8 @@ class CenterScrollPanel(ctk.CTkScrollableFrame):
         setattr(self, f"{field_name}_input", input_widget)
     
     def _create_characters_section(self):
-        """Create functional Character Profile section with detailed fields."""
+        """Create functional Character Profile section using shared CharacterFrame."""
+        # Container
         card = ctk.CTkFrame(
             self.story_bible_container,
             fg_color=ThemeEngine.CARD_BG,
@@ -478,254 +479,23 @@ class CenterScrollPanel(ctk.CTkScrollableFrame):
             anchor="w"
         ).pack(anchor="w", padx=ThemeEngine.CARD_PADDING, pady=(ThemeEngine.CARD_PADDING, 10))
         
-        # 1. Existing Characters List
-        self.char_list_frame = ctk.CTkFrame(card, fg_color="transparent")
-        self.char_list_frame.pack(fill="x", padx=ThemeEngine.CARD_PADDING, pady=(0, 10))
+        # Import CharacterFrame
+        # Note: CharacterFrame is already imported at top level
         
-        # 2. Add/Edit Character Form
-        form_frame = ctk.CTkFrame(card, fg_color="transparent")
-        form_frame.pack(fill="x", padx=ThemeEngine.CARD_PADDING, pady=(0, ThemeEngine.CARD_PADDING))
+        # Create Frame
+        self.character_frame = CharacterFrame(card, self.db_manager)
+        self.character_frame.pack(fill="x", padx=ThemeEngine.CARD_PADDING, pady=(0, ThemeEngine.CARD_PADDING))
         
-        # Character Name (Essential)
-        ctk.CTkLabel(form_frame, text="Name", text_color=ThemeEngine.TEXT_MUTED, font=ThemeEngine.FONT_UI).pack(anchor="w")
-        self.char_name_entry = ctk.CTkEntry(
-            form_frame,
-            placeholder_text="Character Name",
-            height=32,
-            fg_color=ThemeEngine.BG_INPUT,
-            border_width=1,
-            border_color=ThemeEngine.BORDER_COLOR
-        )
-        self.char_name_entry.pack(fill="x", pady=(0, 10))
-        
-        # TOP ROW: Pronouns | Groups | Other Names
-        top_row = ctk.CTkFrame(form_frame, fg_color="transparent")
-        top_row.pack(fill="x", pady=(0, 10))
-        top_row.grid_columnconfigure(0, weight=1)
-        top_row.grid_columnconfigure(1, weight=1)
-        top_row.grid_columnconfigure(2, weight=1)
-        
-        # Helper for small text areas
-        def create_mini_field(parent, label, col):
-            f = ctk.CTkFrame(parent, fg_color="transparent")
-            f.grid(row=0, column=col, sticky="nsew", padx=5)
-            ctk.CTkLabel(f, text=label, text_color=ThemeEngine.TEXT_MUTED, font=("Inter", 12)).pack(anchor="w")
-            inp = ctk.CTkTextbox(
-                f, 
-                height=40, 
-                fg_color=ThemeEngine.BG_INPUT,
-                border_width=1,
-                border_color=ThemeEngine.BORDER_COLOR,
-                font=ThemeEngine.FONT_UI
-            )
-            inp.pack(fill="x")
-            
-            # Bind auto-resize
-            inp._textbox.bind("<KeyRelease>", lambda e: self._auto_resize_textbox(inp, 40))
-            inp._textbox.bind("<FocusOut>", lambda e: self._auto_resize_textbox(inp, 40))
-            return inp
-            
-        self.char_pronouns = create_mini_field(top_row, "Pronouns", 0)
-        self.char_groups = create_mini_field(top_row, "Groups", 1)
-        self.char_aliases = create_mini_field(top_row, "Other Names", 2)
-        
-        # VERTICAL FIELDS
-        self.char_fields = {}
-        fields = [
-            "Personality", "Motivations", "Internal Conflicts",
-            "Strength", "Weakness", "Character Arc"
-        ]
-        
-        for field in fields:
-            ctk.CTkLabel(form_frame, text=field, text_color=ThemeEngine.TEXT_MUTED, font=("Inter", 12)).pack(anchor="w", pady=(5, 0))
-            txt = ctk.CTkTextbox(
-                form_frame,
-                height=60,
-                fg_color=ThemeEngine.BG_INPUT,
-                border_width=1,
-                border_color=ThemeEngine.BORDER_COLOR,
-                font=ThemeEngine.FONT_UI,
-                wrap="word"
-            )
-            txt.pack(fill="x")
-            
-            # Bind auto-resize
-            txt._textbox.bind("<KeyRelease>", lambda e, w=txt: self._auto_resize_textbox(w, 60))
-            txt._textbox.bind("<FocusOut>", lambda e, w=txt: self._auto_resize_textbox(w, 60))
-            
-            self.char_fields[field.lower().replace(" ", "_")] = txt
-        
-        # Dynamic Traits Container
-        self.traits_container = ctk.CTkFrame(form_frame, fg_color="transparent")
-        self.traits_container.pack(fill="x", pady=10)
-        self.trait_entries = [] # List of (label_entry, value_entry) tuples
-        
-        # Buttons
-        btn_row = ctk.CTkFrame(form_frame, fg_color="transparent")
-        btn_row.pack(fill="x", pady=10)
-        
-        ctk.CTkButton(
-            btn_row,
-            text="+ Add Trait",
-            width=100,
-            fg_color="transparent",
-            border_width=1,
-            border_color=ThemeEngine.BORDER_COLOR,
-            text_color=ThemeEngine.TEXT_PRIMARY,
-            command=self._add_trait_row
-        ).pack(side="left")
-        
-        ctk.CTkButton(
-            btn_row,
-            text="Save Character",
-            width=120,
-            command=self._on_save_character,
-            fg_color=ThemeEngine.ACCENT_PRIMARY,
-            text_color=ThemeEngine.TEXT_PRIMARY
-        ).pack(side="right")
-        
-        self._refresh_character_list()
+        # Set project ID if known
+        if self.current_project_id:
+            self.character_frame.project_id = self.current_project_id
+            self.character_frame.load_list()
+
+    # _add_trait_row, _on_save_character, _refresh_character_list no longer needed here
+    # as they are handled inside CharacterFrame. 
+    # Validating removal.
     
-    def _auto_resize_textbox(self, widget, min_height):
-        """Auto-expand CTkTextbox height based on content."""
-        try:
-            # Get number of display lines from internal tk widget
-            num_lines = widget._textbox.count("displaylines", "1.0", "end")
-            if not num_lines:
-                num_lines = 1
-            else:
-                num_lines = int(num_lines)
-            
-            # Approximate line height (Inter 13/14 + padding) - approx 20px
-            line_height = 22 
-            padding = 16
-            
-            new_height = max(min_height, (num_lines * line_height) + padding)
-            
-            if widget.cget("height") != new_height:
-                widget.configure(height=new_height)
-        except Exception as e:
-            # Fail silently if count not supported or widget destroyed
-            pass
-    
-    def _add_trait_row(self):
-        """Add a dynamic trait row."""
-        row = ctk.CTkFrame(self.traits_container, fg_color="transparent")
-        row.pack(fill="x", pady=2)
-        
-        label = ctk.CTkEntry(row, placeholder_text="Trait Name", width=120, height=28)
-        label.pack(side="left", padx=(0, 5))
-        
-        val = ctk.CTkEntry(row, placeholder_text="Value", height=28)
-        val.pack(side="left", fill="x", expand=True)
-        
-        self.trait_entries.append((label, val))
-    
-    def _on_save_character(self):
-        """Handle saving character profile."""
-        if not self.current_project_id:
-            return
-            
-        name = self.char_name_entry.get().strip()
-        if not name:
-            return
-            
-        # Collect data
-        data = {
-            "pronouns": self.char_pronouns.get("1.0", "end-1c").strip(),
-            "groups": self.char_groups.get("1.0", "end-1c").strip(),
-            "aliases": self.char_aliases.get("1.0", "end-1c").strip(),
-        }
-        
-        for key, widget in self.char_fields.items():
-            data[key] = widget.get("1.0", "end-1c").strip()
-            
-        # Collect traits
-        traits = {}
-        for l_ent, v_ent in self.trait_entries:
-            k = l_ent.get().strip()
-            v = v_ent.get().strip()
-            if k:
-                traits[k] = v
-        data["traits"] = traits
-        
-        # Serialize to JSON for description field
-        import json
-        description_json = json.dumps(data)
-        
-        try:
-            self.db_manager.save_character({
-                "project_id": self.current_project_id,
-                "name": name,
-                "backstory": description_json
-            })
-            
-            # Clear inputs
-            self.char_name_entry.delete(0, "end")
-            self.char_pronouns.delete("1.0", "end")
-            self.char_groups.delete("1.0", "end")
-            self.char_aliases.delete("1.0", "end")
-            for w in self.char_fields.values():
-                w.delete("1.0", "end")
-            
-            # Clear traits
-            for widget in self.traits_container.winfo_children():
-                widget.destroy()
-            self.trait_entries = []
-            
-            self._refresh_character_list()
-        except Exception as e:
-            logging.error(f"Failed to save character: {e}")
-    
-    def _refresh_character_list(self):
-        """Display characters list."""
-        for w in self.char_list_frame.winfo_children():
-            w.destroy()
-            
-        if not self.current_project_id:
-            return
-            
-        chars = self.db_manager.get_all_characters(self.current_project_id)
-        if not chars:
-            return
-            
-        # Accordion-style or Simple List? User said "Display list".
-        # I'll do a simple summary card for each.
-        import json
-        
-        for char in chars:
-            card = ctk.CTkFrame(self.char_list_frame, fg_color=ThemeEngine.BG_INPUT)
-            card.pack(fill="x", pady=4)
-            
-            # Parse data
-            role = ""
-            try:
-                if char.get('backstory'):
-                    data = json.loads(char['backstory'])
-                    # Get summary from personality or role
-                    role = data.get('personality', '')
-                    if not role and data.get('role'): role = data.get('role')
-                    if role: role = role[:50] + "..."
-            except:
-                role = char.get('backstory', '')[:50]
-            
-            header = ctk.CTkFrame(card, fg_color="transparent")
-            header.pack(fill="x", padx=10, pady=5)
-            
-            ctk.CTkLabel(
-                header, 
-                text=char['name'], 
-                font=("Inter", 14, "bold"),
-                text_color=ThemeEngine.TEXT_PRIMARY
-            ).pack(side="left")
-            
-            if role:
-                ctk.CTkLabel(
-                    header,
-                    text=f"  {role}",
-                    text_color=ThemeEngine.TEXT_MUTED,
-                    font=("Inter", 12)
-                ).pack(side="left")
+
     
     def _create_style_section(self):
         """Create Style selection section with buttons."""
@@ -863,9 +633,9 @@ class CenterScrollPanel(ctk.CTkScrollableFrame):
                 # Use get_story_bible to fetch all Story Bible fields
                 bible_data = self.db_manager.get_story_bible(project_id)
                 if bible_data:
-                    # Load all Story Bible fields
+                    # Load all Story Bible fields (Characters handled separately)
                     for field in ["braindump", "genre", "style", "synopsis", 
-                                 "characters", "worldbuilding", "outline"]:
+                                 "worldbuilding", "outline"]:
                         if field in bible_data and bible_data[field]:
                             if field == "style":
                                 self._select_style(bible_data[field])
@@ -875,8 +645,11 @@ class CenterScrollPanel(ctk.CTkScrollableFrame):
                                     widget.delete("1.0", "end")
                                     widget.insert("1.0", bible_data[field])
                     
-                    # Refresh characters list
-                    self._refresh_character_list()
+                    # Refresh characters list via Frame
+                    if hasattr(self, 'character_frame'):
+                        self.character_frame.project_id = project_id
+                        self.character_frame.load_list()
+
             except Exception as e:
                 logging.error(f"Failed to load story bible: {e}")
         
