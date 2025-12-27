@@ -63,22 +63,35 @@ class DatabaseManager:
                     cursor.execute("ALTER TABLE chapters ADD COLUMN beats TEXT")
                     logging.info("Added beats column to chapters table")
 
-                # Migration: Add project_id to characters AND fix unique constraint
-                # We need to recreate the table to change the UNIQUE constraint to (name, project_id)
+                # Migration: Add project_id to characters AND fix unique constraint + Add new fields
                 cursor.execute("PRAGMA index_list(characters)")
                 indexes = cursor.fetchall()
-                # Check if we have a composite index or just name
-                needs_rebuild = True
+                # Check for table structure to see if we need to add columns or rebuild
+                cursor.execute("PRAGMA table_info(characters)")
+                current_cols = [c[1] for c in cursor.fetchall()]
+
+                # Fields we want
+                required_fields = {
+                    'project_id', 'name', 'role', 'personality_traits', 'speech_pattern', 
+                    'relationship_to_author', 'backstory', 'continuity_notes',
+                    'pronouns', 'groups', 'other_names', 'motivations', 
+                    'internal_conflicts', 'strengths', 'weaknesses', 'character_arc'
+                }
+                
+                missing_fields = required_fields - set(current_cols)
+                
+                # Check constraints (unique name+project_id)
+                needs_constraint_fix = True
                 for idx in indexes:
                     if idx[2] == 1: # Unique
                         cursor.execute(f"PRAGMA index_info({idx[1]})")
                         cols = sorted([r[2] for r in cursor.fetchall()])
                         if cols == ['name', 'project_id'] or cols == ['project_id', 'name']:
-                            needs_rebuild = False
+                            needs_constraint_fix = False
                             break
                             
-                if needs_rebuild:
-                    logging.info("Migrating characters table to scope by project_id...")
+                if needs_constraint_fix or missing_fields:
+                    logging.info("Migrating characters table schema...")
                     conn.execute("ALTER TABLE characters RENAME TO characters_old")
                     
                     conn.execute("""
@@ -92,24 +105,28 @@ class DatabaseManager:
                             relationship_to_author TEXT,
                             backstory TEXT,
                             continuity_notes TEXT,
+                            pronouns TEXT,
+                            groups TEXT,
+                            other_names TEXT,
+                            motivations TEXT,
+                            internal_conflicts TEXT,
+                            strengths TEXT,
+                            weaknesses TEXT,
+                            character_arc TEXT,
                             UNIQUE(name, project_id)
                         )
                     """)
                     
-                    # Copy data. If original didn't have project_id, it defaults to 0.
-                    # We need to check columns of old table to copy correctly
+                    # Copy data.
                     cursor.execute("PRAGMA table_info(characters_old)")
-                    old_cols = [c[1] for c in cursor.fetchall()]
+                    old_cols_info = cursor.fetchall()
+                    old_cols = [c[1] for c in old_cols_info]
                     
-                    # Build dynamic insert
-                    # We map old columns to new. 'project_id' might exist in old if we ran previous migration, or not.
-                    insert_cols = [c for c in old_cols if c != 'id']  # Skip ID to let autoincrement work or keep it? Keep it for safety.
-                    insert_cols = ['id', 'name', 'role', 'personality_traits', 'speech_pattern', 'relationship_to_author', 'backstory', 'continuity_notes']
-                    if 'project_id' in old_cols:
-                        insert_cols.append('project_id')
-                        
-                    col_str = ", ".join(insert_cols)
-                    qs = ", ".join(["?"] * len(insert_cols))
+                    # We map intersection of old and new columns
+                    common_cols = [c for c in old_cols if c in required_fields or c == 'id']
+                    
+                    col_str = ", ".join(common_cols)
+                    qs = ", ".join(common_cols) # SELECT msg matches INSERT msg
                     
                     cursor.execute(f"INSERT INTO characters ({col_str}) SELECT {col_str} FROM characters_old")
                     conn.execute("DROP TABLE characters_old")
@@ -684,20 +701,30 @@ class DatabaseManager:
                 cursor = conn.cursor()
                 pid = data.get('project_id', 0)
                 
-                cursor.execute("""
+                # Dynamic update/insert based on provided keys would be better, but fixed schema is safer for now
+                # We must ensure all keys are present or handled
+                
+                keys = [
+                    'project_id', 'name', 'role', 'personality_traits', 'speech_pattern', 
+                    'relationship_to_author', 'backstory', 'continuity_notes',
+                    'pronouns', 'groups', 'other_names', 'motivations', 
+                    'internal_conflicts', 'strengths', 'weaknesses', 'character_arc'
+                ]
+                
+                values = [pid]
+                values.append(data.get('name', ''))
+                # All others interactively
+                for k in keys[2:]:
+                    values.append(data.get(k, ''))
+
+                placeholders = ", ".join(["?"] * len(keys))
+                columns = ", ".join(keys)
+
+                cursor.execute(f"""
                     INSERT OR REPLACE INTO characters 
-                    (project_id, name, role, personality_traits, speech_pattern, relationship_to_author, backstory, continuity_notes)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                """, (
-                    pid,
-                    data['name'], 
-                    data.get('role', ''),
-                    data.get('personality_traits', ''),
-                    data.get('speech_pattern', ''),
-                    data.get('relationship_to_author', ''),
-                    data.get('backstory', ''),
-                    data.get('continuity_notes', '')
-                ))
+                    ({columns})
+                    VALUES ({placeholders})
+                """, values)
                 conn.commit()
                 return True
         except sqlite3.Error as e:
@@ -708,8 +735,9 @@ class DatabaseManager:
         try:
             with self.get_connection() as conn:
                 cursor = conn.cursor()
-                cursor.execute("SELECT name, backstory FROM characters WHERE project_id = ? ORDER BY name", (project_id,))
-                return [{'name': row[0], 'backstory': row[1]} for row in cursor.fetchall()]
+                # Return limited info for list
+                cursor.execute("SELECT name, role FROM characters WHERE project_id = ? ORDER BY name", (project_id,))
+                return [{'name': row[0], 'role': row[1]} for row in cursor.fetchall()]
         except sqlite3.Error as e:
             logging.error(f"Get characters error: {e}")
             return []
@@ -722,9 +750,9 @@ class DatabaseManager:
                 row = cursor.fetchone()
                 if row:
                     # Map based on schema. 
-                    # Schema: id, project_id, name, role, traits, speech, rel, back, cont
-                    keys = ['id', 'project_id', 'name', 'role', 'personality_traits', 'speech_pattern', 'relationship_to_author', 'backstory', 'continuity_notes']
-                    return dict(zip(keys, row))
+                    # We need column names to be reliable.
+                    col_names = [description[0] for description in cursor.description]
+                    return dict(zip(col_names, row))
                 return None
         except sqlite3.Error as e:
             logging.error(f"Get details error: {e}")

@@ -2656,3 +2656,67 @@ TypeError: DatabaseManager.get_all_characters() missing 1 required positional ar
 2025-12-27 21:57:35,296 - INFO - KeyboardInterrupt caught. Shutting down...
 2025-12-27 21:57:35,297 - INFO - Unloading model and freeing VRAM...
 2025-12-27 21:57:35,587 - INFO - App shutdown complete.
+2025-12-27 23:04:32,261 - INFO - Starting Story Bible App - Milestone 1.3
+2025-12-27 23:04:32,265 - INFO - Database initialized at /home/sabona/Desktop/DesktopApp/data/story_bible.db
+2025-12-27 23:04:32,266 - INFO - Loading model from /home/sabona/Desktop/DesktopApp/models/llama/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf with n_gpu_layers=-1
+2025-12-27 23:04:36,392 - INFO - Model loaded successfully.
+2025-12-27 23:04:44,636 - INFO - Saved style
+2025-12-27 23:04:46,967 - INFO - Saved style
+2025-12-27 23:04:49,879 - INFO - Saved style
+2025-12-27 23:04:51,902 - INFO - Saved style
+2025-12-27 23:04:54,973 - INFO - Show trash clicked
+2025-12-27 23:16:32,924 - INFO - KeyboardInterrupt caught. Shutting down...
+2025-12-27 23:16:32,925 - INFO - Unloading model and freeing VRAM...
+2025-12-27 23:16:33,272 - INFO - App shutdown complete.
+2025-12-27 23:20:42,840 - INFO - Starting Story Bible App - Milestone 1.3
+2025-12-27 23:20:42,841 - INFO - Migrating characters table schema...
+2025-12-27 23:20:42,858 - INFO - Characters table migration complete.
+2025-12-27 23:20:42,859 - INFO - Database initialized at /home/sabona/Desktop/DesktopApp/data/story_bible.db
+2025-12-27 23:20:42,859 - INFO - Loading model from /home/sabona/Desktop/DesktopApp/models/llama/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf with n_gpu_layers=-1
+2025-12-27 23:20:44,715 - INFO - Model loaded successfully.
+2025-12-27 23:20:49,215 - INFO - Saved style
+2025-12-27 23:20:50,982 - INFO - Saved style
+2025-12-27 23:22:59,047 - INFO - KeyboardInterrupt caught. Shutting down...
+2025-12-27 23:22:59,048 - INFO - Unloading model and freeing VRAM...
+2025-12-27 23:22:59,350 - INFO - App shutdown complete.
+2025-12-27 23:25:32,123 - INFO - Starting Story Bible App - Milestone 1.3
+2025-12-27 23:25:32,126 - INFO - Database initialized at /home/sabona/Desktop/DesktopApp/data/story_bible.db
+2025-12-27 23:25:32,127 - INFO - Loading model from /home/sabona/Desktop/DesktopApp/models/llama/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf with n_gpu_layers=-1
+2025-12-27 23:25:33,908 - INFO - Model loaded successfully.
+2025-12-27 23:25:46,719 - INFO - Saved style
+2025-12-27 23:25:48,806 - INFO - Saved style
+2025-12-27 23:30:05,290 - INFO - KeyboardInterrupt caught. Shutting down...
+2025-12-27 23:30:05,290 - INFO - Unloading model and freeing VRAM...
+2025-12-27 23:30:05,599 - INFO - App shutdown complete.
+2025-12-27 23:34:56,773 - INFO - Starting Story Bible App - Milestone 1.3
+2025-12-27 23:34:56,775 - INFO - Database initialized at /home/sabona/Desktop/DesktopApp/data/story_bible.db
+2025-12-27 23:34:56,775 - INFO - Loading model from /home/sabona/Desktop/DesktopApp/models/llama/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf with n_gpu_layers=-1
+2025-12-27 23:34:58,227 - INFO - Model loaded successfully.
+2025-12-27 23:35:03,740 - INFO - Saved style
+2025-12-27 23:35:05,685 - INFO - Saved style
+2025-12-27 23:43:07,546 - INFO - KeyboardInterrupt caught. Shutting down...
+2025-12-27 23:43:07,546 - INFO - Unloading model and freeing VRAM...
+2025-12-27 23:43:07,846 - INFO - App shutdown complete.
+2025-12-27 23:43:18,783 - INFO - Starting Story Bible App - Milestone 1.3
+2025-12-27 23:43:18,786 - INFO - Database initialized at /home/sabona/Desktop/DesktopApp/data/story_bible.db
+2025-12-27 23:43:18,787 - INFO - Loading model from /home/sabona/Desktop/DesktopApp/models/llama/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf with n_gpu_layers=-1
+2025-12-27 23:43:20,302 - INFO - Model loaded successfully.
+2025-12-27 23:43:26,715 - INFO - Saved style
+2025-12-27 23:43:28,485 - INFO - Saved style
+2025-12-27 23:44:50,218 - INFO - Saved style
+2025-12-27 23:44:53,573 - INFO - Saved style
+2025-12-27 23:44:55,014 - INFO - Saved style
+2025-12-27 23:45:02,592 - INFO - Saved style
+2025-12-27 23:47:11,532 - INFO - KeyboardInterrupt caught. Shutting down...
+2025-12-27 23:47:11,533 - INFO - Unloading model and freeing VRAM...
+2025-12-27 23:47:11,832 - INFO - App shutdown complete.
+2025-12-28 00:09:06,737 - INFO - Starting Story Bible App - Milestone 1.3
+2025-12-28 00:09:06,738 - INFO - Database initialized at /home/sabona/Desktop/DesktopApp/data/story_bible.db
+2025-12-28 00:09:06,738 - INFO - Loading model from /home/sabona/Desktop/DesktopApp/models/llama/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf with n_gpu_layers=-1
+2025-12-28 00:09:08,865 - INFO - Model loaded successfully.
+2025-12-28 00:09:13,174 - INFO - Saved style
+2025-12-28 00:09:15,607 - INFO - Saved style
+2025-12-28 00:09:29,593 - INFO - Saved style
+2025-12-28 00:09:38,928 - INFO - Saved style
+2025-12-28 00:10:11,491 - INFO - Unloading model and freeing VRAM...
+2025-12-28 00:10:11,846 - INFO - App shutdown complete.
