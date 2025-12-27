@@ -23,36 +23,86 @@ pip install pyinstaller
 # 3. Verify PyInstaller works
 pyinstaller --version
 ```
+# Story Bible App - Cross-Platform Deployment Guide
 
-## 3. Build the Executable
+This guide explains how to build the Story Bible App for Windows, Linux, and macOS.
+The application preserves all functionality, including the custom writing canvas and AI integration, across all platforms.
 
-Run the following command in the project root (where `deployment.spec` is located):
+## ⚠️ Important Configuration
 
-```powershell
-pyinstaller deployment.spec
-```
+The LLaMA model (~4.9GB) is **too large to bundle** inside the executable.
+It must be distributed alongside the app in a `models/` directory.
 
-This will create two folders: `build/` (temp files) and `dist/` (final output).
+---
 
-## 4. Post-Build Setup (CRITICAL)
+## 🏗️ Build Instructions
 
-The LLaMA model is too large to bundle, so you must place it manually.
+### Prerequisites
+1.  Python 3.10+ installed.
+2.  Dependencies installed:
+    ```bash
+    pip install -r requirements.txt
+    ```
 
-1. Navigate to `dist/StoryBibleApp/`.
-2. Create a folder named `models`.
-3. Inside `models`, create a folder named `llama`.
-4. Place your `.gguf` model file here.
+### How to Build (All Platforms)
+We provide a unified build script that detects your OS and configures PyInstaller automatically.
 
-**Structure:**
-```
-dist/
-└── StoryBibleApp/
-    ├── StoryBibleApp.exe
-    ├── _internal/
+1.  **Open a terminal** in the project root.
+2.  **Run the build script**:
+    ```bash
+    python build.py
+    ```
+
+### Platform Specifics
+
+#### 🪟 Windows
+- **Output**: `dist\StoryBibleApp\StoryBibleApp.exe`
+- **Icon**: Uses `resources/icon.ico` if available.
+- **Console**: Hidden by default (GUI only).
+
+#### 🐧 Linux
+- **Output**: `dist/StoryBibleApp/StoryBibleApp`
+- **Icon**: Uses `resources/icon.png` if available.
+- **Note**: Ensure you have GLIBC compatible with your target distribution (build on the oldest distro you intend to support, e.g., Ubuntu 20.04).
+
+#### 🍎 macOS
+- **Output**: `dist/StoryBibleApp.app` (Application Bundle)
+- **Icon**: Uses `resources/icon.icns` if available.
+- **Note**: The build script enables `argv_emulation` so you can open files with valid double-click behavior.
+- **Signing**: This build script does **not** code-sign the app. You may need to allow it in "Security & Privacy" to run.
+
+---
+
+## 📦 Distribution Steps (Post-Build)
+
+After building, you must verify the folder structure before zipping potential releases.
+
+1.  **Locate the executable folder**:
+    - Windows/Linux: `dist/StoryBibleApp/`
+    - macOS: `dist/StoryBibleApp.app/Contents/MacOS/`
+
+2.  **Copy the AI Model**:
+    Create a `models/llama/` folder next to the main executable and place your `.gguf` model there.
+
+    **Structure:**
+    ```text
+    StoryBibleApp/          (or inside .app/Contents/MacOS/)
+    ├── StoryBibleApp       (Executable)
     └── models/
         └── llama/
-            └── Llama-3.1-8B-Instruct.gguf  <-- YOUR MODEL HERE
-```
+            └── Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf
+    ```
+
+3.  **Run to Verify**:
+    Double-click the executable. If the model is missing, the logs (or console if enabled) will show an error.
+
+---
+
+## 🐛 Troubleshooting
+
+- **Model Not Found**: Check that `models/` is directly next to the executable file, not just in the parent `dist` folder.
+- **DLL Missing (Windows)**: Ensure you have the Visual C++ Redistributable installed.
+- **Permission Denied (Linux/macOS)**: Ensure the binary is executable: `chmod +x StoryBibleApp`.
 
 ## 5. Persistent Data
 

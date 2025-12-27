@@ -40,3 +40,4 @@ models/llama/*
 !models/llama/.gitkeep
 models/tts/*
 !models/tts/.gitkeep
+dist/*
