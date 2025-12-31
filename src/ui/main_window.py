@@ -4,6 +4,8 @@ import threading
 import queue
 import time
 import logging
+import os
+from PIL import Image
 from .theme_engine import ThemeEngine
 from src.ui.character_frame import CharacterFrame
 from src.ui.story_bible_view import StoryBibleView
@@ -1509,6 +1511,28 @@ class StoryBibleUI(ctk.CTk):
         self.title("Story Bible Pro - Sudowrite Style")
         self.geometry("1600x1000")
         self.configure(fg_color=ThemeEngine.BG_MAIN)
+
+        # --- Background Image ---
+        try:
+            current_dir = os.path.dirname(os.path.abspath(__file__))
+            bg_path = os.path.join(current_dir, "assets", "backgroundimg.png")
+            
+            if os.path.exists(bg_path):
+                pil_image = Image.open(bg_path)
+                # Use a large size for background covarage
+                self.bg_image = ctk.CTkImage(
+                    light_image=pil_image,
+                    dark_image=pil_image,
+                    size=(1920, 1080)
+                )
+                self.bg_label = ctk.CTkLabel(self, text="", image=self.bg_image)
+                self.bg_label.place(x=0, y=0, relwidth=1, relheight=1)
+                self.bg_label.lower()
+                logging.info(f"Background image loaded: {bg_path}")
+            else:
+                logging.warning(f"Background image not found: {bg_path}")
+        except Exception as e:
+            logging.error(f"Failed to load background image: {e}")
         
         # ============================================================
         # NEW SUDOWRITE-STYLE LAYOUT
