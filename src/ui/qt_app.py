@@ -135,16 +135,13 @@ class ToolbarWidget(QWidget):
         from PyQt6.QtWidgets import QSizePolicy
         
         buttons = [
-            ("Write", "write", ["Auto", "Guided", "Tone Shift", "Write Settings"])
+            ("←", "back", None),
+            ("Write ▼", "write", ["Continue Writing", "Write Scene", "Generate Opening"]),
+            ("Rewrite ▼", "rewrite", ["Show Don't Tell", "Dramatic", "Gritty", "Elegant", "Concise"]),
+            ("Describe ▼", "describe", ["Sight", "Sound", "Smell", "Taste", "Touch", "Metaphor"]),
+            ("Brainstorm ▼", "brainstorm", ["Character Ideas", "Plot Twists", "Setting Details"]),
+            ("More Tools ▼", "more_tools", ["Export", "Import", "Settings"])
         ]
-        
-        # Hide other buttons for now as per requirement
-        # buttons = [
-        #    ("←", "back", None),
-        #    ("Write ▼", "write", ["Continue Writing", "Write Scene", "Generate Opening"]),
-        #    ("Rewrite ▼", "rewrite", ["Show Don't Tell", "Dramatic", "Gritty", "Elegant", "Concise"]),
-        #    # ...
-        # ]
         
         for text, action, menu_items in buttons:
             if action == "write":
@@ -188,7 +185,69 @@ class ToolbarWidget(QWidget):
                 self.write_btn.setMenu(menu)
                 self.write_btn.clicked.connect(lambda: self.action_triggered.emit("write", self._current_write_mode))
                 layout.addWidget(self.write_btn, 2)
+            
+            elif action == "describe":
+                self.describe_btn = QToolButton()
+                self.describe_btn.setText("Describe")
+                self.describe_btn.setPopupMode(QToolButton.ToolButtonPopupMode.MenuButtonPopup)
+                self.describe_btn.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+                self.describe_btn.setStyleSheet(self.write_btn.styleSheet()) # Reuse style
                 
+                menu = QMenu(self)
+                menu.setStyleSheet(QtTheme.get_global_stylesheet())
+                
+                self.sense_actions = {}
+                self.sense_actions = {}
+                from PyQt6.QtWidgets import QWidgetAction, QCheckBox
+                
+                for item in menu_items:
+                    # Create custom widget action for toggle button
+                    widget_action = QWidgetAction(menu)
+                    
+                    # Create container widget
+                    container = QWidget()
+                    container_layout = QHBoxLayout(container)
+                    container_layout.setContentsMargins(10, 5, 20, 5) # Indent for alignment
+                    
+                    # Label
+                    label = QLabel(item)
+                    label.setStyleSheet(f"color: {QtTheme.TEXT_PRIMARY}; font-size: 14px;")
+                    
+                    # Toggle Checkbox (styled as simply as possible for now)
+                    checkbox = QCheckBox()
+                    checkbox.setStyleSheet(f"""
+                        QCheckBox::indicator {{
+                            width: 18px;
+                            height: 18px;
+                            border: 1px solid {QtTheme.BORDER_COLOR};
+                            border-radius: 4px;
+                            background: transparent;
+                        }}
+                        QCheckBox::indicator:checked {{
+                            background: {QtTheme.ACCENT_PRIMARY};
+                            border: 1px solid {QtTheme.ACCENT_PRIMARY};
+                        }}
+                    """)
+                    
+                    container_layout.addWidget(label)
+                    container_layout.addStretch()
+                    container_layout.addWidget(checkbox)
+                    
+                    widget_action.setDefaultWidget(container)
+                    menu.addAction(widget_action)
+                    
+                    # Store action and logic
+                    self.sense_actions[item] = checkbox # Store checkbox directly for easy access
+                    checkbox.toggled.connect(self._update_describe_visuals)
+                    
+                    # HACK: Prevent menu closing on internal widget click? 
+                    # Actually QAction triggered usually closes it.
+                    # QCheckBox click might not close menu if handled inside widget.
+                
+                self.describe_btn.setMenu(menu)
+                self.describe_btn.clicked.connect(lambda: self.action_triggered.emit("describe", "current"))
+                layout.addWidget(self.describe_btn, 2)
+
             else:
                  # Hidden buttons logic if we were to show them
                  pass
@@ -196,6 +255,17 @@ class ToolbarWidget(QWidget):
     def _set_write_mode(self, mode: str):
         self._current_write_mode = mode
         self.write_btn.setText(f"Write: {mode}")
+
+    def _update_describe_visuals(self):
+        """Update Describe button visuals based on active toggles."""
+        # Visual feedback for active toggles can be added here
+        pass
+            
+    def get_active_senses(self) -> List[str]:
+        """Get list of active sensory toggles."""
+        if not hasattr(self, 'sense_actions'):
+            return []
+        return [sense for sense, checkbox in self.sense_actions.items() if checkbox.isChecked()]
     
     def _create_status_indicators(self, layout):
         """Create status indicators with fixed positioning."""
@@ -1374,6 +1444,22 @@ class CenterPanel(QWidget):
         cursor = self.editor_textbox.textCursor()
         cursor.insertText(text)
         self.editor_textbox.setTextCursor(cursor)
+    
+    def get_selected_text(self) -> str:
+        """Get currently selected text."""
+        cursor = self.editor_textbox.textCursor()
+        return cursor.selectedText()
+    
+    def replace_selected_text(self, text: str):
+        """Replace currently selected text with new text."""
+        cursor = self.editor_textbox.textCursor()
+        if cursor.hasSelection():
+            cursor.insertText(text)
+            self.editor_textbox.setTextCursor(cursor)
+        else:
+            # Fallback to insert if no selection (though logic should prevent this for Describe)
+            cursor.insertText(text)
+
 
 
 # ============================================================================
@@ -1384,14 +1470,14 @@ class AssistantPanel(QWidget):
     """Right panel - Glass sidebar with AI chat."""
     
     chat_sent = pyqtSignal(str)  # query
-    insert_requested = pyqtSignal(str) # text
+    insert_requested = pyqtSignal(str)  # text to insert
     
     def __init__(self, parent=None):
         super().__init__(parent)
         
         # Glass sidebar effect
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
-        self.setAutoFillBackground(False)  # Keep False, paint manually
+        self.setAutoFillBackground(False)
         
         self.setProperty("class", "SidebarWidget")
         self.setMinimumWidth(QtTheme.ASSISTANT_WIDTH)
@@ -1402,39 +1488,42 @@ class AssistantPanel(QWidget):
         """Paint dark glass background manually."""
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-        
-        # Paint dark glass overlay - 86% black
         color = QColor(0, 0, 0, 220)
         painter.fillRect(self.rect(), color)
-        
-        # Paint left border
-        border_color = QColor(255, 255, 255, 26)  # 10% white
+        border_color = QColor(255, 255, 255, 26)
         painter.setPen(border_color)
         painter.drawLine(0, 0, 0, self.height())
-        
         super().paintEvent(event)
     
     def _setup_ui(self):
-        """Create assistant panel UI."""
+        """Create assistant panel UI with ScrollArea for bubbles."""
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(10, 10, 10, 10)
+        layout.setContentsMargins(0, 0, 0, 0)
         
-        # Chat history (Scroll Area)
-        self.chat_scroll = TransparentScrollArea()
+        # 1. Chat Area (ScrollArea)
+        self.scroll_area = QScrollArea()
+        self.scroll_area.setWidgetResizable(True)
+        self.scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.scroll_area.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
+        self.scroll_area.setFrameShape(QFrame.Shape.NoFrame)
+        self.scroll_area.setStyleSheet("background: transparent; border: none;")
         
-        self.chat_widget = QWidget()
-        self.chat_widget.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
-        self.chat_widget.setStyleSheet("background-color: transparent;")
+        # Container for messages
+        self.chat_container = QWidget()
+        self.chat_container.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
+        self.chat_layout = QVBoxLayout(self.chat_container)
+        self.chat_layout.setContentsMargins(10, 10, 10, 10)
+        self.chat_layout.setSpacing(15)
+        self.chat_layout.addStretch() # Push messages to bottom initially? No, top.
         
-        self.chat_layout = QVBoxLayout(self.chat_widget)
-        self.chat_layout.setContentsMargins(0, 0, 0, 0)
-        self.chat_layout.setSpacing(12)
-        self.chat_layout.addStretch()
+        self.scroll_area.setWidget(self.chat_container)
+        layout.addWidget(self.scroll_area, 1)
         
-        self.chat_scroll.setWidget(self.chat_widget)
-        layout.addWidget(self.chat_scroll, 1)
+        # 2. Input Area
+        input_container = QWidget()
+        input_layout = QHBoxLayout(input_container)
+        input_layout.setContentsMargins(10, 10, 10, 10)
         
-        # Chat input (glass)
         self.chat_input = QLineEdit()
         self.chat_input.setPlaceholderText("Ask about lore...")
         self.chat_input.setStyleSheet(f"""
@@ -1451,95 +1540,117 @@ class AssistantPanel(QWidget):
             }}
         """)
         self.chat_input.returnPressed.connect(self._send_chat)
-        layout.addWidget(self.chat_input)
-    
+        input_layout.addWidget(self.chat_input)
+        
+        layout.addWidget(input_container)
+
     def _send_chat(self):
-        """Send chat message."""
         query = self.chat_input.text().strip()
         if query:
-            self.add_message(query, sender="user")
+            self.add_message(query, "user")
             self.chat_sent.emit(query)
             self.chat_input.clear()
-    
-    def add_message(self, text: str, sender: str = "ai"):
-        """Add a message bubble to chat history."""
-        is_user = (sender == "user")
+
+    def add_message(self, text: str, sender: str):
+        """Add a message bubble to the chat."""
+        # Create container for bubble to handle alignment
+        row_widget = QWidget()
+        row_layout = QHBoxLayout(row_widget)
+        row_layout.setContentsMargins(0, 0, 0, 0)
         
-        # Message Container
-        msg_container = QWidget()
-        msg_container.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
-        msg_layout = QHBoxLayout(msg_container)
-        msg_layout.setContentsMargins(0, 0, 0, 0)
-        
-        # Bubble Frame
         bubble = QFrame()
-        # bubble_color logic
-        bubble_bg = QtTheme.ACCENT_SECONDARY if is_user else QtTheme.CARD_BG
+        bubble.setProperty("class", "MessageBubble")
         
-        bubble.setStyleSheet(f"""
-            QFrame {{
-                background-color: {bubble_bg};
-                border-radius: 12px;
-                border: 1px solid {QtTheme.GLASS_BORDER};
-            }}
-        """)
+        if sender == "user":
+            bubble.setStyleSheet(f"""
+                QFrame {{
+                    background-color: {QtTheme.ACCENT_PRIMARY};
+                    border-radius: 12px;
+                    border-bottom-right-radius: 2px;
+                    padding: 10px;
+                }}
+            """)
+            row_layout.addStretch()
+            row_layout.addWidget(bubble, 8) 
+        else:
+            bubble.setStyleSheet(f"""
+                QFrame {{
+                    background-color: {QtTheme.BG_HOVER};
+                    border: 1px solid {QtTheme.GLASS_BORDER};
+                    border-radius: 12px;
+                    border-bottom-left-radius: 2px;
+                    padding: 10px;
+                }}
+            """)
+            row_layout.addWidget(bubble, 8)
+            row_layout.addStretch()
+
+        # Bubble content
         bubble_layout = QVBoxLayout(bubble)
-        bubble_layout.setContentsMargins(12, 12, 12, 12)
-        bubble_layout.setSpacing(8)
+        bubble_layout.setContentsMargins(5, 5, 5, 5)
         
-        # Text Label
-        label = QLabel(text)
-        label.setFont(QtTheme.get_font_ui())
-        label.setStyleSheet(f"color: {QtTheme.TEXT_PRIMARY}; background-color: transparent; border: none;")
-        label.setWordWrap(True)
-        label.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
-        bubble_layout.addWidget(label)
+        msg_label = QLabel(text)
+        msg_label.setWordWrap(True)
+        msg_label.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+        msg_label.setStyleSheet("border: none; background: transparent; color: white;")
+        msg_label.setFont(QtTheme.get_font_ui())
+        bubble_layout.addWidget(msg_label)
         
-        # Insert Button for AI
-        if not is_user:
+        # Add Insert Button for AI
+        if sender == "assistant":
+            # Add separator
+            line = QFrame()
+            line.setFrameShape(QFrame.Shape.HLine)
+            line.setStyleSheet(f"color: {QtTheme.GLASS_BORDER};")
+            bubble_layout.addWidget(line)
+            
             insert_btn = QPushButton("Insert to Editor")
             insert_btn.setCursor(Qt.CursorShape.PointingHandCursor)
             insert_btn.setStyleSheet(f"""
                 QPushButton {{
-                    background-color: {QtTheme.ACCENT_PRIMARY};
-                    color: {QtTheme.TEXT_PRIMARY};
-                    border-radius: 4px;
-                    padding: 4px 12px;
-                    font-size: 11px;
+                    background-color: transparent;
+                    color: {QtTheme.ACCENT_SECONDARY};
                     border: none;
+                    text-align: left;
+                    font-weight: bold;
+                    padding: 5px;
                 }}
                 QPushButton:hover {{
-                    background-color: {QtTheme.ACCENT_HOVER};
+                    color: white;
                 }}
             """)
             insert_btn.clicked.connect(lambda: self.insert_requested.emit(text))
             bubble_layout.addWidget(insert_btn)
+
+        # Add to main layout (remove stretch at bottom first if exists)
+        # We used setSpacing, so no stretch needed really.
+        # But to keep items at top, we need a stretch at the VERY END of chat_layout.
         
-        # Alignment
-        if is_user:
-            msg_layout.addStretch()
-            msg_layout.addWidget(bubble, 0)
-        else:
-            msg_layout.addWidget(bubble, 1) # Expand
-            msg_layout.addStretch()
-            
-        # Add to layout before stretch (stretch is last item)
+        # Remove the last item (stretch) if it exists, add widget, then add stretch back?
+        # Simpler: Just add widget. The layout will fill top to bottom.
+        # To align to top, we added addStretch() in setup. 
+        # We should insert BEFORE the stretch.
+        
         count = self.chat_layout.count()
         if count > 0:
-            self.chat_layout.insertWidget(count - 1, msg_container)
+            # Assuming last item is stretch
+            self.chat_layout.insertWidget(count - 1, row_widget)
         else:
-            self.chat_layout.addWidget(msg_container)
-            
-        # Scroll to bottom
-        QTimer.singleShot(50, self._scroll_to_bottom)
+            self.chat_layout.addWidget(row_widget)
         
+        # Auto scroll
+        QTimer.singleShot(100, self._scroll_to_bottom)
+
     def _scroll_to_bottom(self):
-        sb = self.chat_scroll.verticalScrollBar()
+        sb = self.scroll_area.verticalScrollBar()
         sb.setValue(sb.maximum())
-        
+
     def append_message(self, text: str):
-        """Compat alias."""
-        self.add_message(text, sender="ai")
+        # Fallback for old calls - treat as AI message
+        # But streaming might call this repeatedly?
+        # We need to handle streaming. 
+        # Ideally StoryBibleApp buffers text and calls add_message once.
+        pass
 
 
 # ============================================================================
@@ -1563,14 +1674,12 @@ class StoryBibleApp(QMainWindow):
         self.is_generating = False
         self.response_queue = queue.Queue()
         self.target_panel = None
+        self.current_ai_response_text = ""
         
         self._setup_window()
         self._create_ui()
         self._connect_signals()
-
         self._start_timers()
-        
-        self.current_ai_response_text = ""
         
         self.load_session()
     
@@ -1632,7 +1741,10 @@ class StoryBibleApp(QMainWindow):
         self.center_panel.content_changed.connect(self._on_content_change)
         self.center_panel.action_requested.connect(self._handle_action)
         self.right_panel.chat_sent.connect(self._handle_chat)
-        self.right_panel.insert_requested.connect(self.center_panel.insert_editor_content)
+        self.right_panel.insert_requested.connect(self.insert_text_to_editor)
+    
+    def insert_text_to_editor(self, text):
+        self.center_panel.replace_selected_text(text)
     
     def _start_timers(self):
         """Start background timers."""
@@ -1656,13 +1768,32 @@ class StoryBibleApp(QMainWindow):
         logging.info(f"Toolbar action: {action} - {item}")
         
         if action == "write":
-            # item is the mode: "Auto", "Guided", "Tone Shift"
-            prompt = f"WRITE_WITH_MODE::{item}"
-            self._handle_ai_request(prompt, 'assistant')
+            if item == "Continue Writing":
+                self._handle_ai_request("Continue writing from where I left off", 'editor')
+            elif item == "Write Scene":
+                self._handle_ai_request("Write a new scene", 'editor')
+            elif item == "Generate Opening":
+                self._handle_ai_request("Generate an opening paragraph", 'editor')
         elif action == "rewrite":
             self._handle_ai_request(f"PLUGIN::rewrite_{item.lower().replace(' ', '_')}::", 'editor')
         elif action == "describe":
-            self._handle_ai_request(f"PLUGIN::describe_{item.lower()}::", 'editor')
+            # 1. Validation: Require selection
+            selected_text = self.center_panel.get_selected_text()
+            if not selected_text.strip():
+                # Non-blocking warning as requested
+                QMessageBox.warning(self, "Selection Required", "Please select text to describe.")
+                return
+
+            # 2. Collect Active Senses
+            active_senses = self.toolbar.get_active_senses()
+            
+            # 3. Construct Prompt
+            prompt = f"DESCRIBE::{selected_text}"
+            if active_senses:
+                prompt += f"::SENSES::{','.join(active_senses)}"
+            
+            self._handle_ai_request(prompt, 'assistant')
+
         elif action == "brainstorm":
             self._handle_ai_request(f"Brainstorm: {item}", 'assistant')
         elif action == "export":
@@ -1670,7 +1801,7 @@ class StoryBibleApp(QMainWindow):
         elif action == "help":
             self._show_help()
         elif action == "settings":
-            QMessageBox.information(self, "Settings", f"Configuration for: {item}")
+            logging.info("Settings clicked")
     
     @pyqtSlot(int, int)
     def _load_chapter(self, chapter_id: int, project_id: int):
@@ -1730,26 +1861,34 @@ class StoryBibleApp(QMainWindow):
         try:
             while True:
                 token = self.response_queue.get_nowait()
-                is_final = False
                 if token == "[[END]]":
-                    is_final = True
-                    token = ""
-                
-                if self.target_panel == 'editor':
-                    self.center_panel.insert_editor_content(token)
-                elif self.target_panel == 'assistant':
-                    self.current_ai_response_text += token
-                
-                if is_final:
                     self.is_generating = False
                     self.toolbar.set_save_status(True)
                     
-                    if self.target_panel == 'assistant' and self.current_ai_response_text:
-                        self.right_panel.add_message(self.current_ai_response_text, sender="ai")
+                    # If target was assistant, finalize the message bubble
+                    if self.target_panel == 'assistant':
+                        # Clean up formatting if needed
+                        final_text = self.current_ai_response_text.strip()
+                        if final_text:
+                            self.right_panel.add_message(final_text, "assistant")
+                        # Reset for next time
                         self.current_ai_response_text = ""
+                    
+                else:
+                    if self.target_panel == 'editor':
+                        self.center_panel.insert_editor_content(token)
+                    elif self.target_panel == 'assistant':
+                        # Accumulate tokens
+                        self.current_ai_response_text += token
+                        # We don't stream directly to UI anymore to allow bubble creation at end?
+                        # Or we could update a "streaming" bubble.
+                        # For "clear separation", buffering and showing at end is safest for now.
+                        # User wants "answers given... merging... add insert button after EACH response".
+                        pass
         except queue.Empty:
             pass
 
+    
     @pyqtSlot()
     def _auto_save(self):
         """Auto-save current content."""
@@ -1803,7 +1942,27 @@ class StoryBibleApp(QMainWindow):
                     current_text=context,
                     style=style
                 )
+            
+            elif prompt.startswith("DESCRIBE::"):
+                # Handle Describe request
+                parts = prompt.split("::SENSES::")
+                text_to_describe = parts[0].replace("DESCRIBE::", "")
+                active_senses = parts[1].split(",") if len(parts) > 1 else []
                 
+                instruction = "Rewrite the provided text adding rich sensory details."
+                if active_senses:
+                    instruction += f" Focus strictly on: {', '.join(active_senses)}."
+                else:
+                    instruction += " Use a neutral, descriptive style."
+                
+                instruction += " Output ONLY the rewritten text. Do not include original text if not part of the rewrite."
+                
+                self.ai_engine.stream_response(
+                    instruction,
+                    self.response_queue,
+                    current_text=text_to_describe
+                )
+
             elif target == 'editor':
                 self.ai_engine.stream_response(prompt, self.response_queue, "", context)
             elif target == 'assistant':
