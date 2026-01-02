@@ -14,7 +14,7 @@ from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel, 
     QPushButton, QTextEdit, QLineEdit, QScrollArea, QFrame,
     QSplitter, QMenu, QMessageBox, QInputDialog, QGridLayout,
-    QStackedWidget, QTabWidget
+    QStackedWidget, QTabWidget, QToolButton
 )
 from PyQt6.QtCore import Qt, QTimer, pyqtSignal, QSize, pyqtSlot, QPoint
 from PyQt6.QtGui import QPixmap, QPainter, QFont, QColor, QPalette, QAction, QTextCursor
@@ -135,50 +135,67 @@ class ToolbarWidget(QWidget):
         from PyQt6.QtWidgets import QSizePolicy
         
         buttons = [
-            ("←", "back", None),
-            ("Write ▼", "write", ["Continue Writing", "Write Scene", "Generate Opening"]),
-            ("Rewrite ▼", "rewrite", ["Show Don't Tell", "Dramatic", "Gritty", "Elegant", "Concise"]),
-            ("Describe ▼", "describe", ["Sight", "Sound", "Smell", "Taste", "Touch", "Metaphor"]),
-            ("Brainstorm ▼", "brainstorm", ["Character Ideas", "Plot Twists", "Setting Details"]),
-            ("More Tools ▼", "more_tools", ["Export", "Import", "Settings"])
+            ("Write", "write", ["Auto", "Guided", "Tone Shift", "Write Settings"])
         ]
         
+        # Hide other buttons for now as per requirement
+        # buttons = [
+        #    ("←", "back", None),
+        #    ("Write ▼", "write", ["Continue Writing", "Write Scene", "Generate Opening"]),
+        #    ("Rewrite ▼", "rewrite", ["Show Don't Tell", "Dramatic", "Gritty", "Elegant", "Concise"]),
+        #    # ...
+        # ]
+        
         for text, action, menu_items in buttons:
-            btn = QPushButton(text)
-            btn.setProperty("class", "TransparentButton")
-            
-            # Responsive size policy - expand horizontally
-            btn.setSizePolicy(
-                QSizePolicy.Policy.Expanding,
-                QSizePolicy.Policy.Fixed
-            )
-            
-            btn.setStyleSheet(f"""
-                QPushButton {{
-                    background-color: transparent;
-                    border: 1px solid {QtTheme.BORDER_COLOR};
-                    color: {QtTheme.TEXT_MUTED};
-                    border-radius: 8px;
-                    padding: 8px 12px;
-                    min-height: 36px;
-                }}
-                QPushButton:hover {{
-                    background-color: {QtTheme.BG_HOVER};
-                    color: {QtTheme.TEXT_PRIMARY};
-                }}
-            """)
-            
-            if menu_items:
+            if action == "write":
+                self.write_btn = QToolButton()
+                self.write_btn.setText("Write: Auto")
+                self.write_btn.setPopupMode(QToolButton.ToolButtonPopupMode.MenuButtonPopup)
+                self.write_btn.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+                self.write_btn.setStyleSheet(f"""
+                    QToolButton {{
+                        background-color: transparent;
+                        border: 1px solid {QtTheme.BORDER_COLOR};
+                        color: {QtTheme.TEXT_MUTED};
+                        border-radius: 8px;
+                        padding: 8px 12px;
+                        min-height: 36px;
+                    }}
+                    QToolButton:hover {{
+                        background-color: {QtTheme.BG_HOVER};
+                        color: {QtTheme.TEXT_PRIMARY};
+                    }}
+                    QToolButton::menu-button {{
+                        border-left: 1px solid {QtTheme.BORDER_COLOR};
+                        width: 20px;
+                        border-top-right-radius: 8px;
+                        border-bottom-right-radius: 8px;
+                    }}
+                """)
+                
                 menu = QMenu(self)
                 menu.setStyleSheet(QtTheme.get_global_stylesheet())
+                
+                self._current_write_mode = "Auto"
+                
                 for item in menu_items:
-                    menu.addAction(item, lambda a=action, i=item: self.action_triggered.emit(a, i))
-                btn.setMenu(menu)
+                    menu_action = menu.addAction(item)
+                    if item == "Write Settings":
+                        menu_action.triggered.connect(lambda checked: self.action_triggered.emit("settings", "write"))
+                    else:
+                        menu_action.triggered.connect(lambda checked, m=item: self._set_write_mode(m))
+                
+                self.write_btn.setMenu(menu)
+                self.write_btn.clicked.connect(lambda: self.action_triggered.emit("write", self._current_write_mode))
+                layout.addWidget(self.write_btn, 2)
+                
             else:
-                btn.clicked.connect(lambda checked, a=action: self.action_triggered.emit(a, ""))
-            
-            # Add button with stretch factor for even distribution
-            layout.addWidget(btn, 1)
+                 # Hidden buttons logic if we were to show them
+                 pass
+                 
+    def _set_write_mode(self, mode: str):
+        self._current_write_mode = mode
+        self.write_btn.setText(f"Write: {mode}")
     
     def _create_status_indicators(self, layout):
         """Create status indicators with fixed positioning."""
@@ -1367,6 +1384,7 @@ class AssistantPanel(QWidget):
     """Right panel - Glass sidebar with AI chat."""
     
     chat_sent = pyqtSignal(str)  # query
+    insert_requested = pyqtSignal(str) # text
     
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -1401,32 +1419,20 @@ class AssistantPanel(QWidget):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(10, 10, 10, 10)
         
-        # Chat history (black overlay for readability)
-        self.chat_history = QTextEdit()
-        self.chat_history.setReadOnly(True)
-        self.chat_history.setFont(QtTheme.get_font_ui())
+        # Chat history (Scroll Area)
+        self.chat_scroll = TransparentScrollArea()
         
-        # TRANSPARENT WITH BLACK OVERLAY
-        self.chat_history.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
-        self.chat_history.setAutoFillBackground(False)
-        self.chat_history.setFrameShape(QFrame.Shape.NoFrame)
+        self.chat_widget = QWidget()
+        self.chat_widget.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
+        self.chat_widget.setStyleSheet("background-color: transparent;")
         
-        self.chat_history.setStyleSheet(f"""
-            QTextEdit {{
-                background-color: transparent;
-                border: none;
-                color: {QtTheme.TEXT_PRIMARY};
-                selection-background-color: {QtTheme.ACCENT_PRIMARY};
-            }}
-        """)
+        self.chat_layout = QVBoxLayout(self.chat_widget)
+        self.chat_layout.setContentsMargins(0, 0, 0, 0)
+        self.chat_layout.setSpacing(12)
+        self.chat_layout.addStretch()
         
-        # BLACK OVERLAY on viewport
-        chat_viewport = self.chat_history.viewport()
-        chat_viewport.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
-        chat_viewport.setAutoFillBackground(True)  # TRUE to render RGBA
-        chat_viewport.setStyleSheet(f"background-color: {QtTheme.OVERLAY_LIGHT};")
-        
-        layout.addWidget(self.chat_history, 1)
+        self.chat_scroll.setWidget(self.chat_widget)
+        layout.addWidget(self.chat_scroll, 1)
         
         # Chat input (glass)
         self.chat_input = QLineEdit()
@@ -1451,13 +1457,89 @@ class AssistantPanel(QWidget):
         """Send chat message."""
         query = self.chat_input.text().strip()
         if query:
+            self.add_message(query, sender="user")
             self.chat_sent.emit(query)
             self.chat_input.clear()
     
+    def add_message(self, text: str, sender: str = "ai"):
+        """Add a message bubble to chat history."""
+        is_user = (sender == "user")
+        
+        # Message Container
+        msg_container = QWidget()
+        msg_container.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
+        msg_layout = QHBoxLayout(msg_container)
+        msg_layout.setContentsMargins(0, 0, 0, 0)
+        
+        # Bubble Frame
+        bubble = QFrame()
+        # bubble_color logic
+        bubble_bg = QtTheme.ACCENT_SECONDARY if is_user else QtTheme.CARD_BG
+        
+        bubble.setStyleSheet(f"""
+            QFrame {{
+                background-color: {bubble_bg};
+                border-radius: 12px;
+                border: 1px solid {QtTheme.GLASS_BORDER};
+            }}
+        """)
+        bubble_layout = QVBoxLayout(bubble)
+        bubble_layout.setContentsMargins(12, 12, 12, 12)
+        bubble_layout.setSpacing(8)
+        
+        # Text Label
+        label = QLabel(text)
+        label.setFont(QtTheme.get_font_ui())
+        label.setStyleSheet(f"color: {QtTheme.TEXT_PRIMARY}; background-color: transparent; border: none;")
+        label.setWordWrap(True)
+        label.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+        bubble_layout.addWidget(label)
+        
+        # Insert Button for AI
+        if not is_user:
+            insert_btn = QPushButton("Insert to Editor")
+            insert_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+            insert_btn.setStyleSheet(f"""
+                QPushButton {{
+                    background-color: {QtTheme.ACCENT_PRIMARY};
+                    color: {QtTheme.TEXT_PRIMARY};
+                    border-radius: 4px;
+                    padding: 4px 12px;
+                    font-size: 11px;
+                    border: none;
+                }}
+                QPushButton:hover {{
+                    background-color: {QtTheme.ACCENT_HOVER};
+                }}
+            """)
+            insert_btn.clicked.connect(lambda: self.insert_requested.emit(text))
+            bubble_layout.addWidget(insert_btn)
+        
+        # Alignment
+        if is_user:
+            msg_layout.addStretch()
+            msg_layout.addWidget(bubble, 0)
+        else:
+            msg_layout.addWidget(bubble, 1) # Expand
+            msg_layout.addStretch()
+            
+        # Add to layout before stretch (stretch is last item)
+        count = self.chat_layout.count()
+        if count > 0:
+            self.chat_layout.insertWidget(count - 1, msg_container)
+        else:
+            self.chat_layout.addWidget(msg_container)
+            
+        # Scroll to bottom
+        QTimer.singleShot(50, self._scroll_to_bottom)
+        
+    def _scroll_to_bottom(self):
+        sb = self.chat_scroll.verticalScrollBar()
+        sb.setValue(sb.maximum())
+        
     def append_message(self, text: str):
-        """Append message to chat history."""
-        self.chat_history.insertPlainText(text)
-        self.chat_history.moveCursor(QTextCursor.MoveOperation.End)
+        """Compat alias."""
+        self.add_message(text, sender="ai")
 
 
 # ============================================================================
@@ -1485,7 +1567,10 @@ class StoryBibleApp(QMainWindow):
         self._setup_window()
         self._create_ui()
         self._connect_signals()
+
         self._start_timers()
+        
+        self.current_ai_response_text = ""
         
         self.load_session()
     
@@ -1547,6 +1632,7 @@ class StoryBibleApp(QMainWindow):
         self.center_panel.content_changed.connect(self._on_content_change)
         self.center_panel.action_requested.connect(self._handle_action)
         self.right_panel.chat_sent.connect(self._handle_chat)
+        self.right_panel.insert_requested.connect(self.center_panel.insert_editor_content)
     
     def _start_timers(self):
         """Start background timers."""
@@ -1570,12 +1656,9 @@ class StoryBibleApp(QMainWindow):
         logging.info(f"Toolbar action: {action} - {item}")
         
         if action == "write":
-            if item == "Continue Writing":
-                self._handle_ai_request("Continue writing from where I left off", 'editor')
-            elif item == "Write Scene":
-                self._handle_ai_request("Write a new scene", 'editor')
-            elif item == "Generate Opening":
-                self._handle_ai_request("Generate an opening paragraph", 'editor')
+            # item is the mode: "Auto", "Guided", "Tone Shift"
+            prompt = f"WRITE_WITH_MODE::{item}"
+            self._handle_ai_request(prompt, 'assistant')
         elif action == "rewrite":
             self._handle_ai_request(f"PLUGIN::rewrite_{item.lower().replace(' ', '_')}::", 'editor')
         elif action == "describe":
@@ -1587,7 +1670,7 @@ class StoryBibleApp(QMainWindow):
         elif action == "help":
             self._show_help()
         elif action == "settings":
-            logging.info("Settings clicked")
+            QMessageBox.information(self, "Settings", f"Configuration for: {item}")
     
     @pyqtSlot(int, int)
     def _load_chapter(self, chapter_id: int, project_id: int):
@@ -1647,17 +1730,26 @@ class StoryBibleApp(QMainWindow):
         try:
             while True:
                 token = self.response_queue.get_nowait()
+                is_final = False
                 if token == "[[END]]":
+                    is_final = True
+                    token = ""
+                
+                if self.target_panel == 'editor':
+                    self.center_panel.insert_editor_content(token)
+                elif self.target_panel == 'assistant':
+                    self.current_ai_response_text += token
+                
+                if is_final:
                     self.is_generating = False
                     self.toolbar.set_save_status(True)
-                else:
-                    if self.target_panel == 'editor':
-                        self.center_panel.insert_editor_content(token)
-                    elif self.target_panel == 'assistant':
-                        self.right_panel.append_message(token)
+                    
+                    if self.target_panel == 'assistant' and self.current_ai_response_text:
+                        self.right_panel.add_message(self.current_ai_response_text, sender="ai")
+                        self.current_ai_response_text = ""
         except queue.Empty:
             pass
-    
+
     @pyqtSlot()
     def _auto_save(self):
         """Auto-save current content."""
@@ -1689,7 +1781,30 @@ class StoryBibleApp(QMainWindow):
     def _ai_thread(self, prompt: str, target: str, context: str):
         """AI generation thread."""
         try:
-            if target == 'editor':
+            if prompt.startswith("WRITE_WITH_MODE::"):
+                # Handle Write Button modes
+                mode = prompt.split("::")[1]
+                instruction = "Continue the story naturally."
+                style = None
+                
+                if mode == "Guided":
+                    instruction = "Continue the story, guiding the narrative towards a resolution."
+                elif mode == "Tone Shift":
+                    instruction = "Continue the story but shift the tone to be more dramatic and intense."
+                elif mode == "Auto":
+                    instruction = "Continue the story naturally from the current text."
+                
+                # Strict Output Rule enforcement
+                instruction += " Output ONLY the generated story text. No headers, no preambles, no 'Here is the text'."
+                
+                self.ai_engine.stream_response(
+                    instruction, 
+                    self.response_queue, 
+                    current_text=context,
+                    style=style
+                )
+                
+            elif target == 'editor':
                 self.ai_engine.stream_response(prompt, self.response_queue, "", context)
             elif target == 'assistant':
                 project_memory = ""
