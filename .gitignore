@@ -41,3 +41,4 @@ models/llama/*
 models/tts/*
 !models/tts/.gitkeep
 dist/*
+deskapp/*

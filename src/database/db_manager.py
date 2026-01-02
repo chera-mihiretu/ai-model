@@ -75,7 +75,8 @@ class DatabaseManager:
                     'project_id', 'name', 'role', 'personality_traits', 'speech_pattern', 
                     'relationship_to_author', 'backstory', 'continuity_notes',
                     'pronouns', 'groups', 'other_names', 'motivations', 
-                    'internal_conflicts', 'strengths', 'weaknesses', 'character_arc'
+                    'internal_conflicts', 'strengths', 'weaknesses', 'character_arc',
+                    'physical_description', 'is_visible'
                 }
                 
                 missing_fields = required_fields - set(current_cols)
@@ -113,6 +114,8 @@ class DatabaseManager:
                             strengths TEXT,
                             weaknesses TEXT,
                             character_arc TEXT,
+                            physical_description TEXT,
+                            is_visible INTEGER DEFAULT 1,
                             UNIQUE(name, project_id)
                         )
                     """)
@@ -209,16 +212,19 @@ class DatabaseManager:
                 cursor.execute("SELECT * FROM story_bible WHERE project_id = ?", (project_id,))
                 row = cursor.fetchone()
                 if row:
-                    # Convert to dict. 
-                    # Columns: 0=id, 1=project_id, 2=braindump, 3=genre, 4=style, 5=synopsis, 6=characters, 7=worldbuilding, 8=outline
+                    # Convert to dict using column names from cursor description
+                    col_names = [description[0] for description in cursor.description]
+                    data = dict(zip(col_names, row))
+                    
+                    # Return expected fields, defaulting to empty string
                     return {
-                        'braindump': row[2] or "",
-                        'genre': row[3] or "",
-                        'style': row[4] or "",
-                        'synopsis': row[5] or "",
-                        'characters': row[6] or "",
-                        'worldbuilding': row[7] or "",
-                        'outline': row[8] or ""
+                        'braindump': data.get('braindump') or "",
+                        'genre': data.get('genre') or "",
+                        'style': data.get('style') or "",
+                        'synopsis': data.get('synopsis') or "",
+                        'characters': data.get('characters') or "",
+                        'worldbuilding': data.get('worldbuilding') or "",
+                        'outline': data.get('outline') or ""
                     }
                 return {k: "" for k in ['braindump', 'genre', 'style', 'synopsis', 'characters', 'worldbuilding', 'outline']}
         except sqlite3.Error as e:
@@ -616,18 +622,35 @@ class DatabaseManager:
                 cursor = conn.cursor()
 
                 # 1. Relevant Characters
-                memory.append("[RELEVANT CHARACTERS]")
-                cursor.execute("SELECT name, role, personality_traits, backstory FROM characters")
+                memory.append("[CHARACTERS IN STORY]")
+                # Fetch all VISIBLE characters
+                cursor.execute("SELECT name, role, personality_traits, backstory FROM characters WHERE is_visible = 1")
                 all_chars = cursor.fetchall()
-                found_char = False
-                for c in all_chars:
-                    # Check if char name is in query
-                    if c[0].lower() in query_lower:
-                        memory.append(f"Name: {c[0]}\nRole: {c[1]}\nTraits: {c[2]}\nBackstory: {c[3]}")
-                        memory.append("---")
-                        found_char = True
-                if not found_char:
-                    memory.append("No specific characters mentioned in query.")
+                
+                if all_chars:
+                    # Always provide a full cast list for context
+                    memory.append("Cast List:")
+                    for c in all_chars:
+                        memory.append(f"- {c[0]} ({c[1]})")
+                    memory.append("") # Spacer
+                    
+                    # Add details for characters specifically mentioned or if query asks for "all"
+                    found_specific = False
+                    is_asking_all = any(phrase in query_lower for phrase in ["who are", "list characters", "all characters", "everyone"])
+                    
+                    for c in all_chars:
+                        # Check if char name is in query or user asks for everyone
+                        if is_asking_all or c[0].lower() in query_lower:
+                            memory.append(f"--- DETAILED PROFILE: {c[0]} ---")
+                            memory.append(f"Role: {c[1]}")
+                            memory.append(f"Traits: {c[2]}")
+                            memory.append(f"Backstory: {c[3]}")
+                            found_specific = True
+                    
+                    if not found_specific and not is_asking_all:
+                         memory.append("(Detailed profiles omitted for brevity as no specific names were mentioned.)")
+                else:
+                    memory.append("No characters have been introduced yet.")
 
                 # 2. Story Beats (Overview)
                 memory.append("\n[STORY BEATS (SUMMARY)]")

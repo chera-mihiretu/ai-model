@@ -1,7 +1,8 @@
 import sys
 import logging
-import customtkinter as ctk
 from pathlib import Path
+from PyQt6.QtWidgets import QApplication
+from PyQt6.QtCore import Qt
 
 # Add src to path to allow imports
 sys.path.append(str(Path(__file__).resolve().parent / "src"))
@@ -9,7 +10,7 @@ sys.path.append(str(Path(__file__).resolve().parent / "src"))
 from src.config.manager import ConfigManager
 from src.database.db_manager import DatabaseManager
 from src.services.ai_engine import AIEngine
-from src.ui.main_window import StoryBibleUI
+from src.ui.qt_app import StoryBibleApp
 
 import os
 
@@ -38,7 +39,7 @@ def setup_logging():
 
 def main():
     setup_logging()
-    logging.info("Starting Story Bible App - Milestone 1.3")
+    logging.info("Starting Story Bible App - PyQt6 Version")
     
     # 1. Initialize Database
     try:
@@ -50,18 +51,30 @@ def main():
     # 2. Initialize AI Engine (REAL LLAMA INTEGRATION)
     try:
         ai_engine = AIEngine()
-        # ai_engine = MockAIEngine()
     except Exception as e:
         logging.critical(f"AI Engine setup failed: {e}")
         return
 
-    # 3. Launch UI
+    # 3. Launch PyQt6 Application
     try:
-        ctk.set_appearance_mode("Dark")
-        ctk.set_default_color_theme("blue")
+        # Enable high DPI scaling
+        QApplication.setHighDpiScaleFactorRoundingPolicy(
+            Qt.HighDpiScaleFactorRoundingPolicy.PassThrough
+        )
         
-        app = StoryBibleUI(ai_engine, db_mgr)
-        app.mainloop()
+        app = QApplication(sys.argv)
+        app.setApplicationName("Story Bible Pro")
+        app.setOrganizationName("StoryBible")
+        
+        # Create and show main window
+        main_window = StoryBibleApp(ai_engine, db_mgr)
+        main_window.show()
+        
+        # Start event loop
+        exit_code = app.exec()
+        
+        logging.info("Application exited cleanly.")
+        sys.exit(exit_code)
         
     except KeyboardInterrupt:
         logging.info("KeyboardInterrupt caught. Shutting down...")
