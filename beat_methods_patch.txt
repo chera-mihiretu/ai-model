@@ -1,0 +1,69 @@
+
+    def generate_beats_from_prose(self, prose_text: str) -> str:
+        """Extract story beats from existing prose (reverse outlining)."""
+        if not self.llm:
+            return "Error: AI Model not loaded"
+        
+        if len(prose_text) < 100:
+            return "Error: Prose too short for beat extraction"
+        
+        prompt = PROMPT_BEAT_EXTRACTOR.format(prose_text=prose_text[:4000])
+        
+        full_prompt = (
+            f"{prompt}"
+            f"<|start_header_id|>user<|end_header_id|>\n"
+            f"Extract the beats:\n"
+            f"<|eot_id|>\n"
+            f"<|start_header_id|>assistant<|end_header_id|>"
+        )
+        
+        try:
+            with self.lock:
+                output = self.llm(
+                    full_prompt,
+                    max_tokens=300,
+                    stop=["<|eot_id|>"],
+                    echo=False,
+                    temperature=0.5
+                )
+            return output['choices'][0]['text'].strip()
+        except Exception as e:
+            logging.error(f"Beat extraction error: {e}")
+            return f"Error: {e}"
+
+    def suggest_next_beats(self, prev_beats: str, lore_package: dict) -> str:
+        """Suggest beats for next chapter based on previous chapter and lore."""
+        if not self.llm:
+            return "Error: AI Model not loaded"
+        
+        char_summary = "\n".join([f"- {c['name']}: {c.get('traits', '')}" for c in lore_package.get('characters', [])])
+        story_summary = "\n".join(lore_package.get('story_so_far', []))
+        lore_text = f"Characters:\n{char_summary}\n\nStory:\n{story_summary}"
+        
+        system_prompt = PROMPT_BEAT_SUGGESTER.format(
+            genre=lore_package.get('genre', 'fiction'),
+            prev_beats=prev_beats or "Beginning of story",
+            lore_summary=lore_text or "No lore available"
+        )
+        
+        full_prompt = (
+            f"{system_prompt}"
+            f"<|start_header_id|>user<|end_header_id|>\n"
+            f"Suggest beats for next chapter:\n"
+            f"<|eot_id|>\n"
+            f"<|start_header_id|>assistant<|end_header_id|>"
+        )
+        
+        try:
+            with self.lock:
+                output = self.llm(
+                    full_prompt,
+                    max_tokens=300,
+                    stop=["<|eot_id|>"],
+                    echo=False,
+                    temperature=0.7
+                )
+            return output['choices'][0]['text'].strip()
+        except Exception as e:
+            logging.error(f"Beat suggestion error: {e}")
+            return f"Error: {e}"
