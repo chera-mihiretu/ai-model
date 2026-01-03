@@ -14,15 +14,23 @@ from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel, 
     QPushButton, QTextEdit, QLineEdit, QScrollArea, QFrame,
     QSplitter, QMenu, QMessageBox, QInputDialog, QGridLayout,
-    QStackedWidget, QTabWidget, QToolButton
+    QStackedWidget, QTabWidget, QToolButton, QToolTip
 )
-from PyQt6.QtCore import Qt, QTimer, pyqtSignal, QSize, pyqtSlot, QPoint
-from PyQt6.QtGui import QPixmap, QPainter, QFont, QColor, QPalette, QAction, QTextCursor
+from PyQt6.QtCore import Qt, QTimer, pyqtSignal, QSize, pyqtSlot, QPoint, QRect, QEvent
+from PyQt6.QtGui import QPixmap, QPainter, QFont, QColor, QPalette, QAction, QTextCursor, QTextBlockUserData, QTextCharFormat
 
 from .qt_theme import QtTheme
 from .character_components import CharacterWidget
 
 
+# ============================================================================
+# USER DATA FOR COMMENTS
+# ============================================================================
+
+class ParagraphData(QTextBlockUserData):
+    def __init__(self, comments=None):
+        super().__init__()
+        self.comments = comments or []
 # ============================================================================
 # BACKGROUND WIDGET
 # ============================================================================
@@ -138,9 +146,9 @@ class ToolbarWidget(QWidget):
             ("←", "back", None),
             ("Write ▼", "write", ["Continue Writing", "Write Scene", "Generate Opening"]),
             ("Rewrite ▼", "rewrite", ["Show Don't Tell", "Dramatic", "Gritty", "Elegant", "Concise"]),
-            ("Describe ▼", "describe", ["Sight", "Sound", "Smell", "Taste", "Touch", "Metaphor"]),
-            ("Brainstorm ▼", "brainstorm", ["Character Ideas", "Plot Twists", "Setting Details"]),
-            ("More Tools ▼", "more_tools", ["Export", "Import", "Settings"])
+            ("Rewrite ▼", "rewrite", ["Show Don't Tell", "Dramatic", "Gritty", "Elegant", "Concise"]),
+            ("Describe ▼", "describe", ["Sight", "Sound", "Smell", "Taste", "Touch", "Metaphor"]), 
+            ("More Tools ▼", "more_tools", ["Visualize", "Twist", "Poem"])
         ]
         
         for text, action, menu_items in buttons:
@@ -248,8 +256,25 @@ class ToolbarWidget(QWidget):
                 self.describe_btn.clicked.connect(lambda: self.action_triggered.emit("describe", "current"))
                 layout.addWidget(self.describe_btn, 2)
 
+
+            elif action == "more_tools":
+                self.more_tools_btn = QToolButton()
+                self.more_tools_btn.setText("More Tools")
+                self.more_tools_btn.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
+                self.more_tools_btn.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+                self.more_tools_btn.setStyleSheet(self.write_btn.styleSheet()) # Reuse style
+                
+                menu = QMenu(self)
+                menu.setStyleSheet(QtTheme.get_global_stylesheet())
+                
+                for item in menu_items:
+                    menu.addAction(item, lambda m=item: self.action_triggered.emit("more_tools", m))
+                
+                self.more_tools_btn.setMenu(menu)
+                layout.addWidget(self.more_tools_btn, 2)
+            
             else:
-                 # Hidden buttons logic if we were to show them
+                 # Hidden buttons logic 
                  pass
                  
     def _set_write_mode(self, mode: str):
@@ -294,7 +319,7 @@ class ToolbarWidget(QWidget):
                 }}
             """)
             btn.clicked.connect(lambda checked, a=action: self.action_triggered.emit(a, ""))
-            layout.addWidget(btn)
+            layout.addWidget(btn, 0)
     
     def update_word_count(self, count: int):
         """Update word counter display."""
@@ -304,10 +329,104 @@ class ToolbarWidget(QWidget):
         """Update save status indicator."""
         if saved:
             self.save_status_label.setText("Saved ✓")
-            self.save_status_label.setStyleSheet(f"color: {QtTheme.ACCENT_PRIMARY};")
+            self.save_status_label.setStyleSheet(f"color: {QtTheme.ACCENT_PRIMARY}; padding: 0 8px;")
         else:
             self.save_status_label.setText("Saving...")
-            self.save_status_label.setStyleSheet(f"color: {QtTheme.TEXT_MUTED};")
+            self.save_status_label.setStyleSheet(f"color: {QtTheme.TEXT_MUTED}; padding: 0 8px;")
+
+
+# ============================================================================
+# CONTEXTUAL POPUP TOOLBAR
+# ============================================================================
+
+class ContextualPopup(QWidget):
+    """
+    Floating contextual toolbar that appears on text selection.
+    Glass UI with action buttons.
+    """
+    
+    action_triggered = pyqtSignal(str, str)  # (action, text)
+    
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowFlags(Qt.WindowType.ToolTip | Qt.WindowType.FramelessWindowHint)
+        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
+        
+        self.setFixedSize(450, 44) # Increased width for new button
+        self._setup_ui()
+        self.hide()
+        
+    def _setup_ui(self):
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(5, 5, 5, 5)
+        layout.setSpacing(4)
+        
+        # Glass background container
+        container = QFrame()
+        container.setStyleSheet(f"""
+            QFrame {{
+                background-color: {QtTheme.BG_SIDEBAR};
+                border: 1px solid {QtTheme.GLASS_BORDER};
+                border-radius: 20px;
+            }}
+        """)
+        container_layout = QHBoxLayout(container)
+        container_layout.setContentsMargins(8, 0, 8, 0)
+        container_layout.setSpacing(6)
+        
+        # Tools: Comment, Rewrite, Describe, Expand, Quick Edit
+        tools = [
+            ("💬 Comment", "comment"),
+            ("🗑️ Clear", "clear_comments"),
+            ("🔄 Rewrite", "rewrite_context"),
+            ("✨ Describe", "describe_context"),
+            ("➕ Expand", "expand_context"),
+            ("✍️ Quick Edit", "quick_edit")
+        ]
+        
+        for text, action in tools:
+            btn = QPushButton(text)
+            btn.setCursor(Qt.CursorShape.PointingHandCursor)
+            btn.setStyleSheet(f"""
+                QPushButton {{
+                    background: transparent;
+                    color: {QtTheme.TEXT_MUTED};
+                    border: none;
+                    font-size: 13px;
+                    font-weight: bold;
+                    padding: 4px 8px;
+                }}
+                QPushButton:hover {{
+                    color: white;
+                    background-color: {QtTheme.BG_HOVER};
+                    border-radius: 12px;
+                }}
+            """)
+            btn.setFont(QtTheme.get_font_ui())
+            btn.clicked.connect(lambda checked, a=action: self.action_triggered.emit(a, ""))
+            container_layout.addWidget(btn)
+            
+        layout.addWidget(container)
+
+    def show_at(self, pos: QPoint):
+        """Show the popup at the specified global position."""
+        # Align center horizontally
+        target_pos = pos - QPoint(self.width() // 2, self.height() + 10)
+        
+        # Keep within window/screen bounds roughly
+        from PyQt6.QtGui import QGuiApplication
+        screen = QGuiApplication.primaryScreen().availableGeometry()
+        
+        if target_pos.x() < 5: target_pos.setX(5)
+        if target_pos.x() + self.width() > screen.width() - 5:
+            target_pos.setX(screen.width() - self.width() - 5)
+            
+        if target_pos.y() < 5:
+            # If no room above, show below
+            target_pos.setY(pos.y() + 25)
+            
+        self.move(target_pos)
+        self.show()
 
 
 # ============================================================================
@@ -800,6 +919,11 @@ class CenterPanel(QWidget):
         self.current_chapter_id = None
         self.story_bible_container = None
         self.bible_section_widgets = {}
+        self._last_hovered_block = None
+        
+        # Contextual Popup
+        self.context_popup = ContextualPopup(self)
+        self.context_popup.action_triggered.connect(self._handle_context_action)
         
         # TRANSPARENT WITH BLACK OVERLAY for readability
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
@@ -922,6 +1046,12 @@ class CenterPanel(QWidget):
         editor_viewport.setStyleSheet(f"background-color: {QtTheme.OVERLAY_LIGHT};")
         
         self.editor_textbox.textChanged.connect(self.content_changed.emit)
+        self.editor_textbox.selectionChanged.connect(self._handle_selection_change)
+        
+        # Enable mouse tracking for comment tooltips
+        self.editor_textbox.viewport().installEventFilter(self)
+        self.editor_textbox.viewport().setMouseTracking(True)
+        
         self.content_layout.addWidget(self.editor_textbox)
         
         # Action buttons
@@ -1460,6 +1590,135 @@ class CenterPanel(QWidget):
             # Fallback to insert if no selection (though logic should prevent this for Describe)
             cursor.insertText(text)
 
+    # ------------------------------------------------------------------------
+    # CONTEXTUAL POPUP LOGIC
+    # ------------------------------------------------------------------------
+
+    def _handle_selection_change(self):
+        """Show contextual popup when text is selected."""
+        cursor = self.editor_textbox.textCursor()
+        if cursor.hasSelection() and cursor.selectedText().strip():
+            # Get cursor position in viewport coordinates
+            rect = self.editor_textbox.cursorRect()
+            # Map to global screen coordinates
+            viewport = self.editor_textbox.viewport()
+            global_pos = viewport.mapToGlobal(rect.topLeft())
+            
+            # Position popup above selection
+            self.context_popup.show_at(global_pos)
+        else:
+            self.context_popup.hide()
+
+    def _handle_context_action(self, action: str, _: str):
+        """Handle actions from contextual popup."""
+        cursor = self.editor_textbox.textCursor()
+        text = cursor.selectedText()
+        
+        if action == "comment":
+            comment, ok = QInputDialog.getMultiLineText(self, "Add Comment", "Enter your comment:")
+            if ok and comment:
+                self._add_comment_to_block(cursor.block(), comment)
+        
+        elif action == "clear_comments":
+            self._clear_comments_from_block(cursor.block())
+        
+        elif action == "rewrite_context":
+            self.action_requested.emit(f"CONTEXT_REWRITE::{text}")
+        
+        elif action == "describe_context":
+            self.action_requested.emit(f"CONTEXT_DESCRIBE::{text}")
+            
+        elif action == "expand_context":
+            self.action_requested.emit(f"CONTEXT_EXPAND::{text}")
+            
+        elif action == "quick_edit":
+            self._open_quick_edit(cursor.block())
+
+    def _add_comment_to_block(self, block, comment):
+        """Add a comment to a paragraph block."""
+        data = block.userData()
+        if not data:
+            data = ParagraphData()
+            block.setUserData(data)
+        
+        data.comments.append(comment)
+        # No immediate underline formatting here anymore, as requested
+
+    def _clear_comments_from_block(self, block):
+        """Remove all comments from a paragraph block."""
+        block.setUserData(None)
+        self._clear_block_underline(block)
+        QToolTip.hideText()
+        if self._last_hovered_block == block:
+            self._last_hovered_block = None
+
+    def eventFilter(self, obj, event):
+        """Handle tooltip display and underline for commented paragraphs."""
+        if obj == self.editor_textbox.viewport() and event.type() == QEvent.Type.MouseMove:
+            pos = event.position().toPoint()
+            cursor = self.editor_textbox.cursorForPosition(pos)
+            block = cursor.block()
+            data = block.userData()
+            
+            # 1. Clear previous underline if we moved to a new block
+            if self._last_hovered_block and self._last_hovered_block != block:
+                self._clear_block_underline(self._last_hovered_block)
+                self._last_hovered_block = None
+            
+            # 2. If block has comments, show tooltip and apply underline
+            if data and isinstance(data, ParagraphData) and data.comments:
+                tooltip_text = "<b>Comments:</b><br>" + "<br>---<br>".join(data.comments)
+                QToolTip.showText(event.globalPosition().toPoint(), tooltip_text, self.editor_textbox)
+                
+                if self._last_hovered_block != block:
+                    self._apply_block_underline(block)
+                    self._last_hovered_block = block
+            else:
+                QToolTip.hideText()
+                if self._last_hovered_block:
+                    self._clear_block_underline(self._last_hovered_block)
+                    self._last_hovered_block = None
+                    
+        return super().eventFilter(obj, event)
+
+    def _apply_block_underline(self, block):
+        """Apply wave underline to the specified block."""
+        cursor = QTextCursor(block)
+        cursor.select(QTextCursor.SelectionType.BlockUnderCursor)
+        fmt = QTextCharFormat()
+        fmt.setUnderlineStyle(QTextCharFormat.UnderlineStyle.WaveUnderline)
+        fmt.setUnderlineColor(QColor(QtTheme.ACCENT_PRIMARY))
+        cursor.mergeCharFormat(fmt)
+
+    def _clear_block_underline(self, block):
+        """Clear the underline from the specified block."""
+        cursor = QTextCursor(block)
+        cursor.select(QTextCursor.SelectionType.BlockUnderCursor)
+        fmt = QTextCharFormat()
+        fmt.setUnderlineStyle(QTextCharFormat.UnderlineStyle.NoUnderline)
+        cursor.mergeCharFormat(fmt)
+
+    def _open_quick_edit(self, block):
+        """Open a mini inline editor for the current paragraph."""
+        old_text = block.text()
+        new_text, ok = QInputDialog.getMultiLineText(self, "Quick Edit", "Modify paragraph:", old_text)
+        if ok and new_text != old_text:
+            cursor = QTextCursor(block)
+            cursor.select(QTextCursor.SelectionType.BlockUnderCursor)
+            # preserve trailing newline if needed? block.text doesn't include it.
+            cursor.insertText(new_text)
+
+    def append_text_below_selection(self, text: str):
+        """Append text naturally below the current selection/paragraph."""
+        cursor = self.editor_textbox.textCursor()
+        # Move to end of selection if any
+        if cursor.hasSelection():
+            cursor.setPosition(cursor.selectionEnd())
+        
+        cursor.insertBlock() # New paragraph
+        cursor.insertText(text)
+        self.editor_textbox.setTextCursor(cursor)
+
 
 
 # ============================================================================
@@ -1744,8 +2003,11 @@ class StoryBibleApp(QMainWindow):
         self.right_panel.insert_requested.connect(self.insert_text_to_editor)
     
     def insert_text_to_editor(self, text):
-        self.center_panel.replace_selected_text(text)
-    
+        if hasattr(self, 'last_action_type') and self.last_action_type == 'expand':
+            self.center_panel.append_text_below_selection(text)
+        else:
+            self.center_panel.replace_selected_text(text)
+        
     def _start_timers(self):
         """Start background timers."""
         # Queue checker
@@ -1768,12 +2030,21 @@ class StoryBibleApp(QMainWindow):
         logging.info(f"Toolbar action: {action} - {item}")
         
         if action == "write":
-            if item == "Continue Writing":
-                self._handle_ai_request("Continue writing from where I left off", 'editor')
-            elif item == "Write Scene":
-                self._handle_ai_request("Write a new scene", 'editor')
-            elif item == "Generate Opening":
-                self._handle_ai_request("Generate an opening paragraph", 'editor')
+            # Handle Write Modes
+            mode = item # "Auto", "Guided", "Tone Shift", etc.
+            
+            # 1. Get Context (Selected text or last paragraph)
+            context = self.center_panel.get_selected_text()
+            if not context:
+               context = self.center_panel.get_editor_content() # Fallback to all content or last para logic handled in thread
+            
+            # 2. Construct Prompt
+            prompt = f"WRITE_WITH_MODE::{mode}::{context}"
+            
+            # 3. Send to LORE CHAT (Assistant), NOT Editor
+            # Requirement: "Displays the generated response in Lore Chat... The response appears with an Insert button"
+            self._handle_ai_request(prompt, 'assistant')
+
         elif action == "rewrite":
             self._handle_ai_request(f"PLUGIN::rewrite_{item.lower().replace(' ', '_')}::", 'editor')
         elif action == "describe":
@@ -1793,6 +2064,27 @@ class StoryBibleApp(QMainWindow):
                 prompt += f"::SENSES::{','.join(active_senses)}"
             
             self._handle_ai_request(prompt, 'assistant')
+
+        elif action == "more_tools":
+            # 1. Validation: Require selection
+            selected_text = self.center_panel.get_selected_text()
+            if not selected_text.strip():
+                # Non-blocking warning
+                QMessageBox.warning(self, "Selection Required", "Please select text first.")
+                return
+
+            if item == "Visualize":
+                # Dummy action - Direct message to Lore Chat (Assistant)
+                # Since we want it to look like an AI response, we can add it directly.
+                self.right_panel.add_message("Visualize is not implemented yet.", "assistant")
+            elif item == "Twist":
+                prompt = f"TRANSFORM::TWIST::{selected_text}"
+                self._handle_ai_request(prompt, 'assistant')
+            elif item == "Poem":
+                prompt = f"TRANSFORM::POEM::{selected_text}"
+                self._handle_ai_request(prompt, 'assistant')
+            elif item == "export":
+                self._export_document()
 
         elif action == "brainstorm":
             self._handle_ai_request(f"Brainstorm: {item}", 'assistant')
@@ -1849,6 +2141,14 @@ class StoryBibleApp(QMainWindow):
             self._handle_ai_request("Generate 3 different opening paragraphs", 'editor')
         elif action == "chat_idea":
             self.right_panel.chat_input.setFocus()
+        elif action.startswith("CONTEXT_"):
+            # Set action type for insertion logic
+            if "REWRITE" in action: self.last_action_type = "rewrite"
+            elif "DESCRIBE" in action: self.last_action_type = "describe"
+            elif "EXPAND" in action: self.last_action_type = "expand"
+            else: self.last_action_type = "other"
+            
+            self._handle_ai_request(action, 'assistant')
     
     @pyqtSlot(str)
     def _handle_chat(self, query: str):
@@ -1962,6 +2262,42 @@ class StoryBibleApp(QMainWindow):
                     self.response_queue,
                     current_text=text_to_describe
                 )
+
+            elif prompt.startswith("TRANSFORM::"):
+                # Handle More Tools requests
+                parts = prompt.split("::")
+                # parts[0] = TRANSFORM, parts[1] = TYPE, parts[2] = TEXT
+                t_type = parts[1]
+                text_to_transform = parts[2]
+                
+                instruction = ""
+                if t_type == "TWIST":
+                    instruction = "Rewrite the provided text with a creative narrative twist, change of perspective, or unexpected shift."
+                elif t_type == "POEM":
+                    instruction = "Rewrite the provided text as a poem."
+                
+                instruction += " Output ONLY the transformed text. No headers, no explanations."
+                
+                self.ai_engine.stream_response(
+                    instruction,
+                    self.response_queue,
+                    current_text=text_to_transform
+                )
+
+            elif prompt.startswith("CONTEXT_REWRITE::"):
+                text = prompt.split("::", 1)[1]
+                instruction = "Rewrite the following text with a random new literary style while preserving its original meaning. Output ONLY the rewritten text. NO headers."
+                self.ai_engine.stream_response(instruction, self.response_queue, current_text=text)
+
+            elif prompt.startswith("CONTEXT_DESCRIBE::"):
+                text = prompt.split("::", 1)[1]
+                instruction = "Expand the following text with vivid sensory details (sight, sound, smell, taste, touch) and metaphors. Output ONLY the descriptive expansion. NO headers."
+                self.ai_engine.stream_response(instruction, self.response_queue, current_text=text)
+
+            elif prompt.startswith("CONTEXT_EXPAND::"):
+                text = prompt.split("::", 1)[1]
+                instruction = "Naturally expand the following paragraph by adding a few more sentences that follow the same tone and direction. Output ONLY the expansion text. NO headers."
+                self.ai_engine.stream_response(instruction, self.response_queue, current_text=text)
 
             elif target == 'editor':
                 self.ai_engine.stream_response(prompt, self.response_queue, "", context)
