@@ -303,6 +303,20 @@ class DatabaseManager:
             logging.error(f"Get projects error: {e}")
             return []
 
+    def get_chapters(self, project_id: int):
+        """Get all chapters for a project."""
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    "SELECT id, title FROM chapters WHERE project_id = ? ORDER BY chapter_order",
+                    (project_id,)
+                )
+                return [{'id': r[0], 'title': r[1]} for r in cursor.fetchall()]
+        except sqlite3.Error as e:
+            logging.error(f"Get chapters error: {e}")
+            return []
+
     def get_full_project_content(self, project_id: int):
         """Returns all chapters for a project in order."""
         try:
