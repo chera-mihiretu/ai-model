@@ -70,7 +70,7 @@ class AnimatedBackground(QWidget):
 
         self.timer = QTimer(self)
         self.timer.timeout.connect(self._update_animation)
-        # self.timer.start(30) # Animation stopped per user request
+        self.timer.start(30) # Animation enabled for "glowing dents" effect
 
         # Theme
         self.current_theme = theme

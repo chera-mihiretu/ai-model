@@ -191,15 +191,47 @@ class AIEngine:
             logging.error(f"Failed to load model: {e}")
             self.llm = None
 
-    def get_genre_context(self, genre: str) -> dict:
-        """
-        Generate genre-specific context for AI prompt conditioning.
-        Returns dict with archetypes, conflicts, tone guidelines, and elements to avoid.
-        """
-        # Normalize genre input
-        genre_lower = genre.lower().strip() if genre else "general fiction"
+    def count_tokens(self, text: str) -> int:
+        """Counts tokens in the provided text using the internal LLM tokenizer."""
+        if not self.llm or not text:
+            return 0
+        try:
+            # We use add_bos=False because our prompt templates already include 
+            # the <|begin_of_text|> tag. This prevents off-by-one errors.
+            tokens = self.llm.tokenize(text.encode("utf-8"), add_bos=False)
+            return len(tokens)
+        except Exception as e:
+            logging.error(f"Token counting failed: {e}")
+            return len(text) // 4
+
+    def smart_trim(self, text: str, token_limit: int, keep_start: bool = False) -> str:
+        """Trims text to fit within a token limit."""
+        if not text or token_limit <= 0:
+            return ""
         
-        # Genre-specific context mapping
+        current_tokens = self.count_tokens(text)
+        if current_tokens <= token_limit:
+            return text
+
+        # Start with a safe string slice based on average 4 chars/token
+        char_limit = max(10, token_limit * 4)
+        if keep_start:
+            trimmed = text[:char_limit]
+        else:
+            trimmed = text[-char_limit:]
+            
+        # Refine iteratively for accuracy
+        while self.count_tokens(trimmed) > token_limit and len(trimmed) > 10:
+            if keep_start:
+                trimmed = trimmed[:-10]
+            else:
+                trimmed = trimmed[10:]
+            
+        return trimmed
+
+    def get_genre_context(self, genre: str) -> dict:
+        """Generate genre-specific context."""
+        genre_lower = genre.lower().strip() if genre else "general fiction"
         genre_contexts = {
             "fantasy": {
                 "genre": "Fantasy",
@@ -208,61 +240,59 @@ class AIEngine:
                 "tone_guidelines": "Epic, adventurous, and high-stakes. Emphasize wonder and magic.",
                 "avoid_elements": ["Modern technology", "Contemporary slang", "Scientific explanations"],
                 "narrative_elements": ["Magic systems", "Kingdoms", "Ancient prophecies", "Mythical creatures"],
-                "style_notes": "Use archaic or elevated language when appropriate. Focus on worldbuilding and lore."
+                "style_notes": "Use archaic or elevated language. Focus on worldbuilding and lore."
             },
             "sci-fi": {
                 "genre": "Science Fiction",
                 "archetypes": ["Scientist", "Explorer", "AI/Robot", "Rebel", "Visionary"],
                 "common_conflicts": ["Technological advancement", "Space exploration", "AI uprising", "Dystopian control"],
-                "tone_guidelines": "Intellectual, speculative, and forward-thinking. Emphasize innovation and discovery.",
-                "avoid_elements": ["Magic without scientific basis", "Fantasy creatures", "Medieval settings"],
-                "narrative_elements": ["Advanced technology", "Space travel", "Scientific concepts", "Future societies"],
-                "style_notes": "Ground fantastical elements in plausible science. Use technical vocabulary appropriately."
+                "tone_guidelines": "Intellectual, speculative, and forward-thinking.",
+                "avoid_elements": ["Magic without scientific basis", "Fantasy creatures"],
+                "narrative_elements": ["Advanced technology", "Space travel", "Science concepts"],
+                "style_notes": "Ground fantastical elements in plausible science."
             },
             "romance": {
                 "genre": "Romance",
                 "archetypes": ["Lover", "Best Friend", "Rival", "Confidant"],
-                "common_conflicts": ["Forbidden love", "Misunderstanding", "Class differences", "Love triangle"],
-                "tone_guidelines": "Emotional, intimate, and tension-filled. Focus on character chemistry.",
-                "avoid_elements": ["Excessive violence", "Political intrigue overshadowing relationships"],
-                "narrative_elements": ["Emotional beats", "Relationship development", "Internal conflicts"],
-                "style_notes": "Emphasize emotional depth, attraction, and interpersonal dynamics."
+                "common_conflicts": ["Forbidden love", "Misunderstanding", "Class differences"],
+                "tone_guidelines": "Emotional, intimate, and tension-filled.",
+                "avoid_elements": ["Excessive violence"],
+                "narrative_elements": ["Emotional beats", "Relationship development"],
+                "style_notes": "Emphasize emotional depth and attraction."
             },
             "thriller": {
                 "genre": "Thriller",
-                "archetypes": ["Detective", "Victim", "Antagonist", "Ally", "Red Herring"],
-                "common_conflicts": ["Investigation", "Chase", "Conspiracy", "Psychological manipulation"],
-                "tone_guidelines": "Suspenseful, tense, and fast-paced. Build dread and anticipation.",
-                "avoid_elements": ["Slow pacing", "Comedic relief that breaks tension"],
-                "narrative_elements": ["Clues", "Red herrings", "Time pressure", "High stakes"],
-                "style_notes": "Use short, punchy sentences for action. Build suspense through pacing."
+                "archetypes": ["Detective", "Victim", "Antagonist", "Ally"],
+                "common_conflicts": ["Investigation", "Chase", "Conspiracy"],
+                "tone_guidelines": "Suspenseful, tense, and fast-paced.",
+                "avoid_elements": ["Slow pacing"],
+                "narrative_elements": ["Clues", "Red herrings", "Time pressure"],
+                "style_notes": "Use short, punchy sentences for action."
             },
             "mystery": {
                 "genre": "Mystery",
-                "archetypes": ["Detective", "Suspect", "Witness", "Victim", "Investigator"],
-                "common_conflicts": ["Solving crime", "Uncovering secrets", "Following clues"],
-                "tone_guidelines": "Intriguing, methodical, and cerebral. Encourage reader deduction.",
-                "avoid_elements": ["Deus ex machina solutions", "Unearned revelations"],
-                "narrative_elements": ["Clues", "Misdirection", "Logical deduction", "Plot twists"],
-                "style_notes": "Plant clues fairly. Build logical progression of discovery."
+                "archetypes": ["Detective", "Suspect", "Witness", "Victim"],
+                "common_conflicts": ["Solving crime", "Uncovering secrets"],
+                "tone_guidelines": "Intriguing, methodical, and cerebral.",
+                "avoid_elements": ["Deus ex machina solutions"],
+                "narrative_elements": ["Clues", "Misdirection", "Logical deduction"],
+                "style_notes": "Plant clues fairly. Build logical progression."
             },
             "horror": {
                 "genre": "Horror",
-                "archetypes": ["Final Girl/Boy", "Monster", "Skeptic", "Believer", "Victim"],
+                "archetypes": ["Final Girl/Boy", "Monster", "Skeptic", "Believer"],
                 "common_conflicts": ["Survival", "Unknown threat", "Psychological breakdown"],
-                "tone_guidelines": "Dreadful, atmospheric, and visceral. Build terror and unease.",
-                "avoid_elements": ["Excessive humor", "Safe, predictable outcomes"],
-                "narrative_elements": ["Atmosphere", "Gore/violence", "Psychological terror", "Isolation"],
-                "style_notes": "Use sensory details to build dread. Pace revelations carefully."
+                "tone_guidelines": "Dreadful, atmospheric, and visceral.",
+                "avoid_elements": ["Excessive humor"],
+                "narrative_elements": ["Atmosphere", "Gore/violence", "Isolation"],
+                "style_notes": "Use sensory details to build dread."
             }
         }
         
-        # Find matching genre (fuzzy match)
         for key, context in genre_contexts.items():
             if key in genre_lower or genre_lower in key:
                 return context
         
-        # Default/general fiction context
         return {
             "genre": genre or "General Fiction",
             "archetypes": ["Protagonist", "Antagonist", "Supporting Character"],
@@ -274,71 +304,44 @@ class AIEngine:
         }
 
     def stream_response(self, instruction: str, response_queue: queue.Queue, bible_data: str = "", current_text: str = "", character_context: dict = None, rag_context: dict = None, genre: str = None, style: str = None, synopsis: str = None, worldbuilding: str = None, outline: str = None) -> None:
-        """
-        Streams response tokens into the provided queue.
-        Uses Llama 3 Header format.
-        If rag_context is provided, uses God-Mode Writer prompt for context-aware generation.
-        """
+        """Streams response tokens with strict token budgeting."""
         if not self.llm:
             response_queue.put("Error: AI Model is not loaded check logs.")
             response_queue.put("[[END]]")
             return
 
-        # RAG-Enhanced Writing (God-Mode)
-        if rag_context:
-            # Build character notes string
-            char_notes = ""
-            if rag_context.get('mentioned_characters'):
-                for char in rag_context['mentioned_characters']:
-                    char_notes += f"\n- {char.get('name')}: {char.get('personality_traits', '')}\n  Speech: {char.get('speech_pattern', '')}"
-            else:
-                char_notes = "No characters mentioned in recent text."
-            
-            # Get genre context
-            genre_name = genre or rag_context.get('genre', 'fiction')
-            genre_ctx = self.get_genre_context(genre_name)
-            
-            # Build genre guidance string
-            genre_guidance = f"""
-GENRE: {genre_ctx['genre']}
-TONE: {genre_ctx['tone_guidelines']}
-APPROPRIATE ELEMENTS: {', '.join(genre_ctx['narrative_elements'])}
-AVOID: {', '.join(genre_ctx['avoid_elements']) if genre_ctx['avoid_elements'] else 'None'}
-STYLE NOTES: {genre_ctx['style_notes']}
-"""
-            # Inject Usage Style context if available
-            if style:
-                genre_guidance += f"\nUSER STYLE PREFERENCE: {style}\n"
-            # Inject Synopsis context if available
-            if synopsis:
-                genre_guidance += f"\nSTORY SYNOPSIS (High-Level Plot): {synopsis}\n"
-            # Inject Worldbuilding context if available
-            if worldbuilding:
-                genre_guidance += f"\nWORLDBUILDING (Setting Rules): {worldbuilding}\n"
-            # Inject Outline context if available
-            if outline:
-                genre_guidance += f"\nOUTLINE (Sequential Roadmap): The story must progress through the following beats in order: {outline}\nAdvance the narrative actively towards the next beat."
-            
-            system_prompt = PROMPT_WRITER_GODMODE.format(
-                genre=genre_ctx['genre'],
-                character_notes=char_notes,
-                prev_summary=rag_context.get('prev_summary', 'Beginning of story'),
-                recent_context=rag_context.get('recent_text', current_text[-3000:])
-            )
-            
-            # Append genre guidance to system prompt
-            system_prompt = system_prompt.replace("<|eot_id|>", f"{genre_guidance}<|eot_id|>")
-            
-            full_prompt = (
-                f"{system_prompt}"
-                f"<|start_header_id|>user<|end_header_id|>\n"
-                f"Continue writing:\n"
-                f"<|eot_id|>\n"
-                f"<|start_header_id|>assistant<|end_header_id|>"
-            )
+        max_output_tokens = 800
+        # Increased safety buffer from 150 to 250 to account for BOS/hidden tokens
+        total_budget = 4096 - max_output_tokens - 250
         
-        # Standard Writing
-        elif character_context:
+        instruction_tokens = self.count_tokens(instruction)
+        if instruction_tokens > total_budget:
+             response_queue.put(f"Error: Instruction too long ({instruction_tokens} tokens).")
+             response_queue.put("[[END]]")
+             return
+             
+        remaining_budget = total_budget - instruction_tokens
+        
+        bible_budget = int(remaining_budget * 0.4)
+        trimmed_bible = self.smart_trim(bible_data, bible_budget)
+        remaining_budget -= self.count_tokens(trimmed_bible)
+        
+        context_parts = []
+        global_budget = int(remaining_budget * 0.3)
+        if genre: context_parts.append(f"GENRE: {genre}")
+        if style: context_parts.append(f"STYLE: {style}")
+        if synopsis: context_parts.append(f"SYNOPSIS: {synopsis}")
+        if worldbuilding: context_parts.append(f"WORLDBUILDING: {worldbuilding}")
+        if outline: context_parts.append(f"OUTLINE: {outline}")
+        
+        context_string = "\n".join(context_parts)
+        trimmed_context = self.smart_trim(context_string, global_budget, keep_start=True)
+        remaining_budget -= self.count_tokens(trimmed_context)
+        
+        trimmed_recent = self.smart_trim(current_text, remaining_budget)
+        
+        system_prompt = PROSE_SYSTEM_PROMPT
+        if character_context:
             system_prompt = MIMIC_SYSTEM_PROMPT.format(
                 name=character_context.get('name', 'Unknown'),
                 relationship=character_context.get('relationship_to_author', 'None'),
@@ -346,137 +349,108 @@ STYLE NOTES: {genre_ctx['style_notes']}
                 speech=character_context.get('speech_pattern', 'Standard')
             )
             
-            # Inject Contexts
-            if genre:
-                system_prompt += f"\nCONTEXT NOTE: The user describes this story as a [{genre}] story. Use this context to inform tone and style."
-            if style:
-                system_prompt += f"\nSTYLE NOTE: The user wants this story written in the following style: [{style}]. Use this to inform narrative voice and pacing."
-            if synopsis:
-                system_prompt += f"\nSYNOPSIS NOTE: The story follows this high-level plot: [{synopsis}]. Use this to inform character goals and key conflicts."
-            if worldbuilding:
-                system_prompt += f"\nWORLDBUILDING NOTE: The story is set in the following world: [{worldbuilding}]. Ensure settings, physics, and cultures align with this."
-            if outline:
-                system_prompt += f"\nOUTLINE NOTE: The story follows the structure outlined here: [{outline}]. Generate text starting with the first beat, and progress toward subsequent beats naturally."
+        full_prompt = (
+            f"{system_prompt}\n"
+            f"GLOBAL CONTEXT:\n{trimmed_context}\n"
+            f"<|start_header_id|>user<|end_header_id|>\n"
+            f"BIBLE DATA:\n{trimmed_bible}\n\n"
+            f"RECENT WRITING:\n{trimmed_recent}\n\n"
+            f"INSTRUCTION: {instruction}\n"
+            f"<|eot_id|>\n"
+            f"<|start_header_id|>assistant<|end_header_id|>"
+        )
 
-            full_prompt = (
-                f"{system_prompt}"
-                f"<|start_header_id|>user<|end_header_id|>\n"
-                f"BIBLE DATA: {bible_data}\n"
-                f"CURRENT TEXT: {current_text}\n"
-                f"INSTRUCTION: {instruction}\n"
-                f"<|eot_id|>\n"
-                f"<|start_header_id|>assistant<|end_header_id|>"
-            )
-        else:
-            system_prompt = PROSE_SYSTEM_PROMPT
-            
-            # Inject Contexts
-            context_string = ""
-            if genre:
-                 context_string += f"CONTEXT NOTE: The user describes this story as a [{genre}] story. Use this context to inform tone and style.\n"
-            if style:
-                 context_string += f"STYLE NOTE: The user wants this story written in the following style: [{style}]. Use this to inform narrative voice and pacing.\n"
-            if synopsis:
-                 context_string += f"SYNOPSIS NOTE: The story follows this high-level plot: [{synopsis}]. Use this to inform character goals and key conflicts.\n"
-            if worldbuilding:
-                 context_string += f"WORLDBUILDING NOTE: The story is set in the following world: [{worldbuilding}]. Ensure settings, physics, and cultures align with this.\n"
-            if outline:
-                 context_string += f"OUTLINE NOTE: The story follows the structure outlined here: [{outline}]. Generate text starting with the first beat, and progress toward subsequent beats naturally.\n"
-            
-            if context_string:
-                system_prompt = system_prompt.replace(
-                    "<|eot_id|>", 
-                    f"{context_string}<|eot_id|>"
-                )
-
-            full_prompt = (
-                f"{system_prompt}"
-                f"<|start_header_id|>user<|end_header_id|>\n"
-                f"BIBLE DATA: {bible_data}\n"
-                f"CURRENT TEXT: {current_text}\n"
-                f"INSTRUCTION: {instruction}\n"
-                f"<|eot_id|>\n"
-                f"<|start_header_id|>assistant<|end_header_id|>"
-            )
-
-        self._generate_stream(full_prompt, response_queue)
-
-
+        total_input = self.count_tokens(full_prompt)
+        logging.info(f"Budget Check: {total_input} input + {max_output_tokens} output = {total_input + max_output_tokens} / 4096")
+        self.generate_stream(full_prompt, response_queue, max_tokens=max_output_tokens)
 
     def generate_beat_summary(self, text: str) -> str:
-        """
-        Generates a 2-3 sentence summary of the provided text.
-        Synchronous call (for background thread).
-        """
+        """Generates a brief summary with budgeting."""
         if not self.llm or not text.strip():
             return "No content to summarize."
+
+        max_output_tokens = 150
+        # Increased safety buffer to 250
+        total_budget = 4096 - max_output_tokens - 250
+        trimmed_text = self.smart_trim(text, total_budget)
 
         prompt = (
             f"<|begin_of_text|><|start_header_id|>system<|end_header_id|>\n"
             f"Summarize the story chunk in 3 sentences. Focus on plot points.\n"
-            f"STRICT OUTPUT FORMAT: Output ONLY the summary. Do NOT say 'Here is a summary'.\n"
+            f"STRICT OUTPUT FORMAT: Output ONLY the summary.\n"
             f"<|eot_id|><|start_header_id|>user<|end_header_id|>\n"
-            f"{text[-2500:]}\n"
+            f"{trimmed_text}\n"
             f"<|eot_id|><|start_header_id|>assistant<|end_header_id|>"
         )
 
         try:
             with self.lock:
-                output = self.llm(
-                    prompt,
-                    max_tokens=150,
-                    stop=["<|eot_id|>"],
-                    echo=False,
-                    temperature=0.3
-                )
+                output = self.llm(prompt, max_tokens=max_output_tokens, stop=["<|eot_id|>"], echo=False, temperature=0.3)
             return output['choices'][0]['text'].strip()
         except Exception as e:
             logging.error(f"Summary generation error: {e}")
             return "Error generating summary."
 
     def ask_lore_assistant(self, query: str, response_queue: queue.Queue, project_memory: str, project_name: str = "Current Project") -> None:
-        """
-        Asks the Lore Assistant a question based on project memory.
-        """
+        """Lore Assistant with budgeting."""
         if not self.llm:
             response_queue.put("Error: AI Model is not loaded.")
             response_queue.put("[[END]]")
             return
 
-        system_prompt = f"""<|begin_of_text|><|start_header_id|>system<|end_header_id|>
+        max_output_tokens = 600
+        # Increased safety buffer to 250
+        total_budget = 4096 - max_output_tokens - 250
+        
+        sys_prefix = f"""<|begin_of_text|><|start_header_id|>system<|end_header_id|>
 You are the OMNISCIENT LORE KEEPER for the story '{project_name}'.
 You have perfect memory of every event, character, and detail in this story.
 
 STORY DATA:
-{project_memory}
-
+"""
+        sys_suffix = """
 RULES:
-1. Answer questions DIRECTLY as if you naturally know this information.
-2. NEVER say "According to the database" or "Based on the data" or similar phrases.
-3. If asked about a character's history, answer naturally (e.g., "Sara's past relationship was with Ron, a toxic and manipulative connection from Chapter 11.")
-4. If the author is about to make a continuity mistake, warn them naturally.
-5. If information is not in your memory, say "I don't have that information in the story yet."
-6. Be the story's memory - confident, direct, and helpful.
+1. Answer questions DIRECTLY. Never say "According to the database".
+2. If information is missing, say so naturally.
 <|eot_id|>"""
-
-        full_prompt = (
-            f"{system_prompt}"
-            f"<|start_header_id|>user<|end_header_id|>\n"
-            f"QUESTION: {query}\n"
-            f"<|eot_id|>\n"
-            f"<|start_header_id|>assistant<|end_header_id|>"
-        )
         
-        logging.info(f"DEBUG: ask_lore_assistant called. Memory len: {len(project_memory)}")
-        self._generate_stream(full_prompt, response_queue)
+        query_part = f"<|start_header_id|>user<|end_header_id|>\nQUESTION: {query}\n<|eot_id|>\n<|start_header_id|>assistant<|end_header_id|>"
+        fixed_tokens = self.count_tokens(sys_prefix + sys_suffix + query_part)
+        trimmed_memory = self.smart_trim(project_memory, total_budget - fixed_tokens)
 
-    def _generate_stream(self, prompt, response_queue):
+        full_prompt = sys_prefix + trimmed_memory + sys_suffix + query_part
+        self.generate_stream(full_prompt, response_queue, max_tokens=max_output_tokens)
+
+    def generate_stream(self, prompt, response_queue, max_tokens=500):
         try:
-            logging.info("Generating AI response...")
+            if not self.llm:
+                 response_queue.put("Error: Model not loaded.")
+                 response_queue.put("[[END]]")
+                 return
+
+            # EMERGENCY SAFEGUARD: Verify exact token count of the final prompt
+            # We use add_bos=False because templates already have <|begin_of_text|>
+            prompt_tokens = self.llm.tokenize(prompt.encode("utf-8"), add_bos=False)
+            input_len = len(prompt_tokens)
+            
+            # Context Window Overflow Protection
+            if input_len + max_tokens > 4096:
+                adjusted_max = 4096 - input_len - 5  # 5 token safety margin
+                logging.warning(f"Context limit imminent! Adjusting max_tokens from {max_tokens} to {adjusted_max} (Input: {input_len})")
+                max_tokens = max(1, adjusted_max)
+            
+            if input_len >= 4096:
+                logging.error(f"CRITICAL: Final prompt exceeds hard 4096 limit ({input_len}). Emergency truncating input.")
+                # Last resort: truncate the literal string to hopefully fix the token count
+                prompt = prompt[-12000:] # Roughly 3000 tokens
+                max_tokens = 500
+
+            logging.info(f"Generating AI response (Input: {input_len}, max_tokens={max_tokens})...")
+            
             with self.lock:
                 stream = self.llm(
                     prompt,
-                    max_tokens=None,
+                    max_tokens=max_tokens,
                     stop=["<|eot_id|>", "<|start_header_id|>"], 
                     echo=False,
                     stream=True,
@@ -490,96 +464,87 @@ RULES:
             response_queue.put("[[END]]")
 
         except Exception as e:
-            logging.error(f"Generation error: {e}")
-            response_queue.put(f"\n[Error: {e}]")
+            error_msg = str(e)
+            logging.error(f"Generation error: {error_msg}")
+            if "context window" in error_msg.lower():
+                response_queue.put("\n[Error: The story context is too large for the current model. I've automatically trimmed it, but please try selecting a smaller section of text or shortening your instruction.]")
+            else:
+                response_queue.put(f"\n[AI Error: {error_msg}]")
             response_queue.put("[[END]]")
 
     def unload_model(self):
         if self.llm:
-            logging.info("Unloading model and freeing VRAM...")
+            logging.info("Unloading model...")
             del self.llm
             self.llm = None
-            # Force garbage collection
             import gc
             gc.collect()
 
     def generate_plugin_response(self, text: str, plugin_type: str, response_queue: queue.Queue, context_data: dict = None) -> None:
-        """
-        Handles Describe/Rewrite plugins with context injection.
-        """
+        """Handles Describe/Rewrite plugins with budgeting."""
         if not self.llm:
-            response_queue.put("Error: AI Model is not loaded.")
+            response_queue.put("Error: AI Model not loaded.")
             response_queue.put("[[END]]")
             return
 
+        max_output_tokens = 300
+        if "rewrite" in plugin_type: max_output_tokens = 400
+        elif plugin_type == "sensory_lab": max_output_tokens = 200
+
+        # Increased safety buffer to 250
+        total_budget = 4096 - max_output_tokens - 250
         genre = context_data.get('genre', 'General Fiction') if context_data else 'General Fiction'
         char_name = context_data.get('char_name', 'Unknown') if context_data else 'Unknown'
         dossier = context_data.get('dossier', '') if context_data else ''
 
         system_prompt = PROSE_SYSTEM_PROMPT
-        
         if plugin_type.startswith("describe_"):
             sense = plugin_type.replace("describe_", "")
             system_prompt = PROMPT_DESCRIBE_MASTER.format(
-                sense=sense.upper(),
-                genre=genre,
-                character_name=char_name,
-                dossier=dossier[:500] 
+                sense=sense.upper(), genre=genre, character_name=char_name, dossier=self.smart_trim(dossier, 500) 
             )
         elif plugin_type.startswith("rewrite_"):
             style = plugin_type.replace("rewrite_", "").replace("_", " ").title()
-            system_prompt = PROMPT_REWRITE_MASTER.format(
-                style=style,
-                genre=genre
-            )
+            system_prompt = PROMPT_REWRITE_MASTER.format(style=style, genre=genre)
         elif plugin_type == 'sensory_lab':
             system_prompt = PROMPT_SENSORY_LAB
 
-        full_prompt = (
-            f"{system_prompt}"
-            f"<|start_header_id|>user<|end_header_id|>\n"
-            f"{text}\n"
-            f"<|eot_id|>\n"
-            f"<|start_header_id|>assistant<|end_header_id|>"
-        )
+        instruction_tokens = self.count_tokens(system_prompt)
+        trimmed_input = self.smart_trim(text, total_budget - instruction_tokens)
 
-        self._generate_stream(full_prompt, response_queue)
+        full_prompt = (
+            f"{system_prompt}<|start_header_id|>user<|end_header_id|>\n{trimmed_input}\n<|eot_id|><|start_header_id|>assistant<|end_header_id|>"
+        )
+        self.generate_stream(full_prompt, response_queue, max_tokens=max_output_tokens)
 
     def expand_scene(self, context_text: str, response_queue: queue.Queue) -> None:
-        """
-        Expands the current scene based on the last 500 words.
-        """
+        """Expands the current scene with budgeting."""
         if not self.llm:
-            response_queue.put("Error: AI Model is not loaded.")
+            response_queue.put("Error: AI Model not loaded.")
             response_queue.put("[[END]]")
             return
 
-        full_prompt = (
-            f"{PROMPT_EXPAND_SCENE}"
-            f"<|start_header_id|>user<|end_header_id|>\n"
-            f"PREVIOUS TEXT:\n{context_text[-2500:]}\n" # Approx last 500 words
-            f"<|eot_id|>\n"
-            f"<|start_header_id|>assistant<|end_header_id|>"
-        )
+        max_output_tokens = 800
+        # Increased safety buffer to 250
+        total_budget = 4096 - max_output_tokens - 250
+        system_tokens = self.count_tokens(PROMPT_EXPAND_SCENE)
+        trimmed_context = self.smart_trim(context_text, total_budget - system_tokens)
 
-        self._generate_stream(full_prompt, response_queue)
+        full_prompt = (
+            f"{PROMPT_EXPAND_SCENE}<|start_header_id|>user<|end_header_id|>\nPREVIOUS TEXT:\n{trimmed_context}\n<|eot_id|><|start_header_id|>assistant<|end_header_id|>"
+        )
+        self.generate_stream(full_prompt, response_queue, max_tokens=max_output_tokens)
 
     def check_continuity(self, beats: list, lore_package: dict) -> tuple:
-        """
-        Pre-generation logic check: validates beats against lore for contradictions.
-        Returns: (is_valid: bool, conflict_message: str)
-        """
-        if not self.llm:
-            return (True, "")  # Skip check if model not loaded
+        """Validates beats against lore for contradictions."""
+        if not self.llm: return (True, "")
         
-        # Build lore summary
         char_summary = "\n".join([f"- {c['name']}: {c.get('traits', '')}" for c in lore_package.get('characters', [])])
         story_summary = "\n".join(lore_package.get('story_so_far', []))
         
         prompt = (
             f"<|begin_of_text|><|start_header_id|>system<|end_header_id|>\n"
             f"You are a continuity checker. Review the BEATS against the LORE.\n"
-            f"Find contradictions: dead characters appearing, teleportation, broken world rules.\n"
             f"Output ONLY 'PASS' or 'CONFLICT: [details]'\n"
             f"<|eot_id|><|start_header_id|>user<|end_header_id|>\n"
             f"LORE:\n{char_summary}\n\nSTORY: {story_summary}\n\n"
@@ -589,139 +554,93 @@ RULES:
         
         try:
             with self.lock:
-                output = self.llm(
-                    prompt,
-                    max_tokens=200,
-                    stop=["<|eot_id|>"],
-                    echo=False,
-                    temperature=0.3
-                )
+                output = self.llm(prompt, max_tokens=200, stop=["<|eot_id|>"], echo=False, temperature=0.3)
             result = output['choices'][0]['text'].strip()
-            
-            if result.startswith("CONFLICT"):
-                return (False, result.replace("CONFLICT:", "").strip())
-            else:
-                return (True, "")
-                
+            if result.startswith("CONFLICT"): return (False, result.replace("CONFLICT:", "").strip())
+            return (True, "")
         except Exception as e:
             logging.error(f"Continuity check error: {e}")
-            return (True, "")  # Proceed on error
+            return (True, "")
 
     def generate_omniscient_prose(self, beats: list, lore_package: dict, response_queue: queue.Queue):
-        """
-        Generates 1000+ words of prose from beats using omniscient drafting engine.
-        """
+        """Generates prose from beats with budgeting."""
         if not self.llm:
-            response_queue.put("Error: AI Model is not loaded.")
+            response_queue.put("Error: AI Model not loaded.")
             response_queue.put("[[END]]")
             return
         
-        # Format lore package for prompt
-        char_text = "\n".join([f"- {c['name']}: {c.get('traits', '')} | Speech: {c.get('speech', '')}" 
-                               for c in lore_package.get('characters', [])])
+        max_output_tokens = 1500
+        # Increased safety buffer to 250
+        total_budget = 4096 - max_output_tokens - 250
+
+        char_text = "\n".join([f"- {c['name']}: {c.get('traits', '')}" for c in lore_package.get('characters', [])])
         story_text = "\n".join(lore_package.get('story_so_far', []))
         beats_text = "\n".join([f"{i+1}. {b}" for i, b in enumerate(beats)])
         
+        fixed_tokens = self.count_tokens(PROMPT_OMNISCIENT_DRAFTING)
+        remaining = total_budget - fixed_tokens
+
         system_prompt = PROMPT_OMNISCIENT_DRAFTING.format(
             genre=lore_package.get('genre', 'fiction'),
-            characters=char_text or "No characters mentioned",
-            story_so_far=story_text or "Beginning of story",
+            characters=self.smart_trim(char_text, int(remaining * 0.4)),
+            story_so_far=self.smart_trim(story_text, int(remaining * 0.6)),
             world_rules=lore_package.get('world_rules', 'No specific rules'),
             beats=beats_text
         )
         
         full_prompt = (
-            f"{system_prompt}"
-            f"<|start_header_id|>user<|end_header_id|>\n"
-            f"Write the scene:\n"
-            f"<|eot_id|>\n"
-            f"<|start_header_id|>assistant<|end_header_id|>"
+            f"{system_prompt}<|start_header_id|>user<|end_header_id|>\nWrite the scene:\n<|eot_id|><|start_header_id|>assistant<|end_header_id|>"
         )
-        
-        # Generate with higher max_tokens for 1000+ words
-        try:
-            with self.lock:
-                for output in self.llm(
-                    full_prompt,
-                    max_tokens=1500,  # ~1000-1200 words
-                    stop=["<|eot_id|>"],
-                    stream=True,
-                    temperature=0.7
-                ):
-                    token = output['choices'][0]['text']
-                    response_queue.put(token)
-            
-            response_queue.put("[[END]]")
-            
-        except Exception as e:
-            logging.error(f"Omniscient prose generation error: {e}")
-            response_queue.put(f"\n[Error: {e}]")
-            response_queue.put("[[END]]")
+        self.generate_stream(full_prompt, response_queue, max_tokens=max_output_tokens)
 
     def generate_beats_from_prose(self, prose_text: str) -> str:
-        """Extract story beats from existing prose (reverse outlining)."""
-        if not self.llm:
-            return "Error: AI Model not loaded"
+        """Extract story beats with budgeting."""
+        if not self.llm: return "Error: AI Model not loaded"
         
-        if len(prose_text) < 100:
-            return "Error: Prose too short for beat extraction"
-        
-        prompt = PROMPT_BEAT_EXTRACTOR.format(prose_text=prose_text[:4000])
-        
+        max_output_tokens = 400
+        # Increased safety buffer to 250
+        total_budget = 4096 - max_output_tokens - 250
+        trimmed_prose = self.smart_trim(prose_text, total_budget - 100)
+
         full_prompt = (
-            f"{prompt}"
-            f"<|start_header_id|>user<|end_header_id|>\n"
-            f"Extract the beats:\n"
-            f"<|eot_id|>\n"
-            f"<|start_header_id|>assistant<|end_header_id|>"
+            f"{PROMPT_BEAT_EXTRACTOR.format(prose_text=trimmed_prose)}<|start_header_id|>user<|end_header_id|>\nExtract the beats:\n<|eot_id|><|start_header_id|>assistant<|end_header_id|>"
         )
         
         try:
             with self.lock:
-                output = self.llm(
-                    full_prompt,
-                    max_tokens=300,
-                    stop=["<|eot_id|>"],
-                    echo=False,
-                    temperature=0.5
-                )
+                output = self.llm(full_prompt, max_tokens=max_output_tokens, stop=["<|eot_id|>"], echo=False, temperature=0.5)
             return output['choices'][0]['text'].strip()
         except Exception as e:
             logging.error(f"Beat extraction error: {e}")
             return f"Error: {e}"
 
     def suggest_next_beats(self, prev_beats: str, lore_package: dict) -> str:
-        """Suggest beats for next chapter based on previous chapter and lore."""
-        if not self.llm:
-            return "Error: AI Model not loaded"
+        """Suggest beats for next chapter with budgeting."""
+        if not self.llm: return "Error: AI Model not loaded"
         
+        max_output_tokens = 500
+        # Increased safety buffer to 250
+        total_budget = 4096 - max_output_tokens - 250
+
         char_summary = "\n".join([f"- {c['name']}: {c.get('traits', '')}" for c in lore_package.get('characters', [])])
         story_summary = "\n".join(lore_package.get('story_so_far', []))
-        lore_text = f"Characters:\n{char_summary}\n\nStory:\n{story_summary}"
         
+        fixed_tokens = self.count_tokens(PROMPT_BEAT_SUGGESTER.replace("{prev_beats}", "").replace("{lore_summary}", "").replace("{genre}", "fiction"))
+        remaining = total_budget - fixed_tokens
+
         system_prompt = PROMPT_BEAT_SUGGESTER.format(
             genre=lore_package.get('genre', 'fiction'),
-            prev_beats=prev_beats or "Beginning of story",
-            lore_summary=lore_text or "No lore available"
+            prev_beats=self.smart_trim(prev_beats, int(remaining * 0.4)),
+            lore_summary=self.smart_trim(f"Characters:\n{char_summary}\n\nStory:\n{story_summary}", int(remaining * 0.6))
         )
         
         full_prompt = (
-            f"{system_prompt}"
-            f"<|start_header_id|>user<|end_header_id|>\n"
-            f"Suggest beats for next chapter:\n"
-            f"<|eot_id|>\n"
-            f"<|start_header_id|>assistant<|end_header_id|>"
+            f"{system_prompt}<|start_header_id|>user<|end_header_id|>\nSuggest beats for next chapter:\n<|eot_id|><|start_header_id|>assistant<|end_header_id|>"
         )
         
         try:
             with self.lock:
-                output = self.llm(
-                    full_prompt,
-                    max_tokens=300,
-                    stop=["<|eot_id|>"],
-                    echo=False,
-                    temperature=0.7
-                )
+                output = self.llm(full_prompt, max_tokens=max_output_tokens, stop=["<|eot_id|>"], echo=False, temperature=0.7)
             return output['choices'][0]['text'].strip()
         except Exception as e:
             logging.error(f"Beat suggestion error: {e}")
