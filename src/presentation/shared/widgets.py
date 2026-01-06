@@ -469,3 +469,70 @@ class AutoExpandingTextEdit(QTextEdit):
         doc_height = int(self.document().documentLayout().documentSize().height())
         hint.setHeight(max(150, doc_height + 30))
         return hint
+
+
+class SmartTextEdit(AutoExpandingTextEdit):
+    """
+    Enhanced TextEdit with 'Dirty Tracking' and Smart Triggers.
+    - Tracks edits via textChanged.
+    - Emits signal ONLY on focus loss if content is dirty.
+    - Supports Debounce to prevent rapid firing.
+    """
+    request_summarization = pyqtSignal(str) # Emits source_id
+
+    def __init__(self, source_id: str, placeholder="", parent=None, is_chapter=False):
+        super().__init__(placeholder, parent)
+        self.source_id = source_id
+        self.is_chapter = is_chapter # True if this is the main canvas
+        self.is_dirty = False
+        
+        # Debounce Timer
+        self._debounce_timer = QTimer(self)
+        self._debounce_timer.setSingleShot(True)
+        self._debounce_timer.setInterval(200) # 200ms debounce
+        self._debounce_timer.timeout.connect(self._emit_summarization)
+        
+        # Connect change tracker
+        self.textChanged.connect(self._mark_dirty)
+        
+    def _mark_dirty(self):
+        """Called whenever text changes (typing, paste, etc)."""
+        if not self.is_dirty:
+            self.is_dirty = True
+            # We don't log every keystroke, but we know it's dirty now.
+            
+    def mark_clean(self):
+        """Call this AFTER successful summarization."""
+        self.is_dirty = False
+        
+    def programmatic_insert(self, text: str):
+        """Insert text programmatically (e.g., from AI). Marks as dirty."""
+        cursor = self.textCursor()
+        cursor.insertText(text)
+        self.ensureCursorVisible()
+        self.is_dirty = True # AI generated text counts as 'fresh raw text'
+        
+    def focusOutEvent(self, event):
+        """Trigger summarization check on focus loss."""
+        super().focusOutEvent(event)
+        if self.is_dirty:
+            # Prepare to summarize, but wait for debounce 
+            # (handles rapid tab switching or accidental clicks)
+            self._debounce_timer.start()
+            
+    def force_summarize_if_dirty(self):
+        """Manual trigger (e.g., on Tab Switch)."""
+        if self.is_dirty:
+            self._emit_summarization()
+            
+    def _emit_summarization(self):
+        """Actual signal emission."""
+        if self.is_dirty:
+            # Signal the main app to run the pipeline
+            self.request_summarization.emit(self.source_id)
+            # Note: We do NOT clear dirty here. 
+            # The App must call mark_clean() after the thread starts or completes.
+            # Actually, to prevent double firing, checking is_dirty in the receiver is good,
+            # but we should clear it or mark 'processing' to avoid loops.
+            # Best practice: App calls 'mark_clean' immediately upon STARTING the thread.
+
