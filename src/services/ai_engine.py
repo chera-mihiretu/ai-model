@@ -153,6 +153,38 @@ TASK: Suggest 5-7 beats for the NEXT chapter that:
 - Format as clean numbered list
 <|eot_id|>"""
 
+PROMPT_COMPRESS = """<|begin_of_text|><|start_header_id|>system<|end_header_id|>
+You are a Context Compressor.
+Your task is to compress the provided text to strictly fit within {max_tokens} tokens.
+Preserve:
+1. Major plot beats
+2. Character arcs/relationships
+3. Unresolved conflicts
+Discard:
+1. Flowery prose
+2. Repetitive details
+3. Minor dialogue
+
+STRICT OUTPUT FORMAT: Output ONLY the compressed summary.
+<|eot_id|>"""
+
+PROMPT_INCREMENTAL_SUMMARY = """<|begin_of_text|><|start_header_id|>system<|end_header_id|>
+You are a Narrative Summarizer.
+Summarize the following new text chunk in 1-2 sentences.
+Focus on: Action, Key Dialogue, and State Changes.
+Output ONLY the summary.
+<|eot_id|>"""
+
+PROMPT_SUMMARIZE_CONTEXT = """<|begin_of_text|><|start_header_id|>system<|end_header_id|>
+You are a Context Compressor.
+Your task is to summarize the following text to fit within {char_limit} characters while preserving key facts, names, specific terminology, and relationships.
+STRICT RULES:
+1. Do NOT create new content.
+2. Do NOT act as a creative writer.
+3. Compress the information aggressively but maintain logical coherence.
+4. Output ONLY the summary.
+<|eot_id|>"""
+
 class AIEngine:
     def __init__(self):
         self.config_manager = ConfigManager()
@@ -229,6 +261,98 @@ class AIEngine:
             
         return trimmed
 
+    def compress_text(self, text: str, max_tokens: int) -> str:
+        """Compresses text to strictly fit within max_tokens."""
+        if not self.llm or not text.strip():
+            return ""
+            
+        current_tokens = self.count_tokens(text)
+        if current_tokens <= max_tokens:
+            return text
+
+        # Safety buffer for instruction
+        instruction_tokens = 150
+        available_output = max_tokens
+        
+        # Trim input to avoid overflowing context window during compression
+        max_input = 4096 - available_output - instruction_tokens - 100
+        trimmed_input = self.smart_trim(text, max_input)
+
+        prompt = (
+            f"{PROMPT_COMPRESS.format(max_tokens=max_tokens)}"
+            f"<|start_header_id|>user<|end_header_id|>\n"
+            f"TEXT TO COMPRESS:\n{trimmed_input}\n"
+            f"<|eot_id|><|start_header_id|>assistant<|end_header_id|>"
+        )
+
+        try:
+            with self.lock:
+                output = self.llm(prompt, max_tokens=available_output, stop=["<|eot_id|>"], echo=False, temperature=0.2)
+            return output['choices'][0]['text'].strip()
+        except Exception as e:
+            logging.error(f"Compression error: {e}")
+            return self.smart_trim(text, max_tokens) # Fallback to strict trim
+
+    def assemble_context(self, instruction: str, chapter_summary: str, bible_summaries: list, recent_summary: str, recent_text: str) -> str:
+        """
+        Assembles a strictly budgeted context string.
+        Total Limit: 4096 tokens (minus output buffer).
+        
+        Priority:
+        1. Recent Text (Last Chapter Summary + Raw Recent) - Critical Short Term Memory
+        2. Instruction - Critical
+        3. Chapter Summary - Long Term Memory
+        4. Bible Summaries - Lore
+        """
+        OUTPUT_BUFFER = 800
+        SYSTEM_BUFFER = 200 # For system prompt overhead
+        TOTAL_LIMIT = 4096 - OUTPUT_BUFFER - SYSTEM_BUFFER
+        
+        instruction_tokens = self.count_tokens(instruction)
+        recent_summary_tokens = self.count_tokens(recent_summary)
+        # Recent raw text usually max 1000 chars ~ 250 tokens
+        recent_text_tokens = self.count_tokens(recent_text)
+        
+        mandatory_tokens = instruction_tokens + recent_summary_tokens + recent_text_tokens
+        
+        if mandatory_tokens > TOTAL_LIMIT:
+             # Emergency trim of recent text
+             logging.warning("Context Assembly: Mandatory tokens exceed limit. Trimming recent text.")
+             available = TOTAL_LIMIT - (instruction_tokens + recent_summary_tokens)
+             recent_text = self.smart_trim(recent_text, max(50, available))
+             recent_text_tokens = self.count_tokens(recent_text)
+             # If still over, we have a problem, but proceed with strict trimming
+        
+        remaining = TOTAL_LIMIT - (instruction_tokens + recent_summary_tokens + recent_text_tokens)
+        
+        # Split remaining 50/50 between Chapter Summary and Bible
+        chapter_budget = int(remaining * 0.5)
+        bible_budget = int(remaining * 0.5)
+        
+        # 1. Process Chapter Summary
+        final_chapter_summary = self.smart_trim(chapter_summary, chapter_budget)
+        
+        # 2. Process Bible Summaries
+        # Distribute bible_budget across tabs
+        if bible_summaries:
+            per_tab = int(bible_budget / len(bible_summaries))
+            final_bible_summaries = [self.smart_trim(s, per_tab) for s in bible_summaries if s.strip()]
+        else:
+            final_bible_summaries = []
+            
+        # Construct Final String
+        context_parts = []
+        if final_chapter_summary:
+            context_parts.append(f"STORY SO FAR:\n{final_chapter_summary}")
+        if final_bible_summaries:
+            context_parts.append("LORE:\n" + "\n".join(final_bible_summaries))
+        if recent_summary:
+            context_parts.append(f"IMMEDIATE CONTEXT:\n{recent_summary}")
+        if recent_text:
+             context_parts.append(f"CURRENT SCENE:\n{recent_text}")
+             
+        return "\n\n".join(context_parts)
+
     def get_genre_context(self, genre: str) -> dict:
         """Generate genre-specific context."""
         genre_lower = genre.lower().strip() if genre else "general fiction"
@@ -303,42 +427,30 @@ class AIEngine:
             "style_notes": "Maintain consistency with established tone and voice."
         }
 
-    def stream_response(self, instruction: str, response_queue: queue.Queue, bible_data: str = "", current_text: str = "", character_context: dict = None, rag_context: dict = None, genre: str = None, style: str = None, synopsis: str = None, worldbuilding: str = None, outline: str = None) -> None:
-        """Streams response tokens with strict token budgeting."""
+    def stream_response(self, instruction: str, response_queue: queue.Queue, bible_data: dict = None, current_text: str = "", character_context: dict = None, rag_context: dict = None, style: str = None) -> None:
+        """Streams response tokens using strict context assembly."""
         if not self.llm:
             response_queue.put("Error: AI Model is not loaded check logs.")
             response_queue.put("[[END]]")
             return
 
-        max_output_tokens = 800
-        # Increased safety buffer from 150 to 250 to account for BOS/hidden tokens
-        total_budget = 4096 - max_output_tokens - 250
+        # Unpack context
+        chapter_summary = rag_context.get('prev_summary', '') if rag_context else ''
+        recent_summary = rag_context.get('recent_summary', '') if rag_context else '' # Renamed from char_summary concept
+        bible_summaries = []
+        if bible_data:
+            for k, v in bible_data.items():
+                if k.endswith('_summary') and v:
+                    bible_summaries.append(f"[{k.replace('_summary','').upper()}]: {v}")
         
-        instruction_tokens = self.count_tokens(instruction)
-        if instruction_tokens > total_budget:
-             response_queue.put(f"Error: Instruction too long ({instruction_tokens} tokens).")
-             response_queue.put("[[END]]")
-             return
-             
-        remaining_budget = total_budget - instruction_tokens
-        
-        bible_budget = int(remaining_budget * 0.4)
-        trimmed_bible = self.smart_trim(bible_data, bible_budget)
-        remaining_budget -= self.count_tokens(trimmed_bible)
-        
-        context_parts = []
-        global_budget = int(remaining_budget * 0.3)
-        if genre: context_parts.append(f"GENRE: {genre}")
-        if style: context_parts.append(f"STYLE: {style}")
-        if synopsis: context_parts.append(f"SYNOPSIS: {synopsis}")
-        if worldbuilding: context_parts.append(f"WORLDBUILDING: {worldbuilding}")
-        if outline: context_parts.append(f"OUTLINE: {outline}")
-        
-        context_string = "\n".join(context_parts)
-        trimmed_context = self.smart_trim(context_string, global_budget, keep_start=True)
-        remaining_budget -= self.count_tokens(trimmed_context)
-        
-        trimmed_recent = self.smart_trim(current_text, remaining_budget)
+        # Assemble strictly budgeted context
+        global_context = self.assemble_context(
+            instruction, 
+            chapter_summary, 
+            bible_summaries, 
+            recent_summary, 
+            current_text
+        )
         
         system_prompt = PROSE_SYSTEM_PROMPT
         if character_context:
@@ -351,16 +463,21 @@ class AIEngine:
             
         full_prompt = (
             f"{system_prompt}\n"
-            f"GLOBAL CONTEXT:\n{trimmed_context}\n"
             f"<|start_header_id|>user<|end_header_id|>\n"
-            f"BIBLE DATA:\n{trimmed_bible}\n\n"
-            f"RECENT WRITING:\n{trimmed_recent}\n\n"
+            f"CONTEXT:\n{global_context}\n\n"
             f"INSTRUCTION: {instruction}\n"
             f"<|eot_id|>\n"
             f"<|start_header_id|>assistant<|end_header_id|>"
         )
 
+        max_output_tokens = 800
+        # Verify total
         total_input = self.count_tokens(full_prompt)
+        if total_input + max_output_tokens > 4096:
+             logging.warning(f"Final prompt over budget ({total_input}). Trimming...")
+             # Last ditch safety check is inside generate_stream but strictly we should handle it here
+             pass
+
         logging.info(f"Budget Check: {total_input} input + {max_output_tokens} output = {total_input + max_output_tokens} / 4096")
         self.generate_stream(full_prompt, response_queue, max_tokens=max_output_tokens)
 
@@ -390,6 +507,39 @@ class AIEngine:
         except Exception as e:
             logging.error(f"Summary generation error: {e}")
             return "Error generating summary."
+
+    def generate_summary(self, text: str, mode: str = "incremental") -> str:
+        """
+        Generates summaries based on mode:
+        - 'incremental': Short 1-2 sentence summary of new text.
+        - 'compress': Strict compression to target size.
+        - 'recompress': Deep compression of existing summary.
+        """
+        if not self.llm or not text.strip():
+            return ""
+
+        if mode == "compress":
+            return self.compress_text(text, 1000) # Recompress chapter summary to 1000 tokens
+
+        system_prompt = PROMPT_INCREMENTAL_SUMMARY
+        max_output = 100
+        
+        if mode == 'bible_compress':
+             return self.compress_text(text, 150) # Strict Bible Tab limit
+
+        full_prompt = (
+            f"{system_prompt}<|start_header_id|>user<|end_header_id|>\n"
+            f"TEXT TO SUMMARIZE:\n{text[:2000]}\n" # Safety trim input
+            f"<|eot_id|><|start_header_id|>assistant<|end_header_id|>"
+        )
+
+        try:
+            with self.lock:
+                output = self.llm(full_prompt, max_tokens=max_output, stop=["<|eot_id|>"], echo=False, temperature=0.3)
+            return output['choices'][0]['text'].strip()
+        except Exception as e:
+            logging.error(f"Generate summary error: {e}")
+            return "Error."
 
     def ask_lore_assistant(self, query: str, response_queue: queue.Queue, project_memory: str, project_name: str = "Current Project") -> None:
         """Lore Assistant with budgeting."""

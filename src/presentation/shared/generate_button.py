@@ -9,7 +9,7 @@ class GenerateButton(QPushButton):
     Features subtle hover animations and loading states.
     """
     def __init__(self, parent=None):
-        super().__init__("✨ Generate", parent)
+        super().__init__("✨", parent)
         self.setCursor(Qt.CursorShape.PointingHandCursor)
         self.setFixedWidth(100)
         self.setFixedHeight(28)
@@ -55,5 +55,5 @@ class GenerateButton(QPushButton):
             self.setToolTip("AI is thinking...")
         else:
             self.setEnabled(True)
-            self.setText("✨ Generate")
+            self.setText("✨")
             self.setToolTip("Generate content directly using AI context")

@@ -62,6 +62,18 @@ class DatabaseManager:
                 if 'beats' not in columns:
                     cursor.execute("ALTER TABLE chapters ADD COLUMN beats TEXT")
                     logging.info("Added beats column to chapters table")
+                
+                if 'summary_text' not in columns:
+                    cursor.execute("ALTER TABLE chapters ADD COLUMN summary_text TEXT")
+                    logging.info("Added summary_text column to chapters table")
+
+                if 'recent_chapter_summary' not in columns:
+                    cursor.execute("ALTER TABLE chapters ADD COLUMN recent_chapter_summary TEXT")
+                    logging.info("Added recent_chapter_summary column to chapters table")
+                
+                if 'last_summarized_char_count' not in columns:
+                    cursor.execute("ALTER TABLE chapters ADD COLUMN last_summarized_char_count INTEGER DEFAULT 0")
+                    logging.info("Added last_summarized_char_count column to chapters table")
 
                 # Migration: Add project_id to characters AND fix unique constraint + Add new fields
                 cursor.execute("PRAGMA index_list(characters)")
@@ -163,15 +175,36 @@ class DatabaseManager:
                     CREATE TABLE IF NOT EXISTS story_bible (
                         project_id INTEGER PRIMARY KEY,
                         braindump TEXT,
+                        braindump_summary TEXT,
                         genre TEXT,
+                        genre_summary TEXT,
                         style TEXT,
+                        style_summary TEXT,
                         synopsis TEXT,
+                        synopsis_summary TEXT,
                         characters TEXT,
+                        characters_summary TEXT,
                         worldbuilding TEXT,
+                        worldbuilding_summary TEXT,
                         outline TEXT,
+                        outline_summary TEXT,
                         FOREIGN KEY (project_id) REFERENCES projects (id)
                     )
                 """)
+                
+                # Migration: Add summary columns to story_bible if they don't exist (for existing DBs)
+                cursor.execute("PRAGMA table_info(story_bible)")
+                sb_columns = [row[1] for row in cursor.fetchall()]
+                bible_fields = ['braindump', 'genre', 'style', 'synopsis', 'characters', 'worldbuilding', 'outline']
+                for field in bible_fields:
+                    summary_col = f"{field}_summary"
+                    if summary_col not in sb_columns:
+                        try:
+                            cursor.execute(f"ALTER TABLE story_bible ADD COLUMN {summary_col} TEXT")
+                            logging.info(f"Added {summary_col} to story_bible")
+                        except Exception as e:
+                             logging.error(f"Failed to add {summary_col}: {e}")
+
                 # Create Index for fast loading
                 cursor.execute("CREATE INDEX IF NOT EXISTS idx_story_bible_project_id ON story_bible (project_id)")
                 
@@ -188,7 +221,10 @@ class DatabaseManager:
         Must be safe for rapid debounce-triggered calls.
         Must fail silently.
         """
-        allowed_fields = {'braindump', 'genre', 'style', 'synopsis', 'characters', 'worldbuilding', 'outline'}
+        # Allowed fields now include summaries
+        base_fields = {'braindump', 'genre', 'style', 'synopsis', 'characters', 'worldbuilding', 'outline'}
+        allowed_fields = base_fields.union({f"{f}_summary" for f in base_fields})
+        
         if field_name not in allowed_fields:
             logging.error(f"Invalid Story Bible field: {field_name}")
             return
@@ -217,16 +253,15 @@ class DatabaseManager:
                     data = dict(zip(col_names, row))
                     
                     # Return expected fields, defaulting to empty string
-                    return {
-                        'braindump': data.get('braindump') or "",
-                        'genre': data.get('genre') or "",
-                        'style': data.get('style') or "",
-                        'synopsis': data.get('synopsis') or "",
-                        'characters': data.get('characters') or "",
-                        'worldbuilding': data.get('worldbuilding') or "",
-                        'outline': data.get('outline') or ""
-                    }
-                return {k: "" for k in ['braindump', 'genre', 'style', 'synopsis', 'characters', 'worldbuilding', 'outline']}
+                    # Now includes summaries
+                    result = {}
+                    for k in ['braindump', 'genre', 'style', 'synopsis', 'characters', 'worldbuilding', 'outline']:
+                        result[k] = data.get(k) or ""
+                        result[f"{k}_summary"] = data.get(f"{k}_summary") or ""
+                    return result
+
+                return {k: "" for k in ['braindump', 'genre', 'style', 'synopsis', 'characters', 'worldbuilding', 'outline'] + 
+                        [f"{x}_summary" for x in ['braindump', 'genre', 'style', 'synopsis', 'characters', 'worldbuilding', 'outline']]}
         except sqlite3.Error as e:
             logging.error(f"Get story bible error: {e}")
             return None
@@ -506,6 +541,15 @@ class DatabaseManager:
             logging.error(f"Update chapter error: {e}")
             return False
 
+    def update_chapter_progress(self, chapter_id: int, last_count: int):
+        """Update the last summarized character count."""
+        try:
+            with self.get_connection() as conn:
+                conn.execute("UPDATE chapters SET last_summarized_char_count = ? WHERE id = ?", (last_count, chapter_id))
+                conn.commit()
+        except sqlite3.Error as e:
+            logging.error(f"Update chapter progress error: {e}")
+
     def rename_chapter(self, chapter_id: int, new_title: str):
         """Rename a chapter."""
         try:
@@ -628,6 +672,33 @@ class DatabaseManager:
         except sqlite3.Error as e:
             logging.error(f"Get chapter content error: {e}")
             return ""
+
+    def save_chapter_summary(self, chapter_id: int, summary: str, recent_summary: str = None):
+        try:
+             with self.get_connection() as conn:
+                if recent_summary is not None:
+                    conn.execute("UPDATE chapters SET summary_text = ?, recent_chapter_summary = ? WHERE id = ?", (summary, recent_summary, chapter_id))
+                else:
+                    conn.execute("UPDATE chapters SET summary_text = ? WHERE id = ?", (summary, chapter_id))
+                conn.commit()
+        except sqlite3.Error as e:
+            logging.error(f"Save chapter summary error: {e}")
+
+    def get_chapter_summary(self, chapter_id: int):
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.execute("SELECT summary_text, recent_chapter_summary, last_summarized_char_count FROM chapters WHERE id = ?", (chapter_id,))
+                res = cursor.fetchone()
+                if res:
+                    return {
+                        'summary_text': res[0] if res[0] else "",
+                        'recent_chapter_summary': res[1] if res[1] else "",
+                        'last_summarized_char_count': res[2] if res[2] else 0
+                    }
+                return {'summary_text': "", 'recent_chapter_summary': "", 'last_summarized_char_count': 0}
+        except sqlite3.Error as e:
+            logging.error(f"Get chapter summary error: {e}")
+            return {'summary_text': "", 'recent_chapter_summary': "", 'last_summarized_char_count': 0}
 
     def save_beat(self, project_id: int, chapter_id: int, summary: str):
         try:
