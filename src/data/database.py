@@ -235,10 +235,13 @@ class DatabaseManager:
                 # Ensure record exists
                 cursor.execute("INSERT OR IGNORE INTO story_bible (project_id) VALUES (?)", (project_id,))
                 # Update specific field
+                logging.info(f"DB WRITE: Updating story_bible.{field_name} for project {project_id} ({len(content)} chars)")
                 cursor.execute(f"UPDATE story_bible SET {field_name} = ? WHERE project_id = ?", (content, project_id))
                 conn.commit()
-        except sqlite3.Error:
-            pass # Fail silently as requested
+                logging.info(f"DB WRITE: Successfully committed {field_name} to database")
+                conn.commit()
+        except sqlite3.Error as e:
+            logging.error(f"Failed to save story bible field {field_name}: {e}")
 
     def get_story_bible(self, project_id: int):
         """Fetch all story bible fields for a project."""
@@ -259,12 +262,71 @@ class DatabaseManager:
                         result[k] = data.get(k) or ""
                         result[f"{k}_summary"] = data.get(f"{k}_summary") or ""
                     return result
-
+                
+                # No record found - return empty dict
                 return {k: "" for k in ['braindump', 'genre', 'style', 'synopsis', 'characters', 'worldbuilding', 'outline'] + 
                         [f"{x}_summary" for x in ['braindump', 'genre', 'style', 'synopsis', 'characters', 'worldbuilding', 'outline']]}
         except sqlite3.Error as e:
-            logging.error(f"Get story bible error: {e}")
+            logging.error(f"Error fetching story bible: {e}")
             return None
+
+    def get_bible_field(self, project_id: int, field_name: str) -> str:
+        """Fetch content of a specific bible field."""
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute(f"SELECT {field_name} FROM story_bible WHERE project_id = ?", (project_id,))
+                row = cursor.fetchone()
+                return row[0] if row else None
+        except sqlite3.Error:
+            return None
+
+    def dump_story_bible_contents(self, project_id: int):
+        """DIAGNOSTIC: Log all Story Bible contents for debugging persistence issues."""
+        logging.info("="*80)
+        logging.info(f"DATABASE DUMP: Story Bible for project {project_id}")
+        logging.info("="*80)
+        
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("SELECT * FROM story_bible WHERE project_id = ?", (project_id,))
+                row = cursor.fetchone()
+                
+                if not row:
+                    logging.warning(f"DATABASE DUMP: No Story Bible record found for project {project_id}")
+                    return
+                
+                # Get column names
+                col_names = [description[0] for description in cursor.description]
+                data = dict(zip(col_names, row))
+                
+                # Log each field
+                fields = ['braindump', 'genre', 'style', 'synopsis', 'characters', 'worldbuilding', 'outline']
+                for field in fields:
+                    text = data.get(field, "")
+                    summary = data.get(f"{field}_summary", "")
+                    
+                    logging.info(f"\n--- {field.upper()} ---")
+                    logging.info(f"  Text length: {len(text) if text else 0} chars")
+                    logging.info(f"  Summary length: {len(summary) if summary else 0} chars")
+                    
+                    if text:
+                        preview = text[:200] if len(text) > 200 else text
+                        logging.info(f"  Text preview: {preview}..." if len(text) > 200 else f"  Text: {preview}")
+                    else:
+                        logging.info(f"  Text: [EMPTY]")
+                    
+                    if summary:
+                        preview = summary[:100] if len(summary) > 100 else summary
+                        logging.info(f"  Summary preview: {preview}..." if len(summary) > 100 else f"  Summary: {preview}")
+                    else:
+                        logging.info(f"  Summary: [EMPTY]")
+                
+                logging.info("="*80)
+                
+        except sqlite3.Error as e:
+            logging.error(f"DATABASE DUMP ERROR: {e}")
 
     # --- Project Methods ---
     def create_project(self, name: str, genre: str = ""):

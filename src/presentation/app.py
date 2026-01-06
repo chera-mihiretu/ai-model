@@ -1601,7 +1601,12 @@ class CenterPanel(QWidget):
         text_viewport.setAutoFillBackground(True)  # TRUE to render RGBA
         text_viewport.setStyleSheet(f"background-color: {QtTheme.BG_INPUT};")
         
-        text_input.textChanged.connect(lambda: self._on_bible_field_change(section_key))
+        # Connect save handler with logging
+        def on_text_changed():
+            logging.info(f"TEXT_CHANGED: {section_key} editor content changed")
+            self._on_bible_field_change(section_key)
+        
+        text_input.textChanged.connect(on_text_changed)
         card_layout.addWidget(text_input)
         
         # Store references
@@ -1741,6 +1746,7 @@ class CenterPanel(QWidget):
     def _on_bible_field_change(self, field_name: str):
         """Handle Story Bible field changes."""
         if not self.current_project_id:
+            logging.warning(f"PERSIST: Cannot save {field_name} - no project_id")
             return
         
         # Get field value
@@ -1751,13 +1757,17 @@ class CenterPanel(QWidget):
             if widget_data['widget'] and isinstance(widget_data['widget'], QTextEdit):
                 value = widget_data['widget'].toPlainText()
             else:
+                logging.warning(f"PERSIST: Widget for {field_name} is not QTextEdit")
                 return
         else:
+            logging.warning(f"PERSIST: Unknown field {field_name}")
             return
         
         # Save to database (debounced in real implementation)
         try:
+            logging.info(f"PERSIST: Saving {field_name} to DB (project={self.current_project_id}, length={len(value)} chars)")
             self.db_manager.save_bible_field(self.current_project_id, field_name, value)
+            logging.info(f"PERSIST: Successfully saved {field_name}")
         except Exception as e:
             logging.error(f"Failed to save {field_name}: {e}")
     
@@ -1874,8 +1884,19 @@ class CenterPanel(QWidget):
                     if token == "[[END]]":
                         timer.stop()
                         if gen_btn: gen_btn.set_loading(False)
-                        # TRIGGER PIPELINE: Immediate Summarization
-                        self._trigger_section_summarization(section_key)
+                        
+                        # CRITICAL FIX: Save the generated text to database
+                        widget = widget_data['widget']
+                        generated_text = widget.toPlainText()
+                        logging.info(f"AI_GEN_COMPLETE: Saving {section_key} to DB (length={len(generated_text)} chars)")
+                        self.db_manager.save_bible_field(self.current_project_id, section_key, generated_text)
+                        logging.info(f"AI_GEN_COMPLETE: {section_key} text saved to database")
+                        
+                        # Mark as dirty for summarization
+                        if hasattr(widget, 'is_globally_dirty'):
+                            widget.is_globally_dirty = True
+                            widget.check_dirty_and_trigger(force=True)
+                        
                         return
                     
                     # Insert token into widget
@@ -1919,7 +1940,11 @@ class CenterPanel(QWidget):
             return
 
         # GENERATION LOCK: Prevent summaries while AI is generating or if duplicate
-        if self.is_generating:
+        is_generating = False
+        if self.parent() and hasattr(self.parent(), 'is_generating'):
+             is_generating = self.parent().is_generating
+        
+        if is_generating:
             # If main AI is running, we skip. 
             # The dirty flag remains set in SmartEditor, so it will retry later 
             # (e.g. on next focus loss or debounce).
@@ -2008,7 +2033,15 @@ class CenterPanel(QWidget):
         
         logging.info(f"SmartSummary: Processing Section {section_key}...")
         
+        # Capture ID safely for thread
+        project_id = self.current_project_id
+        if not project_id:
+            logging.error(f"SmartSummary: Aborting {section_key} (No Project ID)")
+            callback()
+            return
+
         def run_summary():
+             # ... (existing code, using project_id instead of self.current_project_id)
             try:
                 # 1. Decide Mode
                 token_count = self.ai_engine.count_tokens(full_text)
@@ -2019,9 +2052,24 @@ class CenterPanel(QWidget):
                 summary = self.ai_engine.generate_summary(full_text, mode=mode)
                 
                 if summary and "Error" not in summary:
-                    self.db_manager.save_bible_field(self.current_project_id, f"{section_key}_summary", summary)
-                    self.db_manager.save_bible_field(self.current_project_id, section_key, full_text)
+                    # STEP 1: ALWAYS save raw text FIRST (source of truth)
+                    logging.info(f"SmartSummary: Saving RAW TEXT for {section_key} ({len(full_text)} chars)")
+                    self.db_manager.save_bible_field(project_id, section_key, full_text)
+                    
+                    # STEP 2: Then save summary
+                    logging.info(f"SmartSummary: Saving SUMMARY for {section_key} ({len(summary)} chars)")
+                    self.db_manager.save_bible_field(project_id, f"{section_key}_summary", summary)
+                    
+                    # STEP 3: Verify both were saved
+                    verify_text = self.db_manager.get_bible_field(project_id, section_key)
+                    verify_summary = self.db_manager.get_bible_field(project_id, f"{section_key}_summary")
+                    
+                    if not verify_text or len(verify_text) == 0:
+                        logging.error(f"FATAL: Raw text for {section_key} is EMPTY after save! This should never happen!")
+                    
+                    logging.info(f"SmartSummary: ✅ VERIFIED - {section_key} text: {len(verify_text) if verify_text else 0} chars, summary: {len(verify_summary) if verify_summary else 0} chars")
                     logging.info(f"SmartSummary: Success for {section_key}")
+                    logging.info(f"SmartSummary: Saved summary: {summary[:200]}..." if len(summary) > 200 else f"SmartSummary: Saved summary: {summary}")
                     callback()
                 else:
                     logging.error(f"SmartSummary Failed for {section_key}")
@@ -2077,18 +2125,60 @@ class CenterPanel(QWidget):
         # Load Story Bible data if container exists
         if self.story_bible_container:
             try:
+                logging.info(f"Loading Story Bible for project {project_id}...")
                 bible_data = self.db_manager.get_story_bible(project_id)
+                logging.info(f"Story Bible data retrieved: {list(bible_data.keys()) if bible_data else 'None'}")
                 if bible_data:
                     for field in ["braindump", "genre", "synopsis", "worldbuilding", "outline"]:
-                        if field in bible_data and bible_data[field]:
-                            if field in self.bible_section_widgets:
-                                widget_data = self.bible_section_widgets[field]
-                                if isinstance(widget_data['widget'], QTextEdit):
-                                    widget_data['widget'].setPlainText(bible_data[field])
+                        field_data = bible_data.get(field, "")
+                        logging.info(f"LOAD: Field '{field}': {len(field_data) if field_data else 0} characters in DB")
+                        
+                        # Check if widget exists
+                        if field not in self.bible_section_widgets:
+                            logging.warning(f"LOAD: No widget found for field '{field}' - skipping")
+                            continue
+                        
+                        widget_data = self.bible_section_widgets[field]
+                        widget = widget_data.get('widget')
+                        
+                        if not widget:
+                            logging.warning(f"LOAD: Widget for '{field}' is None - skipping")
+                            continue
+                        
+                        if not isinstance(widget, QTextEdit):
+                            logging.warning(f"LOAD: Widget for '{field}' is not QTextEdit (type: {type(widget).__name__}) - skipping")
+                            continue
+                        
+                        # Load the text regardless of whether it's empty or not (to clear old data)
+                        logging.info(f"LOAD: Loading '{field}' text into widget...")
+                        widget.blockSignals(True)
+                        widget.setPlainText(field_data if field_data else "")
+                        widget.blockSignals(False)
+                        logging.info(f"LOAD: Successfully loaded {len(field_data) if field_data else 0} chars into '{field}' widget")
                     
                     # Load style
                     if 'style' in bible_data and bible_data['style']:
                         self._select_style(bible_data['style'])
+                    
+                    # STARTUP SUMMARY CHECK: Generate summaries for tabs that don't have them
+                    # This happens AFTER text is loaded and signals are unblocked
+                    for field in ["braindump", "genre", "synopsis", "worldbuilding", "outline"]:
+                        if field in self.bible_section_widgets:
+                            # Check if we have text but no summary
+                            has_text = bible_data.get(field, "").strip()
+                            has_summary = bible_data.get(f"{field}_summary", "").strip()
+                            
+                            if has_text and not has_summary:
+                                logging.info(f"Startup: Missing summary for {field}, will generate on first focus loss")
+                                # Mark as dirty so it will summarize on first focus loss/debounce
+                                widget_data = self.bible_section_widgets[field]
+                                if hasattr(widget_data['widget'], 'is_globally_dirty'):
+                                    widget_data['widget'].is_globally_dirty = True
+                            elif has_summary:
+                                logging.info(f"Startup: Summary exists for {field}, using cached version")
+                    
+                    # DIAGNOSTIC: Dump entire database contents for verification
+                    self.db_manager.dump_story_bible_contents(project_id)
             except Exception as e:
                 logging.error(f"Failed to load story bible: {e}")
         
@@ -2109,7 +2199,11 @@ class CenterPanel(QWidget):
                         break
                 
                 self.document_title.setText(title)
+                
+                # Block signals for editor load too
+                self.editor_textbox.blockSignals(True)
                 self.editor_textbox.setPlainText(content if content else "")
+                self.editor_textbox.blockSignals(False)
             except Exception as e:
                 logging.error(f"Failed to load chapter: {e}")
     
@@ -4202,17 +4296,37 @@ class StoryBibleApp(QMainWindow):
         self._show_dashboard()
     
     def closeEvent(self, event):
-        """Handle window close event."""
+        """Handle window close event - FORCE SAVE ALL DATA."""
+        logging.info("PERSIST: Application closing - forcing save of all content")
+        
+        # Save Writing Canvas content
         if self.current_chapter_id:
             text = self.center_panel.get_editor_content()
+            logging.info(f"PERSIST: Saving Writing Canvas (chapter={self.current_chapter_id}, length={len(text)} chars)")
             self.db_manager.update_chapter_content(self.current_chapter_id, text)
+            logging.info(f"PERSIST: Writing Canvas saved")
         
+        # CRITICAL: Force save all Story Bible tabs
+        if self.current_project_id and hasattr(self.center_panel, 'bible_section_widgets'):
+            logging.info(f"PERSIST: Force-saving all Story Bible tabs for project {self.current_project_id}")
+            for field_name, widget_data in self.center_panel.bible_section_widgets.items():
+                if widget_data and widget_data.get('widget'):
+                    widget = widget_data['widget']
+                    if isinstance(widget, QTextEdit):
+                        text = widget.toPlainText()
+                        logging.info(f"PERSIST: Saving {field_name} (length={len(text)} chars)")
+                        self.db_manager.save_bible_field(self.current_project_id, field_name, text)
+                        logging.info(f"PERSIST: {field_name} saved")
+        
+        # Save session state
         if self.current_project_id:
             self.db_manager.save_app_state("last_project_id", self.current_project_id)
         if self.current_chapter_id:
             self.db_manager.save_app_state("last_chapter_id", self.current_chapter_id)
         
+        # Cleanup
         if hasattr(self.ai_engine, "unload_model"):
             self.ai_engine.unload_model()
         
+        logging.info("PERSIST: All data saved, closing application")
         event.accept()
