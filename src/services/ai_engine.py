@@ -11,7 +11,7 @@ except ImportError:
 
 from ..config.manager import ConfigManager
 
-MIMIC_SYSTEM_PROMPT = """<|begin_of_text|><|start_header_id|>system<|end_header_id|>
+MIMIC_SYSTEM_PROMPT = """<|start_header_id|>system<|end_header_id|>
 You are now roleplaying as {name}.
 RELATIONSHIP TO AUTHOR: {relationship}
 TRAITS: {traits}
@@ -19,7 +19,7 @@ SPEECH STYLE: {speech}
 Respond to the user as THIS character would. Never break character.
 <|eot_id|>"""
 
-PROSE_SYSTEM_PROMPT = """<|begin_of_text|><|start_header_id|>system<|end_header_id|>
+PROSE_SYSTEM_PROMPT = """<|start_header_id|>system<|end_header_id|>
 You are the Story Bible Continuity Engine. 
 Your identity is that of a professional co-author and lore expert.
 RULES:
@@ -29,37 +29,37 @@ RULES:
 4. Always maintain a literary, narrative tone.
 <|eot_id|>"""
 
-PROMPT_DESCRIBE_SIGHT = """<|begin_of_text|><|start_header_id|>system<|end_header_id|>
+PROMPT_DESCRIBE_SIGHT = """<|start_header_id|>system<|end_header_id|>
 Describe the following object or scene focusing ONLY on VISUAL details.
 Focus on light, color, shadow, texture, and geometry.
 Be vivid and poetic. Do not include other senses or plot action.
 <|eot_id|>"""
 
-PROMPT_DESCRIBE_SMELL = """<|begin_of_text|><|start_header_id|>system<|end_header_id|>
+PROMPT_DESCRIBE_SMELL = """<|start_header_id|>system<|end_header_id|>
 Describe the following object or scene focusing ONLY on OLFACTORY details.
 Focus on scents, aromas, musk, dampness, and air quality.
 Be visceral. Do not include visual descriptions.
 <|eot_id|>"""
 
-PROMPT_REWRITE_DRAMATIC = """<|begin_of_text|><|start_header_id|>system<|end_header_id|>
+PROMPT_REWRITE_DRAMATIC = """<|start_header_id|>system<|end_header_id|>
 Rewrite the following text to be more DRAMATIC and HIGH STAKES.
 Enhance emotional resonance, tension, and pacing.
 Make it feel cinematic.
 <|eot_id|>"""
 
-PROMPT_SENSORY_LAB = """<|begin_of_text|><|start_header_id|>system<|end_header_id|>
+PROMPT_SENSORY_LAB = """<|start_header_id|>system<|end_header_id|>
 You are a Sensory Lab Assistant.
 Given a setting, provide 5 distinct, atmospheric details relative to that setting.
 Format as a bulleted list.
 <|eot_id|>"""
 
-PROMPT_EXPAND_SCENE = """<|begin_of_text|><|start_header_id|>system<|end_header_id|>
+PROMPT_EXPAND_SCENE = """<|start_header_id|>system<|end_header_id|>
 You are a Co-Author. Continue the scene naturally from the provided text.
 Maintain the current tone, style, and character voices.
 Focus on action and dialogue.
 <|eot_id|>"""
 
-PROMPT_DESCRIBE_MASTER = """<|begin_of_text|><|start_header_id|>system<|end_header_id|>
+PROMPT_DESCRIBE_MASTER = """<|start_header_id|>system<|end_header_id|>
 You are a sensory-focused prose editor.
 INPUT: A selected snippet of text and a specific sense: {sense}.
 CONTEXT: 
@@ -75,7 +75,7 @@ STYLING RULES:
 - Output format: separated by "---"
 <|eot_id|>"""
 
-PROMPT_REWRITE_MASTER = """<|begin_of_text|><|start_header_id|>system<|end_header_id|>
+PROMPT_REWRITE_MASTER = """<|start_header_id|>system<|end_header_id|>
 Rewrite the following text applying this style: {style}.
 CONTEXT:
 - Genre: {genre}
@@ -84,7 +84,7 @@ GOAL: Provide 3 variations of the rewrite.
 Output format: separated by "---"
 <|eot_id|>"""
 
-PROMPT_WRITER_GODMODE = """<|begin_of_text|><|start_header_id|>system<|end_header_id|>
+PROMPT_WRITER_GODMODE = """<|start_header_id|>system<|end_header_id|>
 You are a professional novelist co-writing a {genre} book.
 
 BIBLE DATA (Character Details):
@@ -153,7 +153,7 @@ TASK: Suggest 5-7 beats for the NEXT chapter that:
 - Format as clean numbered list
 <|eot_id|>"""
 
-PROMPT_COMPRESS = """<|begin_of_text|><|start_header_id|>system<|end_header_id|>
+PROMPT_COMPRESS = """<|start_header_id|>system<|end_header_id|>
 You are a Context Compressor.
 Your task is to compress the provided text to strictly fit within {max_tokens} tokens.
 Preserve:
@@ -168,14 +168,14 @@ Discard:
 STRICT OUTPUT FORMAT: Output ONLY the compressed summary.
 <|eot_id|>"""
 
-PROMPT_INCREMENTAL_SUMMARY = """<|begin_of_text|><|start_header_id|>system<|end_header_id|>
+PROMPT_INCREMENTAL_SUMMARY = """<|start_header_id|>system<|end_header_id|>
 You are a Narrative Summarizer.
 Summarize the following new text chunk in 1-2 sentences.
 Focus on: Action, Key Dialogue, and State Changes.
 Output ONLY the summary.
 <|eot_id|>"""
 
-PROMPT_SUMMARIZE_CONTEXT = """<|begin_of_text|><|start_header_id|>system<|end_header_id|>
+PROMPT_SUMMARIZE_CONTEXT = """<|start_header_id|>system<|end_header_id|>
 You are a Context Compressor.
 Your task is to summarize the following text to fit within {char_limit} characters while preserving key facts, names, specific terminology, and relationships.
 STRICT RULES:
@@ -228,9 +228,9 @@ class AIEngine:
         if not self.llm or not text:
             return 0
         try:
-            # We use add_bos=False because our prompt templates already include 
-            # the <|begin_of_text|> tag. This prevents off-by-one errors.
-            tokens = self.llm.tokenize(text.encode("utf-8"), add_bos=False)
+            # We use add_bos=True to account for the implicit BOS token 
+            # now that we stripped it from templates. This prevents off-by-one errors.
+            tokens = self.llm.tokenize(text.encode("utf-8"), add_bos=True)
             return len(tokens)
         except Exception as e:
             logging.error(f"Token counting failed: {e}")
