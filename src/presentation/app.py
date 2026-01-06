@@ -31,7 +31,7 @@ from .character.character_widget import CharacterWidget
 from .shared import (
     IOSSwitch, ToggleSettingsPopup, TransparentScrollArea, 
     ToolbarSplitButton, DescribeSettingsPopup, DescribeSplitButton,
-    GenerateButton, AutoExpandingTextEdit
+    GenerateButton, AutoExpandingTextEdit, SmartEditor
 )
 from ..services.prompts import get_bible_prompt
 
@@ -1153,6 +1153,9 @@ class CenterPanel(QWidget):
         # Comment Tooltip
         self.comment_tooltip = CommentTooltip(self)
         
+        # Generation Lock
+        self._active_summaries = set()
+        
         # TRANSPARENT WITH BLACK OVERLAY for readability
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
         self.setAutoFillBackground(False)  # Keep False, paint manually
@@ -1246,7 +1249,13 @@ class CenterPanel(QWidget):
         self.content_layout.addWidget(toolbar_widget)
         
         # Editor textbox (BLACK OVERLAY for readability - text + cursor visible)
-        self.editor_textbox = QTextEdit()
+        # Using SmartEditor for incremental summarization
+        self.editor_textbox = SmartEditor()
+        # Connect Smart Signal
+        self.editor_textbox.summary_triggered.connect(
+            lambda text, cb: self._handle_smart_summary(text, 'chapter', cb)
+        )
+        
         self.editor_textbox.setFont(QtTheme.get_font_prose())
         self.editor_textbox.setFixedHeight(800)
         
@@ -1564,6 +1573,11 @@ class CenterPanel(QWidget):
         # Text input (Auto-expanding card)
         text_input = AutoExpandingTextEdit()
         text_input.setPlaceholderText(placeholder)
+        
+        # Connect Smart Signal (Incremental Summarization)
+        text_input.summary_triggered.connect(
+            lambda text, cb: self._handle_smart_summary(text, section_key, cb)
+        )
         
         # TRANSPARENT WITH BLACK OVERLAY
         text_input.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
@@ -1890,100 +1904,151 @@ class CenterPanel(QWidget):
         # Start AI thread
         threading.Thread(target=stream_thread, daemon=True).start()
 
-    def _trigger_section_summarization(self, section_key: str):
-        """Pipeline Step 2: Immediate Summarization for Story Bible (With Strict Token Budgeting)."""
-        import threading
-        
-        widget_data = self.bible_section_widgets.get(section_key)
-        if not widget_data: return
-        
-        # GUARDRAIL: Only summarize if text is actually present
-        full_text = widget_data['widget'].toPlainText()
-        if not full_text.strip(): return
-        
-        # Check if we should recompress (Threshold > 250 tokens ~ 1000 chars)
-        current_len = len(full_text)
-        # We don't track offset for bible tabs yet as strictly as chapters, 
-        # but we can check if it's "too long" for a single summary
-        
-        logging.info(f"Pipeline: Starting background summarization for {section_key}...")
-        
-        def run_summary():
-            # 1. Generate Summary (Incremental or Compress mode?)
-            # For Bible tabs, we treat the whole text as "the truth".
-            # If it's huge, we compress. If small, we summarize.
-            token_count = self.ai_engine.count_tokens(full_text)
-            
-            mode = 'incremental'
-            if token_count > 200:
-                mode = 'bible_compress'
-                
-            summary = self.ai_engine.generate_summary(full_text, mode=mode)
-            
-            if summary and "Error" not in summary:
-                # Store Summary Version
-                self.db_manager.save_bible_field(self.current_project_id, f"{section_key}_summary", summary)
-                # Ensure Full Version is also saved
-                self.db_manager.save_bible_field(self.current_project_id, section_key, full_text)
-                logging.info(f"Pipeline: Summarization complete for {section_key} (Mode: {mode})")
-            else:
-                logging.error(f"Pipeline: Summary generation failed for {section_key}")
-                
-        threading.Thread(target=run_summary, daemon=True).start()
-
-    def _trigger_chapter_summarization(self):
+    def _handle_smart_summary(self, text: str, source_key: str, callback: callable):
         """
-        Pipeline Step 2: Immediate Summarization for Writing Canvas.
-        STRICT GUARDRAILS: Only runs on NEW raw text.
+        Unified handler for incremental summarization from SmartEditors.
+        
+        Args:
+            text: The full text content of the editor at time of trigger.
+            source_key: 'chapter' or a bible tab key (e.g. 'characters').
+            callback: Function to call on success (clears dirty flags).
         """
-        if not self.current_chapter_id: 
+        if not text.strip():
+            # If empty, just clear flags
+            callback() 
             return
+
+        # GENERATION LOCK: Prevent summaries while AI is generating or if duplicate
+        if self.is_generating:
+            # If main AI is running, we skip. 
+            # The dirty flag remains set in SmartEditor, so it will retry later 
+            # (e.g. on next focus loss or debounce).
+            logging.info(f"SmartSummary: Skipping {source_key} (Main AI Generating)")
+            return
+
+        if source_key in self._active_summaries:
+            logging.info(f"SmartSummary: Skipping {source_key} (Already Active)")
+            return
+
+        # Lock
+        self._active_summaries.add(source_key)
+
+        # Distinguish source
+        if source_key == 'chapter':
+            self._process_chapter_summary(text, callback)
+        else:
+            self._process_section_summary(text, source_key, callback)
+
+    def _process_chapter_summary(self, full_text: str, callback: callable):
+        """Logic from old _trigger_chapter_summarization, now event-driven."""
+        if not self.current_chapter_id: 
+            return # Keep dirty? No, likely just transient state.
             
-        full_text = self.editor_textbox.toPlainText()
-        if not full_text: return
+        chapter_id = self.current_chapter_id
         
-        # GUARDRAIL: Check if we actually have new text since last summary
+        # GUARDRAIL: Check new text count
         current_len = len(full_text)
-        chapter_data = self.db_manager.get_chapter_summary(self.current_chapter_id)
+        chapter_data = self.db_manager.get_chapter_summary(chapter_id)
         last_count = chapter_data.get('last_summarized_char_count', 0)
         
         new_char_count = current_len - last_count
         
-        if new_char_count < 50: # Minimum threshold to bother suggesting a summary update
+        if new_char_count < 50:
+             # Not enough new text to bother AI, but we should clear dirty flag 
+             # because we essentially "checked" it and decided it's fine.
+             callback()
              return
-             
-        # We have meaningful new text.
+
+        # Prepare payload
         new_text_chunk = full_text[last_count:]
-        chapter_id = self.current_chapter_id
+        recent_chunk = full_text[-1000:]
         
-        logging.info(f"Pipeline: Triggering Chapter Summarization (New Chars: {new_char_count})...")
+        logging.info(f"SmartSummary: Processing Chapter (New Chars: {new_char_count})...")
         
         def run_summary():
-            # 1. Generate Incremental Summary of NEW Text
-            incremental_summary = self.ai_engine.generate_summary(new_text_chunk, mode='incremental')
-            
-            # 2. Generate Recent Context Summary (Refresh Short Term Memory)
-            # We use the LAST 1000 chars roughly for this
-            recent_chunk = full_text[-1000:]
-            recent_summary = self.ai_engine.generate_summary(recent_chunk, mode='incremental')
-            
-            current_summary = chapter_data.get('summary_text', "")
-            updated_summary = (current_summary + " " + incremental_summary).strip()
-            
-            # 3. Check Token Threshold for Long Term Memory
-            summary_tokens = self.ai_engine.count_tokens(updated_summary)
-            if summary_tokens > 1600:
-                logging.info(f"Pipeline: Recompressing Chapter Summary (Tokens: {summary_tokens})...")
-                updated_summary = self.ai_engine.generate_summary(updated_summary, mode='compress')
-            
-            # 4. Save Everything
-            self.db_manager.save_chapter_summary(chapter_id, updated_summary, recent_summary)
-            # Update offset to current length so we don't re-summarize this chunk
-            self.db_manager.update_chapter_progress(chapter_id, current_len)
-            
-            logging.info(f"Pipeline: Chapter summarization complete (ID: {chapter_id})")
+            try:
+                # 1. Incremental Summary
+                incremental_summary = self.ai_engine.generate_summary(new_text_chunk, mode='incremental')
                 
+                # 2. Recent Context
+                recent_summary = self.ai_engine.generate_summary(recent_chunk, mode='incremental')
+                
+                current_summary = chapter_data.get('summary_text', "")
+                updated_summary = (current_summary + " " + incremental_summary).strip()
+                
+                # 3. Recompression Check
+                summary_tokens = self.ai_engine.count_tokens(updated_summary)
+                if summary_tokens > 1600:
+                    logging.info(f"SmartSummary: Recompressing Chapter (Tokens: {summary_tokens})...")
+                    updated_summary = self.ai_engine.generate_summary(updated_summary, mode='compress')
+                
+                # 4. Save
+                self.db_manager.save_chapter_summary(chapter_id, updated_summary, recent_summary)
+                self.db_manager.update_chapter_progress(chapter_id, current_len)
+                
+                logging.info(f"SmartSummary: Success for Chapter {chapter_id}")
+                
+                # CRITICAL: Signal success to UI thread to join callback
+                # Since we are in a thread, we should interact with UI safely.
+                # But the callback is just setting a boolean flag on the widget object, 
+                # which is generally safe in Python due to GIL, but strictly we should invoke.
+                # For simplicity in this architecture, we call it directly.
+                callback()
+                
+            except Exception as e:
+                logging.error(f"SmartSummary Error (Chapter): {e}")
+                # DO NOT CALL CALLBACK -> Dirty flag remains -> will retry next time.
+            finally:
+                self._active_summaries.discard('chapter')
+
         threading.Thread(target=run_summary, daemon=True).start()
+
+    def _process_section_summary(self, full_text: str, section_key: str, callback: callable):
+        """Logic from old _trigger_section_summarization, now event-driven."""
+        
+        logging.info(f"SmartSummary: Processing Section {section_key}...")
+        
+        def run_summary():
+            try:
+                # 1. Decide Mode
+                token_count = self.ai_engine.count_tokens(full_text)
+                mode = 'incremental'
+                if token_count > 200:
+                    mode = 'bible_compress'
+                    
+                summary = self.ai_engine.generate_summary(full_text, mode=mode)
+                
+                if summary and "Error" not in summary:
+                    self.db_manager.save_bible_field(self.current_project_id, f"{section_key}_summary", summary)
+                    self.db_manager.save_bible_field(self.current_project_id, section_key, full_text)
+                    logging.info(f"SmartSummary: Success for {section_key}")
+                    callback()
+                else:
+                    logging.error(f"SmartSummary Failed for {section_key}")
+                    
+            except Exception as e:
+                logging.error(f"SmartSummary Error ({section_key}): {e}")
+            finally:
+                self._active_summaries.discard(section_key)
+
+        threading.Thread(target=run_summary, daemon=True).start()
+
+    # KEEPING OLD METHODS AS DEPRECATED OR RE-ROUTING IF NEEDED?
+    # Actually, we should replace them or ensure they aren't called duplicatively.
+    # The old triggers were: _trigger_section_summarization and _trigger_chapter_summarization.
+    # We can delete them if we are sure no one else calls them.
+    # Checks: _auto_save called _trigger_chapter_summarization.
+    # _check_queue called it too.
+    # We need to update those call sites or redirect.
+
+    def _trigger_section_summarization(self, section_key: str):
+        """DEPRECATED: Use SmartEditor eventing."""
+        pass 
+
+    def _trigger_chapter_summarization(self):
+        """DEPRECATED: Use SmartEditor eventing."""
+        pass
+
     
     def destroy_story_bible_container(self):
         """Remove Story Bible from center panel."""
@@ -3706,7 +3771,12 @@ class StoryBibleApp(QMainWindow):
                     elif self.target_panel == 'editor':
                         # TRIGGER PIPELINE: Immediate Summarization for Canvas
                         # Force check (since we just generated text)
-                        self.center_panel._trigger_chapter_summarization()
+                        # We notify SmartEditor that AI finished so it can start debounce
+                        if hasattr(self.center_panel.editor_textbox, 'handle_ai_completion'):
+                            self.center_panel.editor_textbox.handle_ai_completion()
+                        else:
+                             # Fallback if for some reason it's not smart
+                            pass
                     
                 else:
                     if self.target_panel == 'editor':
@@ -3729,8 +3799,8 @@ class StoryBibleApp(QMainWindow):
         if self.current_chapter_id:
             text = self.center_panel.get_editor_content()
             self.db_manager.update_chapter_content(self.current_chapter_id, text)
-            # Ensure summary is up to date for manual edits too
-            self.center_panel._trigger_chapter_summarization()
+            # No need to manually trigger summarization; 
+            # SmartEditor handles it on focus loss/debounce.
     
     # ========================================================================
     # HELPER METHODS

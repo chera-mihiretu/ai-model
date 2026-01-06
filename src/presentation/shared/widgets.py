@@ -7,11 +7,12 @@ from PyQt6.QtWidgets import (
     QPushButton, QFrame, QScrollArea, QAbstractButton, QGraphicsDropShadowEffect,
     QTextEdit
 )
-from PyQt6.QtCore import (
-    Qt, pyqtSignal, QPoint, QRectF, QPropertyAnimation, QEasingCurve, pyqtProperty
-)
+
 from PyQt6.QtGui import (
-    QPainter, QColor, QPainterPath
+    QPainter, QColor, QPainterPath, QTextBlockUserData
+)
+from PyQt6.QtCore import (
+    Qt, pyqtSignal, QPoint, QRectF, QPropertyAnimation, QEasingCurve, pyqtProperty, QTimer
 )
 from ..theme import QtTheme
 
@@ -426,13 +427,104 @@ class TransparentScrollArea(QScrollArea):
         viewport.setStyleSheet("background-color: transparent;")
 
 
-class AutoExpandingTextEdit(QTextEdit):
+class SmartEditor(QTextEdit):
+    """
+    Enhanced QTextEdit with dirty tracking and incremental summarization triggers.
+    - Tracks 'dirty' state per block (paragraph).
+    - Triggers summary on FocusOut or Debounce Timeout.
+    - Emits 'summary_triggered(new_text, callback)'.
+    """
+    summary_triggered = pyqtSignal(str, object)  # text, callback_function
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.is_globally_dirty = False
+        self._dirty_blocks = set() # Set of block numbers (int)
+        
+        # Debounce Timer (2 seconds)
+        self.debounce_timer = QTimer(self)
+        self.debounce_timer.setInterval(2000)
+        self.debounce_timer.setSingleShot(True)
+        self.debounce_timer.timeout.connect(self._on_debounce_timeout)
+        
+        self.document().contentsChange.connect(self._on_contents_change)
+
+    def _on_contents_change(self, position, charsRemoved, charsAdded):
+        """Mark changed blocks as dirty."""
+        self.is_globally_dirty = True
+        
+        # Identify affected block(s)
+        cursor = self.textCursor()
+        cursor.setPosition(position)
+        block = cursor.block()
+        
+        # Minimal dirty tracking: just mark the block containing the change
+        # In a real rigorous implementation, we'd track ranges, but block-level is good for prose.
+        self._dirty_blocks.add(block.blockNumber())
+        
+        # Reset debounce
+        self.debounce_timer.start()
+
+    def focusOutEvent(self, event):
+        """Trigger summary on focus loss."""
+        super().focusOutEvent(event)
+        if self.is_globally_dirty:
+            self.check_dirty_and_trigger()
+
+    def _on_debounce_timeout(self):
+        """Trigger summary after pause."""
+        if self.is_globally_dirty:
+            self.check_dirty_and_trigger()
+
+    def check_dirty_and_trigger(self, force=False):
+        """Consolidates dirty text and emits signal."""
+        if not self.is_globally_dirty and not force:
+            return
+
+        # Gather dirty text
+        # Simplification: For now, we send the *whole* new text 
+        # that corresponds to the dirty edits. 
+        # Optimization: We could instruct the App to only summarize the specific dirty blocks.
+        # But for the current pipeline (which generates incremental summaries from NEW text), 
+        # we need to decide what to send.
+        
+        # The App's pipeline expects "New Raw Text" to be identified by diffing length?
+        # OR we can send the full text and let the pipeline decide based on last_summarized_char_count.
+        # Given the "Strict Guardrails" in app.py, it uses `last_summarized_char_count`.
+        # So providing the FULL current text is correct, and the pipeline will slice it.
+        
+        full_text = self.toPlainText()
+        
+        # Callback to clear dirty state if summary succeeds
+        def on_success():
+            self.is_globally_dirty = False
+            self._dirty_blocks.clear()
+            
+        self.summary_triggered.emit(full_text, on_success)
+
+    def handle_ai_completion(self):
+        """
+        Called when AI finishes generating text into this editor.
+        Immediate trigger or force debounce start.
+        """
+        self.is_globally_dirty = True
+        # For AI text, we might want to summarize sooner?
+        # Or just let the debounce handle it.
+        # Let's force a check immediately to keep UI in sync?
+        # User feedback suggested: "Consider automatically marking AI... and trigger immediate"
+        self.debounce_timer.start(500) # Short debounce for AI completion
+
+
+class AutoExpandingTextEdit(SmartEditor):
     """
     QTextEdit that grows vertically to fit its content.
     Prevents internal scrollbars and forces parent containers to expand.
+    Inherits SmartEditor capabilities.
     """
     def __init__(self, placeholder="", parent=None):
-        super().__init__(parent)
+        super().__init__(parent) # Initialize SmartEditor
+        self.setParent(parent) # Ensure parent is set if passed down
+
         self.setPlaceholderText(placeholder)
         
         # Disable internal scrollbars
