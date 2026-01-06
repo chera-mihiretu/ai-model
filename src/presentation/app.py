@@ -1153,6 +1153,9 @@ class CenterPanel(QWidget):
         # Comment Tooltip
         self.comment_tooltip = CommentTooltip(self)
         
+        # Generation Lock
+        self._active_summaries = set()
+        
         # TRANSPARENT WITH BLACK OVERLAY for readability
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
         self.setAutoFillBackground(False)  # Keep False, paint manually
@@ -1915,6 +1918,21 @@ class CenterPanel(QWidget):
             callback() 
             return
 
+        # GENERATION LOCK: Prevent summaries while AI is generating or if duplicate
+        if self.is_generating:
+            # If main AI is running, we skip. 
+            # The dirty flag remains set in SmartEditor, so it will retry later 
+            # (e.g. on next focus loss or debounce).
+            logging.info(f"SmartSummary: Skipping {source_key} (Main AI Generating)")
+            return
+
+        if source_key in self._active_summaries:
+            logging.info(f"SmartSummary: Skipping {source_key} (Already Active)")
+            return
+
+        # Lock
+        self._active_summaries.add(source_key)
+
         # Distinguish source
         if source_key == 'chapter':
             self._process_chapter_summary(text, callback)
@@ -1980,6 +1998,8 @@ class CenterPanel(QWidget):
             except Exception as e:
                 logging.error(f"SmartSummary Error (Chapter): {e}")
                 # DO NOT CALL CALLBACK -> Dirty flag remains -> will retry next time.
+            finally:
+                self._active_summaries.discard('chapter')
 
         threading.Thread(target=run_summary, daemon=True).start()
 
@@ -2008,6 +2028,8 @@ class CenterPanel(QWidget):
                     
             except Exception as e:
                 logging.error(f"SmartSummary Error ({section_key}): {e}")
+            finally:
+                self._active_summaries.discard(section_key)
 
         threading.Thread(target=run_summary, daemon=True).start()
 
