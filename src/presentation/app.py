@@ -1771,16 +1771,33 @@ class CenterPanel(QWidget):
             
         # Gather Context
         title = self.document_title.text()
-        canvas_content = self.editor_textbox.toPlainText()
         
-        # Other Bible sections
+        # Canvas Content -> Use Summary if available (Context System)
+        canvas_content = ""
+        if self.current_chapter_id:
+             canvas_summary = self.db_manager.get_chapter_summary(self.current_chapter_id)
+             if canvas_summary:
+                 canvas_content = canvas_summary
+             else:
+                 canvas_content = self.editor_textbox.toPlainText() # Fallback
+        
+        # Other Bible sections -> Use Summaries (Context System)
         context_parts = []
-        for key, data in self.bible_section_widgets.items():
-            if key != section_key and key != 'characters' and key != 'style':
-                if data['widget'] and isinstance(data['widget'], QTextEdit):
-                    text = data['widget'].toPlainText()
-                    if text.strip():
-                        context_parts.append(f"[{key.upper()}]:\n{text}")
+        
+        # Fetch clean from DB to ensure we get summaries
+        bible_data = self.db_manager.get_story_bible(self.current_project_id)
+        
+        section_mapping = ['braindump', 'genre', 'style', 'synopsis', 'worldbuilding', 'outline']
+        for key in section_mapping:
+            if key != section_key:
+                # Prefer summary, fallback to full
+                summary = bible_data.get(f"{key}_summary")
+                full = bible_data.get(key)
+                text = summary if summary else full
+                
+                if text and text.strip():
+                    context_parts.append(f"[{key.upper()}]:\n{text}")
+                    
         bible_context = "\n\n".join(context_parts)
         
         # Characters - Gather from DB
@@ -1798,10 +1815,8 @@ class CenterPanel(QWidget):
         
         # Genre (from section or DB)
         genre = "General Fiction"
-        if 'genre' in self.bible_section_widgets:
-            genre_widget = self.bible_section_widgets['genre']['widget']
-            if genre_widget:
-                genre = genre_widget.toPlainText().strip() or "General Fiction"
+        if bible_data.get('genre'):
+            genre = bible_data.get('genre')
 
         # Construct Prompt
         prompt = get_bible_prompt(
@@ -1822,8 +1837,17 @@ class CenterPanel(QWidget):
         resp_queue = Queue()
         first_token = True
         
+        # Capture raw text for context assembly during generation
+        rag_context = {}
+        if self.current_chapter_id:
+             # Need to get robust context
+             chap_data = self.db_manager.get_chapter_summary(self.current_chapter_id)
+             rag_context['prev_summary'] = chap_data.get('summary_text', '')
+             rag_context['recent_summary'] = chap_data.get('recent_chapter_summary', '')
+             
         def stream_thread():
-            self.ai_engine.generate_stream(prompt, resp_queue)
+            # Pass correct summaries
+            self.ai_engine.stream_response(prompt, resp_queue, bible_data=bible_data, rag_context=rag_context)
             
         # UI Update Timer
         timer = QTimer(self)
@@ -1836,6 +1860,8 @@ class CenterPanel(QWidget):
                     if token == "[[END]]":
                         timer.stop()
                         if gen_btn: gen_btn.set_loading(False)
+                        # TRIGGER PIPELINE: Immediate Summarization
+                        self._trigger_section_summarization(section_key)
                         return
                     
                     # Insert token into widget
@@ -1863,6 +1889,101 @@ class CenterPanel(QWidget):
         
         # Start AI thread
         threading.Thread(target=stream_thread, daemon=True).start()
+
+    def _trigger_section_summarization(self, section_key: str):
+        """Pipeline Step 2: Immediate Summarization for Story Bible (With Strict Token Budgeting)."""
+        import threading
+        
+        widget_data = self.bible_section_widgets.get(section_key)
+        if not widget_data: return
+        
+        # GUARDRAIL: Only summarize if text is actually present
+        full_text = widget_data['widget'].toPlainText()
+        if not full_text.strip(): return
+        
+        # Check if we should recompress (Threshold > 250 tokens ~ 1000 chars)
+        current_len = len(full_text)
+        # We don't track offset for bible tabs yet as strictly as chapters, 
+        # but we can check if it's "too long" for a single summary
+        
+        logging.info(f"Pipeline: Starting background summarization for {section_key}...")
+        
+        def run_summary():
+            # 1. Generate Summary (Incremental or Compress mode?)
+            # For Bible tabs, we treat the whole text as "the truth".
+            # If it's huge, we compress. If small, we summarize.
+            token_count = self.ai_engine.count_tokens(full_text)
+            
+            mode = 'incremental'
+            if token_count > 200:
+                mode = 'bible_compress'
+                
+            summary = self.ai_engine.generate_summary(full_text, mode=mode)
+            
+            if summary and "Error" not in summary:
+                # Store Summary Version
+                self.db_manager.save_bible_field(self.current_project_id, f"{section_key}_summary", summary)
+                # Ensure Full Version is also saved
+                self.db_manager.save_bible_field(self.current_project_id, section_key, full_text)
+                logging.info(f"Pipeline: Summarization complete for {section_key} (Mode: {mode})")
+            else:
+                logging.error(f"Pipeline: Summary generation failed for {section_key}")
+                
+        threading.Thread(target=run_summary, daemon=True).start()
+
+    def _trigger_chapter_summarization(self):
+        """
+        Pipeline Step 2: Immediate Summarization for Writing Canvas.
+        STRICT GUARDRAILS: Only runs on NEW raw text.
+        """
+        if not self.current_chapter_id: 
+            return
+            
+        full_text = self.editor_textbox.toPlainText()
+        if not full_text: return
+        
+        # GUARDRAIL: Check if we actually have new text since last summary
+        current_len = len(full_text)
+        chapter_data = self.db_manager.get_chapter_summary(self.current_chapter_id)
+        last_count = chapter_data.get('last_summarized_char_count', 0)
+        
+        new_char_count = current_len - last_count
+        
+        if new_char_count < 50: # Minimum threshold to bother suggesting a summary update
+             return
+             
+        # We have meaningful new text.
+        new_text_chunk = full_text[last_count:]
+        chapter_id = self.current_chapter_id
+        
+        logging.info(f"Pipeline: Triggering Chapter Summarization (New Chars: {new_char_count})...")
+        
+        def run_summary():
+            # 1. Generate Incremental Summary of NEW Text
+            incremental_summary = self.ai_engine.generate_summary(new_text_chunk, mode='incremental')
+            
+            # 2. Generate Recent Context Summary (Refresh Short Term Memory)
+            # We use the LAST 1000 chars roughly for this
+            recent_chunk = full_text[-1000:]
+            recent_summary = self.ai_engine.generate_summary(recent_chunk, mode='incremental')
+            
+            current_summary = chapter_data.get('summary_text', "")
+            updated_summary = (current_summary + " " + incremental_summary).strip()
+            
+            # 3. Check Token Threshold for Long Term Memory
+            summary_tokens = self.ai_engine.count_tokens(updated_summary)
+            if summary_tokens > 1600:
+                logging.info(f"Pipeline: Recompressing Chapter Summary (Tokens: {summary_tokens})...")
+                updated_summary = self.ai_engine.generate_summary(updated_summary, mode='compress')
+            
+            # 4. Save Everything
+            self.db_manager.save_chapter_summary(chapter_id, updated_summary, recent_summary)
+            # Update offset to current length so we don't re-summarize this chunk
+            self.db_manager.update_chapter_progress(chapter_id, current_len)
+            
+            logging.info(f"Pipeline: Chapter summarization complete (ID: {chapter_id})")
+                
+        threading.Thread(target=run_summary, daemon=True).start()
     
     def destroy_story_bible_container(self):
         """Remove Story Bible from center panel."""
@@ -2342,162 +2463,500 @@ class AssistantPanel(QWidget):
 
 class ProjectCard(QFrame):
     """
-    Premium glass-style project card for dashboard.
-    Displays project title, snippet, and metadata.
+    Premium floating glass card for dashboard projects.
+    Displays project title, snippet, and metadata with luxurious hover interactions.
     """
     
     clicked = pyqtSignal(int)  # project_id
+    rename_requested = pyqtSignal(int, str)  # project_id, current_title
+    delete_requested = pyqtSignal(int, str)  # project_id, title (for confirmation)
+    duplicate_requested = pyqtSignal(int)  # project_id
+    export_requested = pyqtSignal(int)  # project_id
     
     def __init__(self, project_id: int, title: str, snippet: str = "", 
                  word_count: int = 0, last_modified: str = "", parent=None):
         super().__init__(parent)
         self.project_id = project_id
+        self.project_title = title
         self._hovered = False
+        self._pressed = False
+        self._base_pos = None
         
-        self.setFixedSize(280, 180)
+        self.setFixedSize(300, 195)
         self.setCursor(Qt.CursorShape.PointingHandCursor)
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
+        self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.customContextMenuRequested.connect(self._show_context_menu)
         
         self._setup_ui(title, snippet, word_count, last_modified)
         self._setup_animations()
         self._apply_style()
     
     def _setup_ui(self, title: str, snippet: str, word_count: int, last_modified: str):
-        """Create card content layout."""
+        """Create refined card content with clear visual hierarchy."""
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(20, 18, 20, 18)
+        layout.setContentsMargins(26, 24, 26, 22)
         layout.setSpacing(10)
         
-        # Title
+        # Title - clear and confident
         self.title_label = QLabel(title)
-        self.title_label.setFont(QFont("Inter", 15, QFont.Weight.DemiBold))
-        self.title_label.setStyleSheet(f"color: {QtTheme.TEXT_PRIMARY}; background: transparent;")
+        self.title_label.setFont(QFont("Segoe UI", 16, QFont.Weight.DemiBold))
+        self.title_label.setStyleSheet("""
+            color: rgba(255, 255, 255, 0.95);
+            background: transparent;
+        """)
         self.title_label.setWordWrap(True)
         layout.addWidget(self.title_label)
         
-        # Snippet (truncated preview)
+        # Snippet - muted and supportive
         if snippet:
-            snippet_text = snippet[:100] + "..." if len(snippet) > 100 else snippet
+            snippet_text = snippet[:85] + "..." if len(snippet) > 85 else snippet
         else:
-            snippet_text = "No content yet..."
+            snippet_text = "Your story awaits..."
         
         self.snippet_label = QLabel(snippet_text)
-        self.snippet_label.setFont(QFont("Inter", 11))
-        self.snippet_label.setStyleSheet(f"color: {QtTheme.TEXT_MUTED}; background: transparent;")
+        self.snippet_label.setFont(QFont("Segoe UI", 11))
+        self.snippet_label.setStyleSheet("""
+            color: rgba(255, 255, 255, 0.5);
+            background: transparent;
+        """)
         self.snippet_label.setWordWrap(True)
-        self.snippet_label.setMaximumHeight(50)
+        self.snippet_label.setMaximumHeight(48)
         layout.addWidget(self.snippet_label, 1)
         
-        # Metadata row
+        layout.addSpacing(4)
+        
+        # Subtle divider
+        divider = QFrame()
+        divider.setFixedHeight(1)
+        divider.setStyleSheet("background: rgba(255, 255, 255, 0.06);")
+        layout.addWidget(divider)
+        
+        # Metadata - tertiary importance
         meta_widget = QWidget()
         meta_widget.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
         meta_layout = QHBoxLayout(meta_widget)
-        meta_layout.setContentsMargins(0, 0, 0, 0)
-        meta_layout.setSpacing(12)
+        meta_layout.setContentsMargins(0, 8, 0, 0)
+        meta_layout.setSpacing(14)
+        
+        meta_style = "color: rgba(255, 255, 255, 0.35); background: transparent;"
+        meta_font = QFont("Segoe UI", 10)
         
         if word_count > 0:
-            word_label = QLabel(f"✦ {word_count:,} words")
-            word_label.setFont(QFont("Inter", 10))
-            word_label.setStyleSheet(f"color: {QtTheme.TEXT_MUTED}; background: transparent;")
+            word_label = QLabel(f"◆ {word_count:,} words")
+            word_label.setFont(meta_font)
+            word_label.setStyleSheet(meta_style)
             meta_layout.addWidget(word_label)
         
         if last_modified:
-            date_label = QLabel(f"◷ {last_modified}")
-            date_label.setFont(QFont("Inter", 10))
-            date_label.setStyleSheet(f"color: {QtTheme.TEXT_MUTED}; background: transparent;")
+            date_label = QLabel(f"◇ {last_modified}")
+            date_label.setFont(meta_font)
+            date_label.setStyleSheet(meta_style)
             meta_layout.addWidget(date_label)
         
         meta_layout.addStretch()
         layout.addWidget(meta_widget)
     
     def _setup_animations(self):
-        """Setup hover animations."""
-        # Scale animation via geometry
-        self._base_geometry = None
+        """Setup VERY STRONG shadows and Y-axis movement."""
+        self._base_y = None
+        self._hover_lift = 8  # Pixels to move UP on hover
         
-        # Opacity effect for fade-in
-        self.opacity_effect = QGraphicsDropShadowEffect(self)
-        self.opacity_effect.setBlurRadius(15)
-        self.opacity_effect.setXOffset(0)
-        self.opacity_effect.setYOffset(4)
-        self.opacity_effect.setColor(QColor(0, 0, 0, 60))
-        self.setGraphicsEffect(self.opacity_effect)
-        
-        # Shadow animation
-        self.shadow_anim = QPropertyAnimation(self.opacity_effect, b"blurRadius")
-        self.shadow_anim.setDuration(150)
-        self.shadow_anim.setEasingCurve(QEasingCurve.Type.OutQuad)
+        # VERY STRONG shadow - impossible to miss
+        self.shadow_effect = QGraphicsDropShadowEffect(self)
+        self.shadow_effect.setBlurRadius(35)
+        self.shadow_effect.setXOffset(0)
+        self.shadow_effect.setYOffset(18)
+        self.shadow_effect.setColor(QColor(0, 0, 0, 200))  # 78% opacity - VERY dark
+        self.setGraphicsEffect(self.shadow_effect)
     
     def _apply_style(self):
-        """Apply glass styling."""
+        """Apply elevated card with strong contrast."""
+        self.setStyleSheet("""
+            ProjectCard {
+                background: qlineargradient(
+                    x1:0, y1:0, x2:0, y2:1,
+                    stop:0 rgba(75, 75, 95, 255),
+                    stop:0.05 rgba(65, 65, 82, 255),
+                    stop:1 rgba(45, 45, 60, 255)
+                );
+                border: 1px solid rgba(255, 255, 255, 0.15);
+                border-top: 2px solid rgba(255, 255, 255, 0.35);
+                border-radius: 14px;
+            }
+        """)
+    
+    def _apply_hover_style(self):
+        """Apply brighter hover state."""
+        self.setStyleSheet("""
+            ProjectCard {
+                background: qlineargradient(
+                    x1:0, y1:0, x2:0, y2:1,
+                    stop:0 rgba(95, 92, 125, 255),
+                    stop:0.05 rgba(82, 78, 108, 255),
+                    stop:1 rgba(60, 56, 82, 255)
+                );
+                border: 1px solid rgba(160, 150, 230, 0.5);
+                border-top: 2px solid rgba(200, 190, 255, 0.7);
+                border-radius: 14px;
+            }
+        """)
+    
+    def _apply_pressed_style(self):
+        """Apply pressed state."""
+        self.setStyleSheet("""
+            ProjectCard {
+                background: qlineargradient(
+                    x1:0, y1:0, x2:0, y2:1,
+                    stop:0 rgba(70, 68, 90, 255),
+                    stop:1 rgba(48, 46, 65, 255)
+                );
+                border: 1px solid rgba(160, 150, 230, 0.6);
+                border-radius: 14px;
+            }
+        """)
+    
+    def enterEvent(self, event):
+        """Hover - card moves UP and shadow expands."""
+        self._hovered = True
+        self._apply_hover_style()
+        
+        # Store base position and move card UP
+        if self._base_y is None:
+            self._base_y = self.y()
+        self.move(self.x(), self._base_y - self._hover_lift)
+        
+        # Expand shadow dramatically
+        self.shadow_effect.setBlurRadius(50)
+        self.shadow_effect.setYOffset(28)
+        self.shadow_effect.setColor(QColor(0, 0, 0, 220))
+        
+        super().enterEvent(event)
+    
+    def leaveEvent(self, event):
+        """Leave - card moves back DOWN."""
+        self._hovered = False
+        self._apply_style()
+        
+        # Move card back to original position
+        if self._base_y is not None:
+            self.move(self.x(), self._base_y)
+        
+        # Reset shadow
+        self.shadow_effect.setBlurRadius(35)
+        self.shadow_effect.setYOffset(18)
+        self.shadow_effect.setColor(QColor(0, 0, 0, 200))
+        
+        super().leaveEvent(event)
+    
+    def mousePressEvent(self, event):
+        """Press - card pushes down."""
+        if event.button() == Qt.MouseButton.LeftButton:
+            self._pressed = True
+            self._apply_pressed_style()
+            
+            # Push down effect
+            if self._base_y is not None:
+                self.move(self.x(), self._base_y + 2)
+            self.shadow_effect.setYOffset(8)
+            self.shadow_effect.setBlurRadius(20)
+            self.shadow_effect.setColor(QColor(0, 0, 0, 160))
+        super().mousePressEvent(event)
+    
+    def mouseReleaseEvent(self, event):
+        """Release - spring back and emit click."""
+        if event.button() == Qt.MouseButton.LeftButton:
+            self._pressed = False
+            if self._hovered:
+                self._apply_hover_style()
+                if self._base_y is not None:
+                    self.move(self.x(), self._base_y - self._hover_lift)
+                self.shadow_effect.setYOffset(28)
+                self.shadow_effect.setBlurRadius(50)
+                self.shadow_effect.setColor(QColor(0, 0, 0, 220))
+            else:
+                self._apply_style()
+                if self._base_y is not None:
+                    self.move(self.x(), self._base_y)
+                self.shadow_effect.setYOffset(18)
+                self.shadow_effect.setBlurRadius(35)
+                self.shadow_effect.setColor(QColor(0, 0, 0, 200))
+            self.clicked.emit(self.project_id)
+        super().mouseReleaseEvent(event)
+    
+    def _show_context_menu(self, pos):
+        """Show right-click context menu with project actions."""
+        menu = QMenu(self)
+        menu.setStyleSheet(f"""
+            QMenu {{
+                background-color: rgba(25, 25, 30, 250);
+                border: 1px solid rgba(255, 255, 255, 0.12);
+                border-radius: 10px;
+                padding: 6px;
+            }}
+            QMenu::item {{
+                background-color: transparent;
+                color: {QtTheme.TEXT_PRIMARY};
+                padding: 10px 24px;
+                border-radius: 6px;
+                font-size: 13px;
+            }}
+            QMenu::item:selected {{
+                background-color: rgba(79, 70, 229, 0.3);
+            }}
+            QMenu::separator {{
+                height: 1px;
+                background-color: rgba(255, 255, 255, 0.08);
+                margin: 4px 12px;
+            }}
+        """)
+        
+        # Open action
+        open_action = menu.addAction("📂  Open")
+        open_action.triggered.connect(lambda: self.clicked.emit(self.project_id))
+        
+        menu.addSeparator()
+        
+        # Rename action
+        rename_action = menu.addAction("✏️  Rename")
+        rename_action.triggered.connect(lambda: self.rename_requested.emit(self.project_id, self.project_title))
+        
+        # Duplicate action
+        duplicate_action = menu.addAction("📋  Duplicate")
+        duplicate_action.triggered.connect(lambda: self.duplicate_requested.emit(self.project_id))
+        
+        # Export action
+        export_action = menu.addAction("📤  Export")
+        export_action.triggered.connect(lambda: self.export_requested.emit(self.project_id))
+        
+        menu.addSeparator()
+        
+        # Delete action (with warning color)
+        delete_action = menu.addAction("🗑️  Delete")
+        delete_action.triggered.connect(lambda: self.delete_requested.emit(self.project_id, self.project_title))
+        
+        # Show menu at cursor position
+        menu.exec(self.mapToGlobal(pos))
+
+
+class ActionCard(QFrame):
+    """
+    Premium floating glass action card for New Project and Import Project.
+    More prominent than regular cards with subtle accent glow.
+    """
+    
+    clicked = pyqtSignal()
+    
+    def __init__(self, card_type: str = "new", parent=None):
+        """
+        Args:
+            card_type: "new" for New Project, "import" for Import Project
+        """
+        super().__init__(parent)
+        self.card_type = card_type
+        self._hovered = False
+        self._pressed = False
+        
+        self.setFixedSize(300, 195)  # Match ProjectCard size
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
+        
+        self._setup_ui()
+        self._setup_animations()
+        self._apply_style()
+    
+    def _setup_ui(self):
+        """Create refined action card with clear visual hierarchy."""
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(26, 28, 26, 24)
+        layout.setSpacing(12)
+        layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        
+        # Icon with soft glow effect
+        self.icon_label = QLabel()
+        self.icon_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.icon_label.setFixedSize(52, 52)
+        
+        if self.card_type == "new":
+            self.icon_label.setText("✦")
+            self.icon_label.setFont(QFont("Segoe UI Symbol", 28))
+            self.icon_label.setStyleSheet("""
+                color: rgba(167, 139, 250, 0.9);
+                background: transparent;
+            """)
+            title_text = "New Project"
+            subtitle_text = "Start something beautiful"
+            self._accent_color = (147, 120, 230)  # Soft purple
+        else:
+            self.icon_label.setText("↓")
+            self.icon_label.setFont(QFont("Segoe UI", 28, QFont.Weight.Bold))
+            self.icon_label.setStyleSheet("""
+                color: rgba(100, 160, 240, 0.9);
+                background: transparent;
+            """)
+            title_text = "Import Project"
+            subtitle_text = "Continue your work"
+            self._accent_color = (90, 145, 220)  # Soft blue
+        
+        layout.addWidget(self.icon_label, 0, Qt.AlignmentFlag.AlignCenter)
+        
+        layout.addSpacing(2)
+        
+        # Title - primary emphasis
+        self.title_label = QLabel(title_text)
+        self.title_label.setFont(QFont("Segoe UI", 16, QFont.Weight.DemiBold))
+        self.title_label.setStyleSheet("""
+            color: rgba(255, 255, 255, 0.95);
+            background: transparent;
+        """)
+        self.title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(self.title_label)
+        
+        # Subtitle - muted
+        self.subtitle_label = QLabel(subtitle_text)
+        self.subtitle_label.setFont(QFont("Segoe UI", 11))
+        self.subtitle_label.setStyleSheet("""
+            color: rgba(255, 255, 255, 0.45);
+            background: transparent;
+        """)
+        self.subtitle_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.subtitle_label.setWordWrap(True)
+        layout.addWidget(self.subtitle_label)
+    
+    def _setup_animations(self):
+        """Setup VERY STRONG shadows and Y-axis movement."""
+        self._base_y = None
+        self._hover_lift = 8  # Pixels to move UP on hover
+        
+        # VERY STRONG accent-tinted shadow
+        self.shadow_effect = QGraphicsDropShadowEffect(self)
+        self.shadow_effect.setBlurRadius(35)
+        self.shadow_effect.setXOffset(0)
+        self.shadow_effect.setYOffset(18)
+        
+        r, g, b = self._accent_color
+        self.shadow_effect.setColor(QColor(r // 2, g // 2, b // 2, 180))
+        self.setGraphicsEffect(self.shadow_effect)
+    
+    def _apply_style(self):
+        """Apply elevated card with accent border."""
+        r, g, b = self._accent_color
         self.setStyleSheet(f"""
-            ProjectCard {{
-                background-color: rgba(20, 20, 25, 220);
-                border: 1px solid rgba(255, 255, 255, 0.08);
+            ActionCard {{
+                background: qlineargradient(
+                    x1:0, y1:0, x2:0, y2:1,
+                    stop:0 rgba(72, 68, 95, 255),
+                    stop:0.05 rgba(62, 58, 82, 255),
+                    stop:1 rgba(45, 42, 62, 255)
+                );
+                border: 1px solid rgba({r}, {g}, {b}, 0.3);
+                border-top: 2px solid rgba({r}, {g}, {b}, 0.55);
+                border-radius: 14px;
+            }}
+        """)
+    
+    def _apply_hover_style(self):
+        """Apply brighter hover state."""
+        r, g, b = self._accent_color
+        self.setStyleSheet(f"""
+            ActionCard {{
+                background: qlineargradient(
+                    x1:0, y1:0, x2:0, y2:1,
+                    stop:0 rgba(92, 88, 120, 255),
+                    stop:0.05 rgba(78, 74, 105, 255),
+                    stop:1 rgba(58, 55, 80, 255)
+                );
+                border: 1px solid rgba({r}, {g}, {b}, 0.6);
+                border-top: 2px solid rgba({r}, {g}, {b}, 0.85);
+                border-radius: 14px;
+            }}
+        """)
+    
+    def _apply_pressed_style(self):
+        """Apply pressed state."""
+        r, g, b = self._accent_color
+        self.setStyleSheet(f"""
+            ActionCard {{
+                background: qlineargradient(
+                    x1:0, y1:0, x2:0, y2:1,
+                    stop:0 rgba(68, 65, 88, 255),
+                    stop:1 rgba(48, 45, 65, 255)
+                );
+                border: 1px solid rgba({r}, {g}, {b}, 0.65);
                 border-radius: 14px;
             }}
         """)
     
     def enterEvent(self, event):
-        """Hover enter - subtle lift effect."""
+        """Hover - card moves UP and shadow expands."""
         self._hovered = True
-        self.setStyleSheet(f"""
-            ProjectCard {{
-                background-color: rgba(30, 30, 38, 235);
-                border: 1px solid rgba(79, 70, 229, 0.3);
-                border-radius: 14px;
-            }}
-        """)
+        self._apply_hover_style()
         
-        # Animate shadow
-        self.shadow_anim.stop()
-        self.shadow_anim.setStartValue(15)
-        self.shadow_anim.setEndValue(25)
-        self.shadow_anim.start()
+        # Store base position and move card UP
+        if self._base_y is None:
+            self._base_y = self.y()
+        self.move(self.x(), self._base_y - self._hover_lift)
+        
+        # Expand shadow dramatically
+        r, g, b = self._accent_color
+        self.shadow_effect.setBlurRadius(50)
+        self.shadow_effect.setYOffset(28)
+        self.shadow_effect.setColor(QColor(r // 2, g // 2, b // 2, 210))
         
         super().enterEvent(event)
     
     def leaveEvent(self, event):
-        """Hover leave - return to normal."""
+        """Leave - card moves back DOWN."""
         self._hovered = False
         self._apply_style()
         
-        # Animate shadow back
-        self.shadow_anim.stop()
-        self.shadow_anim.setStartValue(25)
-        self.shadow_anim.setEndValue(15)
-        self.shadow_anim.start()
+        # Move card back to original position
+        if self._base_y is not None:
+            self.move(self.x(), self._base_y)
+        
+        # Reset shadow
+        r, g, b = self._accent_color
+        self.shadow_effect.setBlurRadius(35)
+        self.shadow_effect.setYOffset(18)
+        self.shadow_effect.setColor(QColor(r // 2, g // 2, b // 2, 180))
         
         super().leaveEvent(event)
     
     def mousePressEvent(self, event):
-        """Handle click."""
+        """Press - card pushes down."""
         if event.button() == Qt.MouseButton.LeftButton:
-            # Brief press feedback
-            self.setStyleSheet(f"""
-                ProjectCard {{
-                    background-color: rgba(40, 40, 50, 250);
-                    border: 1px solid rgba(79, 70, 229, 0.5);
-                    border-radius: 14px;
-                }}
-            """)
+            self._pressed = True
+            self._apply_pressed_style()
+            
+            # Push down effect
+            if self._base_y is not None:
+                self.move(self.x(), self._base_y + 2)
+            r, g, b = self._accent_color
+            self.shadow_effect.setYOffset(8)
+            self.shadow_effect.setBlurRadius(20)
+            self.shadow_effect.setColor(QColor(r // 3, g // 3, b // 3, 140))
         super().mousePressEvent(event)
     
     def mouseReleaseEvent(self, event):
-        """Emit clicked signal on release."""
+        """Release - spring back and emit click."""
         if event.button() == Qt.MouseButton.LeftButton:
-            # Restore hover or normal style (don't call enterEvent with wrong event type)
+            self._pressed = False
+            r, g, b = self._accent_color
             if self._hovered:
-                self.setStyleSheet(f"""
-                    ProjectCard {{
-                        background-color: rgba(35, 35, 45, 250);
-                        border: 1px solid rgba(79, 70, 229, 0.4);
-                        border-radius: 14px;
-                    }}
-                """)
+                self._apply_hover_style()
+                if self._base_y is not None:
+                    self.move(self.x(), self._base_y - self._hover_lift)
+                self.shadow_effect.setYOffset(28)
+                self.shadow_effect.setBlurRadius(50)
+                self.shadow_effect.setColor(QColor(r // 2, g // 2, b // 2, 210))
             else:
                 self._apply_style()
-            self.clicked.emit(self.project_id)
+                if self._base_y is not None:
+                    self.move(self.x(), self._base_y)
+                self.shadow_effect.setYOffset(18)
+                self.shadow_effect.setBlurRadius(35)
+                self.shadow_effect.setColor(QColor(r // 2, g // 2, b // 2, 180))
+            self.clicked.emit()
         super().mouseReleaseEvent(event)
 
 
@@ -2600,10 +3059,11 @@ class DashboardHeader(QWidget):
 
 class EmptyStatePlaceholder(QWidget):
     """
-    Shown when no projects exist - friendly welcome message.
+    Shown when no projects exist - friendly welcome message with dual CTAs.
     """
     
     new_project_clicked = pyqtSignal()
+    import_clicked = pyqtSignal()
     
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -2617,31 +3077,38 @@ class EmptyStatePlaceholder(QWidget):
         layout.setSpacing(24)
         
         # Icon/Illustration placeholder
-        icon_label = QLabel("📝")
+        icon_label = QLabel("✨")
         icon_label.setFont(QFont("Segoe UI Emoji", 64))
-        icon_label.setStyleSheet("background: transparent;")
+        icon_label.setStyleSheet(f"color: {QtTheme.ACCENT_PRIMARY}; background: transparent;")
         icon_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(icon_label)
         
         # Title
         title = QLabel("Your writing journey starts here")
-        title.setFont(QFont("Inter", 22, QFont.Weight.DemiBold))
+        title.setFont(QFont("Inter", 24, QFont.Weight.Bold))
         title.setStyleSheet(f"color: {QtTheme.TEXT_PRIMARY}; background: transparent;")
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(title)
         
         # Subtitle
-        subtitle = QLabel("Create your first project and let the words flow")
+        subtitle = QLabel("Create a new project or import existing work to begin")
         subtitle.setFont(QFont("Inter", 14))
         subtitle.setStyleSheet(f"color: {QtTheme.TEXT_MUTED}; background: transparent;")
         subtitle.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(subtitle)
         
-        layout.addSpacing(16)
+        layout.addSpacing(20)
         
-        # CTA Button
-        new_btn = QPushButton("＋ Create New Project")
-        new_btn.setFixedSize(220, 50)
+        # Buttons container
+        btn_container = QWidget()
+        btn_container.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
+        btn_layout = QHBoxLayout(btn_container)
+        btn_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        btn_layout.setSpacing(16)
+        
+        # New Project Button (primary)
+        new_btn = QPushButton("✦  New Project")
+        new_btn.setFixedSize(180, 50)
         new_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         new_btn.setStyleSheet(f"""
             QPushButton {{
@@ -2660,13 +3127,41 @@ class EmptyStatePlaceholder(QWidget):
             }}
         """)
         new_btn.clicked.connect(self.new_project_clicked.emit)
-        
-        btn_container = QWidget()
-        btn_container.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
-        btn_layout = QHBoxLayout(btn_container)
-        btn_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
         btn_layout.addWidget(new_btn)
+        
+        # Import Button (secondary)
+        import_btn = QPushButton("⤓  Import Project")
+        import_btn.setFixedSize(180, 50)
+        import_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        import_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: rgba(255, 255, 255, 0.08);
+                border: 1px solid rgba(255, 255, 255, 0.15);
+                border-radius: 12px;
+                color: {QtTheme.TEXT_SECONDARY};
+                font-size: 15px;
+                font-weight: 600;
+            }}
+            QPushButton:hover {{
+                background-color: rgba(255, 255, 255, 0.12);
+                border: 1px solid rgba(139, 92, 246, 0.4);
+                color: {QtTheme.TEXT_PRIMARY};
+            }}
+            QPushButton:pressed {{
+                background-color: rgba(139, 92, 246, 0.2);
+            }}
+        """)
+        import_btn.clicked.connect(self.import_clicked.emit)
+        btn_layout.addWidget(import_btn)
+        
         layout.addWidget(btn_container)
+        
+        # Hint text
+        hint = QLabel("Supports .txt, .md, and .docx files")
+        hint.setFont(QFont("Inter", 11))
+        hint.setStyleSheet(f"color: {QtTheme.TEXT_MUTED}; background: transparent;")
+        hint.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(hint)
 
 
 class FlowLayout(QVBoxLayout):
@@ -2680,17 +3175,23 @@ class FlowLayout(QVBoxLayout):
 class DashboardView(QWidget):
     """
     Main dashboard/home view with responsive project grid.
+    Features action cards for New/Import and existing project cards with context menus.
     """
     
     project_selected = pyqtSignal(int)  # project_id
     new_project_requested = pyqtSignal()
     import_requested = pyqtSignal()
     settings_requested = pyqtSignal()
+    rename_project_requested = pyqtSignal(int, str)  # project_id, current_title
+    delete_project_requested = pyqtSignal(int, str)  # project_id, title
+    duplicate_project_requested = pyqtSignal(int)  # project_id
+    export_project_requested = pyqtSignal(int)  # project_id
     
     def __init__(self, db_manager, parent=None):
         super().__init__(parent)
         self.db_manager = db_manager
         self.project_cards = []
+        self.action_cards = []  # New/Import cards
         
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
         self.setAutoFillBackground(False)
@@ -2716,46 +3217,77 @@ class DashboardView(QWidget):
         scroll.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
         scroll.setFrameShape(QFrame.Shape.NoFrame)
         scroll.setStyleSheet("QScrollArea { background: transparent; border: none; }")
+        scroll.viewport().setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
+        scroll.viewport().setStyleSheet("background: transparent;")
         
-        # Content container
+        # Content container - this will be centered
         self.content_widget = QWidget()
         self.content_widget.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
         self.content_layout = QVBoxLayout(self.content_widget)
-        self.content_layout.setContentsMargins(40, 20, 40, 40)
+        self.content_layout.setContentsMargins(60, 60, 60, 60)  # Generous margins
         self.content_layout.setSpacing(0)
         
-        # Grid container for cards
+        # Top spacer for vertical centering (flexible)
+        self.content_layout.addStretch(1)
+        
+        # Center container - holds the grid, horizontally centered
+        center_container = QWidget()
+        center_container.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
+        center_layout = QHBoxLayout(center_container)
+        center_layout.setContentsMargins(0, 0, 0, 0)
+        center_layout.setSpacing(0)
+        
+        # Left spacer for horizontal centering
+        center_layout.addStretch(1)
+        
+        # Grid container for cards - MUST have large margins for shadows + hover lift
         self.grid_widget = QWidget()
         self.grid_widget.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
         self.grid_layout = QGridLayout(self.grid_widget)
-        self.grid_layout.setSpacing(20)
-        self.grid_layout.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
-        self.content_layout.addWidget(self.grid_widget)
+        self.grid_layout.setSpacing(40)  # More space between cards for shadows
+        # CRITICAL: Large margins for shadow visibility AND hover lift movement
+        self.grid_layout.setContentsMargins(50, 50, 50, 50)
+        self.grid_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
         
-        # Empty state placeholder
+        center_layout.addWidget(self.grid_widget)
+        
+        # Right spacer for horizontal centering
+        center_layout.addStretch(1)
+        
+        self.content_layout.addWidget(center_container)
+        
+        # Empty state placeholder (also centered)
         self.empty_state = EmptyStatePlaceholder()
         self.empty_state.new_project_clicked.connect(self.new_project_requested.emit)
-        self.content_layout.addWidget(self.empty_state)
+        self.empty_state.import_clicked.connect(self.import_requested.emit)
+        self.content_layout.addWidget(self.empty_state, 0, Qt.AlignmentFlag.AlignCenter)
         
-        self.content_layout.addStretch()
+        # Bottom spacer for vertical centering (flexible, slightly larger for upper-middle feel)
+        self.content_layout.addStretch(2)
         
         scroll.setWidget(self.content_widget)
         main_layout.addWidget(scroll, 1)
     
     def paintEvent(self, event):
-        """Paint dark glass background."""
+        """Paint dark background for card contrast."""
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-        color = QColor(0, 0, 0, 200)  # 78% black
+        # Darker background = more visible card elevation
+        color = QColor(18, 18, 24, 240)  # Very dark, slight transparency
         painter.fillRect(self.rect(), color)
         super().paintEvent(event)
     
     def load_projects(self):
         """Load and display all projects from database."""
-        # Clear existing cards
+        # Clear existing project cards
         for card in self.project_cards:
             card.deleteLater()
         self.project_cards.clear()
+        
+        # Clear action cards
+        for card in self.action_cards:
+            card.deleteLater()
+        self.action_cards.clear()
         
         # Clear grid layout
         while self.grid_layout.count():
@@ -2766,30 +3298,47 @@ class DashboardView(QWidget):
         # Fetch projects using the correct method name
         projects = self.db_manager.get_projects_with_chapters() if self.db_manager else []
         
-        if not projects:
-            self.grid_widget.hide()
-            self.empty_state.show()
-            return
-        
+        # Always show grid (action cards are always present)
         self.empty_state.hide()
         self.grid_widget.show()
         
-        # Calculate columns based on width
+        # Arrange cards (action cards + project cards)
         self._arrange_cards(projects)
     
     def _arrange_cards(self, projects):
-        """Arrange project cards in a responsive grid."""
+        """Arrange action cards and project cards in a responsive grid."""
         # Card dimensions
-        card_width = 280
-        card_spacing = 20
-        available_width = self.width() - 80  # Account for margins
+        card_width = 300
+        card_spacing = 40  # Match grid spacing
+        available_width = self.width() - 220  # Account for all margins
         
-        # Calculate columns
-        cols = max(1, (available_width + card_spacing) // (card_width + card_spacing))
+        # Calculate columns (max 4 for visual balance)
+        cols = min(4, max(1, (available_width + card_spacing) // (card_width + card_spacing)))
         
-        for idx, project in enumerate(projects):
-            row = idx // cols
-            col = idx % cols
+        card_index = 0  # Global index for grid position
+        
+        # === ACTION CARDS (always first) ===
+        # New Project card
+        new_card = ActionCard(card_type="new")
+        new_card.clicked.connect(self.new_project_requested.emit)
+        row, col = card_index // cols, card_index % cols
+        self.grid_layout.addWidget(new_card, row, col)
+        self.action_cards.append(new_card)
+        QTimer.singleShot(50 * card_index, lambda c=new_card: self._animate_card_in(c))
+        card_index += 1
+        
+        # Import Project card
+        import_card = ActionCard(card_type="import")
+        import_card.clicked.connect(self.import_requested.emit)
+        row, col = card_index // cols, card_index % cols
+        self.grid_layout.addWidget(import_card, row, col)
+        self.action_cards.append(import_card)
+        QTimer.singleShot(50 * card_index, lambda c=import_card: self._animate_card_in(c))
+        card_index += 1
+        
+        # === PROJECT CARDS ===
+        for project in projects:
+            row, col = card_index // cols, card_index % cols
             
             # Extract project data
             project_id = project.get('id', project.get('project_id', 0))
@@ -2809,25 +3358,47 @@ class DashboardView(QWidget):
                 word_count=word_count,
                 last_modified=last_modified
             )
+            # Connect signals
             card.clicked.connect(self.project_selected.emit)
+            card.rename_requested.connect(self.rename_project_requested.emit)
+            card.delete_requested.connect(self.delete_project_requested.emit)
+            card.duplicate_requested.connect(self.duplicate_project_requested.emit)
+            card.export_requested.connect(self.export_project_requested.emit)
             
             self.grid_layout.addWidget(card, row, col)
             self.project_cards.append(card)
             
             # Animate card entrance with stagger
-            card.setWindowOpacity(0)
-            QTimer.singleShot(50 * idx, lambda c=card: self._animate_card_in(c))
+            QTimer.singleShot(50 * card_index, lambda c=card: self._animate_card_in(c))
+            card_index += 1
     
     def _animate_card_in(self, card):
         """Animate a single card fading in."""
-        anim = QPropertyAnimation(card, b"windowOpacity")
-        anim.setDuration(200)
-        anim.setStartValue(0.0)
-        anim.setEndValue(1.0)
-        anim.setEasingCurve(QEasingCurve.Type.OutQuad)
-        anim.start()
-        # Keep reference to prevent garbage collection
-        card._fade_anim = anim
+        try:
+            # Check if card still exists (may have been deleted during resize)
+            from PyQt6 import sip
+            if sip.isdeleted(card):
+                return
+        except (RuntimeError, ImportError):
+            # Card was deleted or sip not available - skip animation
+            try:
+                # Fallback check - try accessing a property
+                _ = card.isVisible()
+            except RuntimeError:
+                return
+        
+        try:
+            anim = QPropertyAnimation(card, b"windowOpacity")
+            anim.setDuration(200)
+            anim.setStartValue(0.0)
+            anim.setEndValue(1.0)
+            anim.setEasingCurve(QEasingCurve.Type.OutQuad)
+            anim.start()
+            # Keep reference to prevent garbage collection
+            card._fade_anim = anim
+        except RuntimeError:
+            # Card was deleted between check and animation - ignore
+            pass
     
     def resizeEvent(self, event):
         """Handle resize - rearrange grid."""
@@ -2910,6 +3481,11 @@ class StoryBibleApp(QMainWindow):
         self.dashboard_view.new_project_requested.connect(self._create_new_project)
         self.dashboard_view.import_requested.connect(self._show_import_dialog)
         self.dashboard_view.settings_requested.connect(self._show_settings)
+        # Context menu actions
+        self.dashboard_view.rename_project_requested.connect(self._rename_project)
+        self.dashboard_view.delete_project_requested.connect(self._delete_project_with_confirm)
+        self.dashboard_view.duplicate_project_requested.connect(self._duplicate_project)
+        self.dashboard_view.export_project_requested.connect(self._export_project)
         self.view_stack.addWidget(self.dashboard_view)
         
         # =====================
@@ -3127,6 +3703,10 @@ class StoryBibleApp(QMainWindow):
                             self.right_panel.add_message(final_text, "assistant")
                         # Reset for next time
                         self.current_ai_response_text = ""
+                    elif self.target_panel == 'editor':
+                        # TRIGGER PIPELINE: Immediate Summarization for Canvas
+                        # Force check (since we just generated text)
+                        self.center_panel._trigger_chapter_summarization()
                     
                 else:
                     if self.target_panel == 'editor':
@@ -3149,6 +3729,8 @@ class StoryBibleApp(QMainWindow):
         if self.current_chapter_id:
             text = self.center_panel.get_editor_content()
             self.db_manager.update_chapter_content(self.current_chapter_id, text)
+            # Ensure summary is up to date for manual edits too
+            self.center_panel._trigger_chapter_summarization()
     
     # ========================================================================
     # HELPER METHODS
@@ -3454,6 +4036,87 @@ class StoryBibleApp(QMainWindow):
         """Show settings dialog."""
         QMessageBox.information(self, "Settings", "Settings panel coming soon!")
     
+    def _rename_project(self, project_id: int, current_title: str):
+        """Rename a project from dashboard context menu."""
+        new_name, ok = QInputDialog.getText(
+            self, 
+            "Rename Project", 
+            "New project name:",
+            text=current_title
+        )
+        if ok and new_name.strip() and new_name.strip() != current_title:
+            if self.db_manager.rename_project(project_id, new_name.strip()):
+                self.dashboard_view.load_projects()
+    
+    def _delete_project_with_confirm(self, project_id: int, title: str):
+        """Delete a project with confirmation dialog."""
+        reply = QMessageBox.question(
+            self,
+            "Delete Project",
+            f"Are you sure you want to delete \"{title}\"?\n\nThis action cannot be undone.",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No
+        )
+        
+        if reply == QMessageBox.StandardButton.Yes:
+            if self.db_manager.delete_project(project_id):
+                # Clear current project if it was deleted
+                if self.current_project_id == project_id:
+                    self.current_project_id = None
+                    self.current_chapter_id = None
+                self.dashboard_view.load_projects()
+    
+    def _duplicate_project(self, project_id: int):
+        """Duplicate a project with all its chapters."""
+        try:
+            # Get original project
+            settings = self.db_manager.get_project_settings(project_id)
+            if not settings:
+                QMessageBox.warning(self, "Duplicate Failed", "Could not find project.")
+                return
+            
+            # Create new project with copied name
+            new_name = f"{settings.get('name', 'Untitled')} (Copy)"
+            new_project_id = self.db_manager.create_project(new_name, settings.get('genre', ''))
+            
+            if not new_project_id:
+                QMessageBox.warning(self, "Duplicate Failed", "Could not create duplicate project.")
+                return
+            
+            # Copy chapters
+            chapters = self.db_manager.get_full_project_content(project_id)
+            for chapter in chapters:
+                chapter_id = self.db_manager.create_chapter(new_project_id, chapter.get('title', 'Untitled'))
+                if chapter_id:
+                    self.db_manager.update_chapter_content(chapter_id, chapter.get('content', ''))
+            
+            # Copy story bible if exists
+            bible = self.db_manager.get_story_bible(project_id)
+            if bible:
+                for field, value in bible.items():
+                    if value:
+                        self.db_manager.save_bible_field(new_project_id, field, value)
+            
+            # Refresh dashboard
+            self.dashboard_view.load_projects()
+            logging.info(f"Duplicated project {project_id} as {new_project_id}")
+            
+        except Exception as e:
+            logging.error(f"Duplicate project failed: {e}")
+            QMessageBox.warning(self, "Duplicate Failed", f"Error duplicating project: {str(e)}")
+    
+    def _export_project(self, project_id: int):
+        """Export a specific project to PDF."""
+        # Temporarily store current project id
+        original_project_id = self.current_project_id
+        self.current_project_id = project_id
+        
+        # Use existing export method
+        self._export_document()
+        
+        # Restore original project id
+        self.current_project_id = original_project_id
+    
     def _go_back_to_dashboard(self):
         """Navigate back to dashboard from editor."""
         # Auto-save current work
@@ -3464,19 +4127,9 @@ class StoryBibleApp(QMainWindow):
         self._show_dashboard()
     
     def load_session(self):
-        """Load last session from database - opens last project or stays on dashboard."""
-        last_pid = self.db_manager.get_app_state("last_project_id")
-        last_cid = self.db_manager.get_app_state("last_chapter_id")
-        
-        if last_cid and last_pid:
-            try:
-                self.current_project_id = int(last_pid)
-                self.left_panel.refresh_tree(project_id=int(last_pid))
-                self._load_chapter(int(last_cid), int(last_pid))
-                self._show_editor()
-            except Exception as e:
-                logging.warning(f"Could not restore session: {e}")
-                self._show_dashboard()
+        """Initialize app - always start on the home/dashboard page."""
+        # Always start on the dashboard (home page)
+        self._show_dashboard()
     
     def closeEvent(self, event):
         """Handle window close event."""
