@@ -37,6 +37,7 @@ data/*.db
 
 # Models (keep structure but ignore binaries)
 models/llama/*
+models/tts/*.pth
 !models/llama/.gitkeep
 models/tts/*
 !models/tts/.gitkeep
