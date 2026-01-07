@@ -1373,32 +1373,47 @@ Ensure all strings are properly escaped."""
                     excerpt = content[:200] + "..." if len(content) > 200 else content
                     context += f"Chapter: {title}\n{excerpt}\n\n"
         
-        prompt = f"""Based on this story context, create a NEW character that would be a great addition:
+        # Get simplified list of existing names for stricter checking
+        existing_names = [char[0] for char in existing_chars] if existing_chars else []
+        
+        prompt = f"""You are an expert Story Bible Assistant. Your task is to generate a detailed character for this story.
 
+STORY CONTEXT:
 {context}
 
-Generate a unique, compelling character that fills a gap in the story or adds interesting dynamics. 
-Provide the character information in JSON format:
+EXISTING CHARACTERS (DO NOT DUPLICATE):
+{", ".join(existing_names) if existing_names else "None yet"}
 
+INSTRUCTIONS:
+1. CHECK FOR "GHOST CHARACTERS": Scan the provided story summary/braindump for proper names that are mentioned but NOT listed in "EXISTING CHARACTERS". 
+   - If you find such a name (e.g., "The Shadow", "Elwyn", "Captain Vor"), CREATE THAT CHARACTER.
+   - Use the exact name found in the text.
+   
+2. IF NO GHOST CHARACTERS:
+   - Create a completely NEW, original character that fits the tone and genre.
+   - Ensure the name is UNIQUE (must not be in the EXISTING CHARACTERS list).
+
+3. DEFINE ATTRIBUTES:
+   - Fill in all fields (role, personality, etc.) based on context.
+   - Connect them logically to the events described in the summary.
+
+OUTPUT FORMAT (JSON ONLY):
 {{
-    "name": "character's full name",
-    "role": "protagonist/antagonist/supporting",
-    "pronouns": "he/him, she/her, they/them, etc.",
-    "personality_traits": "detailed personality description",
-    "backstory": "character's background and history",
-    "physical_description": "appearance and physical traits",
-    "speech_pattern": "how they speak and communicate",
-    "motivations": "what drives them",
-    "internal_conflicts": "inner struggles and doubts",
-    "strengths": "their abilities and positive traits",
-    "weaknesses": "flaws and limitations",
-    "character_arc": "potential growth trajectory"
+    "name": "<Unique Name or Summary Name>",
+    "role": "protagonist/antagonist/supporting/minor",
+    "pronouns": "he/him, she/her, they/them",
+    "personality_traits": "Detailed description of personality",
+    "backstory": "Relevant history and background",
+    "physical_description": "Appearance details",
+    "speech_pattern": "Distinctive way of speaking",
+    "motivations": "Core drives and goals",
+    "internal_conflicts": "Inner struggles",
+    "strengths": "Skills and talents",
+    "weaknesses": "Flaws and vulnerabilities",
+    "character_arc": "Potential growth trajectory"
 }}
 
-Be creative and ensure this character complements the existing cast!
-    
-    IMPORTANT: Return ONLY the raw JSON. Do not use Markdown code blocks (```json).
-    Ensure all strings are properly escaped."""
+IMPORTANT: Return VALID JSON ONLY. No markdown blocks. No conversational text."""
         
         import queue
         response_queue = queue.Queue()

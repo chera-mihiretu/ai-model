@@ -31,9 +31,11 @@ from .character.character_widget import CharacterWidget
 from .shared import (
     IOSSwitch, ToggleSettingsPopup, TransparentScrollArea, 
     ToolbarSplitButton, DescribeSettingsPopup, DescribeSplitButton,
-    GenerateButton, AutoExpandingTextEdit, SmartEditor
+    GenerateButton, AutoExpandingTextEdit, SmartEditor,
+    AudioControlWidget
 )
 from ..services.prompts import get_bible_prompt
+from ..services.tts_engine import get_engine as get_tts_engine
 
 
 # ============================================================================
@@ -102,7 +104,7 @@ class BackgroundWidget(QWidget):
             
             if bg_path.exists():
                 self.background_pixmap = QPixmap(str(bg_path))
-                logging.info(f"Background image loaded: {bg_path}")
+                # logging.info(f"Background image loaded: {bg_path}")
             else:
                 logging.warning(f"Background image not found: {bg_path}")
         except Exception as e:
@@ -1155,6 +1157,11 @@ class CenterPanel(QWidget):
         
         # Generation Lock
         self._active_summaries = set()
+
+        # TTS Engine
+        self.tts_engine = get_tts_engine()
+        self.current_voice = "neutral"
+
         
         # TRANSPARENT WITH BLACK OVERLAY for readability
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
@@ -1248,6 +1255,15 @@ class CenterPanel(QWidget):
         toolbar_widget = self._create_formatting_toolbar()
         self.content_layout.addWidget(toolbar_widget)
         
+        # Audio Controls
+        self.audio_controls = AudioControlWidget(self.tts_engine.list_available_voices())
+        self.audio_controls.read_clicked.connect(self._handle_read_aloud)
+        self.audio_controls.stop_clicked.connect(self._handle_stop_reading)
+        self.audio_controls.download_clicked.connect(self._handle_download_mp3)
+        self.audio_controls.voice_changed.connect(self._handle_voice_change)
+        self.content_layout.addWidget(self.audio_controls)
+
+        
         # Editor textbox (BLACK OVERLAY for readability - text + cursor visible)
         # Using SmartEditor for incremental summarization
         self.editor_textbox = SmartEditor()
@@ -1295,6 +1311,71 @@ class CenterPanel(QWidget):
         actions_widget = self._create_action_buttons()
         self.content_layout.addWidget(actions_widget)
     
+    def _handle_read_aloud(self):
+        """Start reading current text."""
+        text = self.editor_textbox.toPlainText()
+        if not text.strip():
+            self.audio_controls.set_reading_state(False)
+            return
+            
+        # Get start position from cursor if selection/cursor exists
+        cursor = self.editor_textbox.textCursor()
+        pos = cursor.position()
+        
+        # Simple heuristic: If near beginning, read all. If in middle, read from there.
+        # But for simpler UX initially, maybe just read from cursor?
+        # User requirement: "Determine the current page index... Extract text from the current page forward."
+        # Since we have one big editor for chapter, "from cursor forward" works best.
+        
+        text_to_read = text[pos:] if pos < len(text) else text
+        if not text_to_read.strip():
+            text_to_read = text # Fallback to start if at end
+            
+        threading.Thread(target=self._run_tts_thread, args=(text_to_read,), daemon=True).start()
+
+    def _run_tts_thread(self, text):
+        """Threaded TTS execution."""
+        try:
+            self.tts_engine.tts_read_text(text, self.current_voice)
+        except Exception as e:
+            logging.error(f"TTS Error: {e}")
+        finally:
+            # Update UI safely
+            QTimer.singleShot(0, lambda: self.audio_controls.set_reading_state(False))
+
+    def _handle_stop_reading(self):
+        """Stop TTS."""
+        self.tts_engine.stop()
+
+    def _handle_download_mp3(self):
+        """Export chapter to Audio."""
+        text = self.editor_textbox.toPlainText()
+        if not text.strip():
+            QMessageBox.warning(self, "Empty Chapter", "Nothing to export.")
+            return
+            
+        path, _ = QFileDialog.getSaveFileName(self, "Save Audio", f"Chapter_{self.current_chapter_id}.wav", "WAV Audio (*.wav)")
+        if path:
+            self.audio_controls.download_btn.setText("⏳")
+            self.audio_controls.download_btn.setEnabled(False)
+            
+            def run_export():
+                out = self.tts_engine.tts_generate_mp3(text, self.current_voice, path)
+                QTimer.singleShot(0, lambda: self._on_export_complete(out))
+                
+            threading.Thread(target=run_export, daemon=True).start()
+
+    def _on_export_complete(self, path):
+        self.audio_controls.download_btn.setText("⬇ MP3")
+        self.audio_controls.download_btn.setEnabled(True)
+        if path:
+            QMessageBox.information(self, "Export Complete", f"Audio saved to:\n{path}")
+        else:
+            QMessageBox.critical(self, "Export Failed", "Could not generate audio file.")
+
+    def _handle_voice_change(self, voice):
+        self.current_voice = voice
+
     def _create_formatting_toolbar(self) -> QWidget:
         """Create formatting toolbar with even distribution."""
         from PyQt6.QtWidgets import QSizePolicy
@@ -1465,15 +1546,15 @@ class CenterPanel(QWidget):
         
         # Keep focus on editor
         self.editor_textbox.setFocus()
-        logging.info(f"Format action applied: {action}")
+        # logging.info(f"Format action applied: {action}")
     
     def _show_document_menu(self):
         """Show document options menu."""
         menu = QMenu(self)
-        menu.addAction("Rename", lambda: logging.info("Rename document"))
-        menu.addAction("Export", lambda: logging.info("Export document"))
+        # menu.addAction("Rename", lambda: logging.info("Rename document"))
+        # menu.addAction("Export", lambda: logging.info("Export document"))
         menu.addSeparator()
-        menu.addAction("Delete", lambda: logging.info("Delete document"))
+        # menu.addAction("Delete", lambda: logging.info("Delete document"))
         menu.exec(self.sender().mapToGlobal(QPoint(0, 40)))
     
     def create_story_bible_container(self):
@@ -1603,7 +1684,7 @@ class CenterPanel(QWidget):
         
         # Connect save handler with logging
         def on_text_changed():
-            logging.info(f"TEXT_CHANGED: {section_key} editor content changed")
+            # logging.info(f"TEXT_CHANGED: {section_key} editor content changed")
             self._on_bible_field_change(section_key)
         
         text_input.textChanged.connect(on_text_changed)
@@ -1746,7 +1827,7 @@ class CenterPanel(QWidget):
     def _on_bible_field_change(self, field_name: str):
         """Handle Story Bible field changes."""
         if not self.current_project_id:
-            logging.warning(f"PERSIST: Cannot save {field_name} - no project_id")
+            # logging.warning(f"PERSIST: Cannot save {field_name} - no project_id")
             return
         
         # Get field value
@@ -1757,17 +1838,17 @@ class CenterPanel(QWidget):
             if widget_data['widget'] and isinstance(widget_data['widget'], QTextEdit):
                 value = widget_data['widget'].toPlainText()
             else:
-                logging.warning(f"PERSIST: Widget for {field_name} is not QTextEdit")
+                # logging.warning(f"PERSIST: Widget for {field_name} is not QTextEdit")
                 return
         else:
-            logging.warning(f"PERSIST: Unknown field {field_name}")
+            # logging.warning(f"PERSIST: Unknown field {field_name}")
             return
         
         # Save to database (debounced in real implementation)
         try:
-            logging.info(f"PERSIST: Saving {field_name} to DB (project={self.current_project_id}, length={len(value)} chars)")
+            # logging.info(f"PERSIST: Saving {field_name} to DB (project={self.current_project_id}, length={len(value)} chars)")
             self.db_manager.save_bible_field(self.current_project_id, field_name, value)
-            logging.info(f"PERSIST: Successfully saved {field_name}")
+            # logging.info(f"PERSIST: Successfully saved {field_name}")
         except Exception as e:
             logging.error(f"Failed to save {field_name}: {e}")
     
@@ -1888,9 +1969,9 @@ class CenterPanel(QWidget):
                         # CRITICAL FIX: Save the generated text to database
                         widget = widget_data['widget']
                         generated_text = widget.toPlainText()
-                        logging.info(f"AI_GEN_COMPLETE: Saving {section_key} to DB (length={len(generated_text)} chars)")
+                        # logging.info(f"AI_GEN_COMPLETE: Saving {section_key} to DB (length={len(generated_text)} chars)")
                         self.db_manager.save_bible_field(self.current_project_id, section_key, generated_text)
-                        logging.info(f"AI_GEN_COMPLETE: {section_key} text saved to database")
+                        # logging.info(f"AI_GEN_COMPLETE: {section_key} text saved to database")
                         
                         # Mark as dirty for summarization
                         if hasattr(widget, 'is_globally_dirty'):
@@ -2120,18 +2201,18 @@ class CenterPanel(QWidget):
         # ALWAYS set project_id on character widget (even if Story Bible not expanded)
         if hasattr(self, 'character_widget') and self.character_widget:
             self.character_widget.set_project_id(project_id)
-            logging.info(f"Set character_widget project_id to {project_id}")
+            # logging.info(f"Set character_widget project_id to {project_id}")
         
         # Load Story Bible data if container exists
         if self.story_bible_container:
             try:
-                logging.info(f"Loading Story Bible for project {project_id}...")
+                # logging.info(f"Loading Story Bible for project {project_id}...")
                 bible_data = self.db_manager.get_story_bible(project_id)
-                logging.info(f"Story Bible data retrieved: {list(bible_data.keys()) if bible_data else 'None'}")
+                # logging.info(f"Story Bible data retrieved: {list(bible_data.keys()) if bible_data else 'None'}")
                 if bible_data:
                     for field in ["braindump", "genre", "synopsis", "worldbuilding", "outline"]:
                         field_data = bible_data.get(field, "")
-                        logging.info(f"LOAD: Field '{field}': {len(field_data) if field_data else 0} characters in DB")
+                        # logging.info(f"LOAD: Field '{field}': {len(field_data) if field_data else 0} characters in DB")
                         
                         # Check if widget exists
                         if field not in self.bible_section_widgets:
@@ -2150,11 +2231,24 @@ class CenterPanel(QWidget):
                             continue
                         
                         # Load the text regardless of whether it's empty or not (to clear old data)
-                        logging.info(f"LOAD: Loading '{field}' text into widget...")
+                        # logging.info(f"LOAD: Loading '{field}' text into widget...")
+                        
+                        # Use SmartEditor specific flag (blockSignals doesn't catch document changes)
+                        if hasattr(widget, 'is_loading'):
+                            widget.is_loading = True
+                        
                         widget.blockSignals(True)
                         widget.setPlainText(field_data if field_data else "")
                         widget.blockSignals(False)
-                        logging.info(f"LOAD: Successfully loaded {len(field_data) if field_data else 0} chars into '{field}' widget")
+                        
+                        if hasattr(widget, 'is_loading'):
+                            widget.is_loading = False
+                            
+                        # FORCE RESIZE: blockSignals(True) prevented auto-resize
+                        if hasattr(widget, 'adjust_height'):
+                            widget.adjust_height()
+                            
+                        # logging.info(f"LOAD: Successfully loaded {len(field_data) if field_data else 0} chars into '{field}' widget")
                     
                     # Load style
                     if 'style' in bible_data and bible_data['style']:
@@ -2169,13 +2263,30 @@ class CenterPanel(QWidget):
                             has_summary = bible_data.get(f"{field}_summary", "").strip()
                             
                             if has_text and not has_summary:
-                                logging.info(f"Startup: Missing summary for {field}, will generate on first focus loss")
-                                # Mark as dirty so it will summarize on first focus loss/debounce
+                                logging.info(f"Startup: Missing summary for {field}, triggering auto-generation")
+                                log_payload = {
+                                    "tab_name": field,
+                                    "summary_generated": True,
+                                    "reason": "Missing summary in DB"
+                                }
+                                logging.info(f"Summary Condition: {log_payload}")
+                                
+                                # Mark as dirty and trigger automation
                                 widget_data = self.bible_section_widgets[field]
-                                if hasattr(widget_data['widget'], 'is_globally_dirty'):
-                                    widget_data['widget'].is_globally_dirty = True
+                                widget = widget_data['widget']
+                                if hasattr(widget, 'is_globally_dirty'):
+                                    widget.is_globally_dirty = True
+                                    # Explicitly start timer to trigger pipeline automatically
+                                    if hasattr(widget, 'debounce_timer'):
+                                        widget.debounce_timer.start(500) # Short delay 
                             elif has_summary:
-                                logging.info(f"Startup: Summary exists for {field}, using cached version")
+                                # Log that we are skipping
+                                log_payload = {
+                                    "tab_name": field,
+                                    "summary_generated": False,
+                                    "reason": "Summary exists in DB"
+                                }
+                                logging.info(f"Summary Condition: {log_payload}")
                     
                     # DIAGNOSTIC: Dump entire database contents for verification
                     self.db_manager.dump_story_bible_contents(project_id)
@@ -3714,7 +3825,7 @@ class StoryBibleApp(QMainWindow):
     @pyqtSlot(str, str)
     def _handle_toolbar_action(self, action: str, item: str):
         """Handle toolbar button actions."""
-        logging.info(f"Toolbar action: {action} - {item}")
+        # logging.info(f"Toolbar action: {action} - {item}")
         
         if action == "write":
             # Handle Write Modes
@@ -3781,7 +3892,8 @@ class StoryBibleApp(QMainWindow):
         elif action == "help":
             self._show_help()
         elif action == "settings":
-            logging.info("Settings clicked")
+            # logging.info("Settings clicked")
+            pass
     
     @pyqtSlot(int, int)
     def _load_chapter(self, chapter_id: int, project_id: int):
@@ -3808,7 +3920,7 @@ class StoryBibleApp(QMainWindow):
     @pyqtSlot()
     def _show_trash(self):
         """Show trash/deleted items."""
-        logging.info("Show trash clicked")
+        # logging.info("Show trash clicked")
     
     @pyqtSlot()
     def _on_content_change(self):
@@ -4039,17 +4151,32 @@ class StoryBibleApp(QMainWindow):
                 QMessageBox.warning(self, "Export", "The project has no chapters to export.")
                 return
 
-            # Initialize PDF
+            # Add Unicode Font
             pdf = FPDF()
             pdf.set_auto_page_break(auto=True, margin=15)
             
+            # Try to load a Unicode font
+            import os
+            font_path = "/usr/share/fonts/TTF/DejaVuSans.ttf"
+            font_name = "Helvetica" # Fallback
+            
+            if os.path.exists(font_path):
+                try:
+                    pdf.add_font("DejaVu", "", font_path)
+                    font_name = "DejaVu"
+                    logging.info("PDF Export: Using Unicode font 'DejaVu'")
+                except Exception as e:
+                    logging.error(f"Failed to load Unicode font: {e}")
+            
             # Add Title Page
             pdf.add_page()
-            pdf.set_font("Helvetica", "B", 24)
+            pdf.set_font(font_name, "", 24)
             pdf.ln(80)
+            
+            # Use 'effective_page_width' logic manually for centering if needed, but cell(0) works for full width
             pdf.cell(0, 20, project_name, align="C")
             pdf.ln(20)
-            pdf.set_font("Helvetica", "I", 14)
+            pdf.set_font(font_name, "", 14)
             pdf.cell(0, 10, "Generated by Story Bible Pro", align="C")
             
             # Add Chapters
@@ -4059,16 +4186,18 @@ class StoryBibleApp(QMainWindow):
                 
                 pdf.add_page()
                 
+                pdf.add_page()
+                
                 # Create Bookmark (Outline Item)
-                pdf.set_font("Helvetica", "B", 18)
+                pdf.set_font(font_name, "", 18)
                 pdf.start_section(title)
                 
                 # Render Title
                 pdf.cell(0, 15, title, ln=True, align="L")
                 pdf.ln(5)
                 
-                # Render Content
-                pdf.set_font("Helvetica", size=12)
+                # Content
+                pdf.set_font(font_name, "", 12)
                 # Ensure content is string and not empty
                 text = str(content) if content else ""
                 
@@ -4085,7 +4214,7 @@ class StoryBibleApp(QMainWindow):
             pdf.output(file_path)
             
             QMessageBox.information(self, "Export", f"Book exported successfully to:\n{file_path}")
-            logging.info(f"Project {self.current_project_id} exported to {file_path}")
+            # logging.info(f"Project {self.current_project_id} exported to {file_path}")
             
         except Exception as e:
             logging.error(f"Failed to export PDF: {e}")
@@ -4190,7 +4319,7 @@ class StoryBibleApp(QMainWindow):
             # Open the imported project
             self._open_project(project_id)
             
-            logging.info(f"Imported {len(chapters)} chapters from {file_path}")
+            # logging.info(f"Imported {len(chapters)} chapters from {file_path}")
             
         except Exception as e:
             logging.error(f"Import failed: {e}")
@@ -4263,7 +4392,7 @@ class StoryBibleApp(QMainWindow):
             
             # Refresh dashboard
             self.dashboard_view.load_projects()
-            logging.info(f"Duplicated project {project_id} as {new_project_id}")
+            # logging.info(f"Duplicated project {project_id} as {new_project_id}")
             
         except Exception as e:
             logging.error(f"Duplicate project failed: {e}")
@@ -4297,26 +4426,26 @@ class StoryBibleApp(QMainWindow):
     
     def closeEvent(self, event):
         """Handle window close event - FORCE SAVE ALL DATA."""
-        logging.info("PERSIST: Application closing - forcing save of all content")
+        # logging.info("PERSIST: Application closing - forcing save of all content")
         
         # Save Writing Canvas content
         if self.current_chapter_id:
             text = self.center_panel.get_editor_content()
-            logging.info(f"PERSIST: Saving Writing Canvas (chapter={self.current_chapter_id}, length={len(text)} chars)")
+            # logging.info(f"PERSIST: Saving Writing Canvas (chapter={self.current_chapter_id}, length={len(text)} chars)")
             self.db_manager.update_chapter_content(self.current_chapter_id, text)
-            logging.info(f"PERSIST: Writing Canvas saved")
+            # logging.info(f"PERSIST: Writing Canvas saved")
         
         # CRITICAL: Force save all Story Bible tabs
         if self.current_project_id and hasattr(self.center_panel, 'bible_section_widgets'):
-            logging.info(f"PERSIST: Force-saving all Story Bible tabs for project {self.current_project_id}")
+            # logging.info(f"PERSIST: Force-saving all Story Bible tabs for project {self.current_project_id}")
             for field_name, widget_data in self.center_panel.bible_section_widgets.items():
                 if widget_data and widget_data.get('widget'):
                     widget = widget_data['widget']
                     if isinstance(widget, QTextEdit):
                         text = widget.toPlainText()
-                        logging.info(f"PERSIST: Saving {field_name} (length={len(text)} chars)")
+                        # logging.info(f"PERSIST: Saving {field_name} (length={len(text)} chars)")
                         self.db_manager.save_bible_field(self.current_project_id, field_name, text)
-                        logging.info(f"PERSIST: {field_name} saved")
+                        # logging.info(f"PERSIST: {field_name} saved")
         
         # Save session state
         if self.current_project_id:
@@ -4328,5 +4457,5 @@ class StoryBibleApp(QMainWindow):
         if hasattr(self.ai_engine, "unload_model"):
             self.ai_engine.unload_model()
         
-        logging.info("PERSIST: All data saved, closing application")
+        # logging.info("PERSIST: All data saved, closing application")
         event.accept()

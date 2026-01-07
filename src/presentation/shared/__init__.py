@@ -8,3 +8,4 @@ from .widgets import (
 )
 from .background import BackgroundWidget
 from .generate_button import GenerateButton
+from .audio_controls import AudioControlWidget

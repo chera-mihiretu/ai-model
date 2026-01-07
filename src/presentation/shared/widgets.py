@@ -439,6 +439,7 @@ class SmartEditor(QTextEdit):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.is_globally_dirty = False
+        self.is_loading = False # Flag to ignore programmatic changes
         self._dirty_blocks = set() # Set of block numbers (int)
         
         # Debounce Timer (2 seconds)
@@ -451,6 +452,9 @@ class SmartEditor(QTextEdit):
 
     def _on_contents_change(self, position, charsRemoved, charsAdded):
         """Mark changed blocks as dirty."""
+        if self.is_loading:
+            return
+
         self.is_globally_dirty = True
         
         # Identify affected block(s)
@@ -542,12 +546,27 @@ class AutoExpandingTextEdit(SmartEditor):
         
         # Initial adjustment
         self.adjust_height()
+        
+    def showEvent(self, event):
+        """Ensure height is adjusted when widget becomes visible."""
+        super().showEvent(event)
+        self.adjust_height()
+
+    def resizeEvent(self, event):
+        """Adjust height on resize."""
+        super().resizeEvent(event)
+        self.adjust_height()
 
     def adjust_height(self):
         """Update height based on document content."""
         doc = self.document()
+        
+        # KEY FIX: Force layout to respect current width
+        if self.width() > 0:
+            doc.setTextWidth(self.width())
+            
         # Use precise height from document layout
-        doc_height = doc.documentLayout().documentSize().height()
+        doc_height = doc.size().height()
         
         # Add padding/margins
         margins = self.contentsMargins()
