@@ -2203,8 +2203,65 @@ class CenterPanel(QWidget):
         if hasattr(self, 'character_widget') and self.character_widget:
             self.character_widget.set_project_id(project_id)
             # logging.info(f"Set character_widget project_id to {project_id}")
+            
+        # Load Character Voices
+        self._load_character_voices(project_id)
         
         # Load Story Bible data if container exists
+    
+    def _load_character_voices(self, project_id: int):
+        """Load character voices for the project into TTS engine."""
+        try:
+            with self.db_manager.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("SELECT name, custom_voice_path FROM characters WHERE project_id = ? AND custom_voice_path IS NOT NULL", (project_id,))
+                rows = cursor.fetchall()
+                
+            if not rows:
+                return
+
+            logging.info(f"Loading {len(rows)} character voices for Project {project_id}...")
+            
+            # Update Voice List in UI
+            current_voices = self.tts_engine.list_available_voices()
+            
+            # Helper to run extraction in background
+            def load_voices_task():
+                loaded_count = 0
+                for name, path in rows:
+                    if not path or not os.path.exists(path):
+                        continue
+                        
+                    # Extract/Load embedding
+                    latents = self.tts_engine.extract_speaker_embedding(path)
+                    if latents:
+                        self.tts_engine.character_voice_map[name] = latents
+                        loaded_count += 1
+                        
+                if loaded_count > 0:
+                    logging.info(f"Loaded {loaded_count} character voices.")
+                    # Update UI on main thread
+                    # We need to signal back. 
+                    # For simplicity, we can just invoke method if thread-safe or use QTimer
+                    pass
+
+            threading.Thread(target=load_voices_task, daemon=True).start()
+            
+            # Add placeholders to Voice List immediately? 
+            # Or wait? 
+            # Better to add them to the dropdown so user can select them.
+            # Even if embedding isn't quite ready (race condition), prompt them?
+            # tts_read_text handles missing map by falling back to default voice.
+            
+            character_voices = [f"Character: {row[0]}" for row in rows]
+            all_voices = current_voices + character_voices
+            
+            # Update Audio Controls
+            if hasattr(self.audio_controls, 'update_voice_list'):
+                 QTimer.singleShot(0, lambda: self.audio_controls.update_voice_list(all_voices))
+            
+        except Exception as e:
+            logging.error(f"Failed to load character voices: {e}")
         if self.story_bible_container:
             try:
                 # logging.info(f"Loading Story Bible for project {project_id}...")
