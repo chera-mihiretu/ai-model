@@ -1814,7 +1814,7 @@ class CenterPanel(QWidget):
         card_layout.addWidget(header)
         
         # Character widget (pass ai_engine for AI generation features)
-        self.character_widget = CharacterWidget(self.db_manager, self.ai_engine)
+        self.character_widget = CharacterWidget(self.db_manager, self.ai_engine, self.tts_engine)
         card_layout.addWidget(self.character_widget)
         
         # Store reference
