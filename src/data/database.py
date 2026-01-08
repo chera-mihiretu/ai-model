@@ -88,7 +88,7 @@ class DatabaseManager:
                     'relationship_to_author', 'backstory', 'continuity_notes',
                     'pronouns', 'groups', 'other_names', 'motivations', 
                     'internal_conflicts', 'strengths', 'weaknesses', 'character_arc',
-                    'physical_description', 'is_visible'
+                    'physical_description', 'is_visible', 'custom_voice_path'
                 }
                 
                 missing_fields = required_fields - set(current_cols)
@@ -127,7 +127,9 @@ class DatabaseManager:
                             weaknesses TEXT,
                             character_arc TEXT,
                             physical_description TEXT,
+                            physical_description TEXT,
                             is_visible INTEGER DEFAULT 1,
+                            custom_voice_path TEXT,
                             UNIQUE(name, project_id)
                         )
                     """)

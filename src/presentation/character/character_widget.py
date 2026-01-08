@@ -7,7 +7,7 @@ import logging
 import queue
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QTextEdit,
-    QScrollArea, QFrame, QInputDialog, QMessageBox, QComboBox
+    QScrollArea, QFrame, QInputDialog, QMessageBox, QComboBox, QFileDialog
 )
 from PyQt6.QtCore import Qt, pyqtSignal, QThread
 from PyQt6.QtGui import QFont
@@ -82,9 +82,10 @@ class CharacterProfileCard(QWidget):
     character_updated = pyqtSignal(int, str, object)  # character_id, field, value
     character_deleted = pyqtSignal(int)  # character_id
     
-    def __init__(self, db_manager, character_data, parent=None):
+    def __init__(self, db_manager, character_data, tts_engine=None, parent=None):
         super().__init__(parent)
         self.db_manager = db_manager
+        self.tts_engine = tts_engine # Store TTS engine
         self.character_id = character_data.get('id')
         self.character_data = character_data
         self.is_expanded = True
@@ -265,6 +266,15 @@ class CharacterProfileCard(QWidget):
         self.visibility_btn.setToolTip("Toggle visibility to AI")
         self._update_visibility_button_style()
         self.visibility_btn.clicked.connect(self._toggle_visibility)
+        
+        # Voice Button (Microphone)
+        self.voice_btn = QPushButton("🎤")
+        self.voice_btn.setFixedSize(40, 36)
+        self.voice_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._update_voice_button_style()
+        self.voice_btn.clicked.connect(self._on_add_voice)
+        layout.addWidget(self.voice_btn)
+        
         layout.addWidget(self.visibility_btn)
         
         # Archive button - More visible with background
@@ -733,6 +743,95 @@ class CharacterProfileCard(QWidget):
         if reply == QMessageBox.StandardButton.Yes:
             self.character_deleted.emit(self.character_id)
 
+    def _update_voice_button_style(self):
+        """Update voice button style based on whether a custom voice is set."""
+        has_voice = bool(self.character_data.get('custom_voice_path'))
+        
+        # Color: Green/Emerald if active, Gray if not
+        bg_col = 'rgba(16, 185, 129, 0.2)' if has_voice else 'rgba(60, 65, 75, 150)'
+        border_col = '#10B981' if has_voice else 'rgba(100, 100, 120, 80)'
+        text_col = '#10B981' if has_voice else QtTheme.TEXT_PRIMARY
+        
+        self.voice_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {bg_col};
+                color: {text_col};
+                border: 1px solid {border_col};
+                font-size: 16px;
+                border-radius: 6px;
+            }}
+            QPushButton:hover {{
+                background-color: {'rgba(16, 185, 129, 0.3)' if has_voice else 'rgba(79, 70, 229, 120)'};
+                border: 1px solid {QtTheme.ACCENT_PRIMARY};
+                color: white;
+            }}
+        """)
+        self.voice_btn.setToolTip(f"Voice: {'Active' if has_voice else 'None'} (Click to set)")
+
+    def _on_add_voice(self):
+        """Handle adding a custom voice."""
+        if not self.tts_engine:
+             QMessageBox.warning(self, "TTS Unavailable", "TTS Engine is not initialized.")
+             return
+
+        # Open file dialog
+        from PyQt6.QtWidgets import QApplication
+        file_path, _ = QFileDialog.getOpenFileName(
+            self, "Select Voice Sample", "", 
+            "Audio Files (*.wav)"
+        )
+        
+        if not file_path:
+            return
+            
+        # Verify WAV
+        if not file_path.lower().endswith('.wav'):
+             QMessageBox.warning(self, "Invalid Format", "XTTS Reference audio must be a .wav file.")
+             return
+        
+        # Extract embedding
+        try:
+            # Show loading
+            original_text = self.voice_btn.text()
+            self.voice_btn.setText("⏳")
+            QApplication.processEvents() 
+            
+            latents = self.tts_engine.extract_speaker_embedding(file_path)
+            
+            if latents:
+                self.character_data['custom_voice_path'] = file_path
+                
+                # Update DB directly
+                try:
+                    with self.db_manager.get_connection() as conn:
+                        conn.execute(
+                            "UPDATE characters SET custom_voice_path = ? WHERE id = ?",
+                            (file_path, self.character_id)
+                        )
+                        conn.commit()
+                except Exception as e:
+                    logging.error(f"Failed to save voice path: {e}")
+                    QMessageBox.warning(self, "Warning", "Voice loaded but failed to save to database.")
+                
+                # Emit update
+                self.character_updated.emit(self.character_id, 'custom_voice_path', file_path)
+                
+                # Update TTS map immediately
+                character_name = self.character_data.get('name')
+                if character_name:
+                    self.tts_engine.character_voice_map[character_name] = latents
+                
+                QMessageBox.information(self, "Success", "Voice cloned successfully!")
+            else:
+                QMessageBox.critical(self, "Error", "Failed to extract features from audio.")
+                
+        except Exception as e:
+            logging.error(f"Voice add error: {e}")
+            QMessageBox.critical(self, "Error", str(e))
+        finally:
+            self.voice_btn.setText("🎤")
+            self._update_voice_button_style()
+
 
 # ============================================================================
 # AI THREAD
@@ -776,13 +875,21 @@ class CharacterGenerationThread(QThread):
 # CHARACTER WIDGET (MAIN CONTAINER)
 # ============================================================================
 
+# ============================================================================
+# CHARACTER WIDGET (MAIN CONTAINER)
+# ============================================================================
+
+
 class CharacterWidget(QWidget):
     """Sudowrite-style character profile page with expandable cards."""
     
-    def __init__(self, db_manager, ai_engine=None, parent=None):
+    voice_updated = pyqtSignal()
+    
+    def __init__(self, db_manager, ai_engine=None, tts_engine=None, parent=None):
         super().__init__(parent)
         self.db_manager = db_manager
         self.ai_engine = ai_engine
+        self.tts_engine = tts_engine # Store TTS engine
         self.project_id = None
         self.character_cards = []
         self.active_threads = []  # Keep references to prevent GC
@@ -971,7 +1078,7 @@ class CharacterWidget(QWidget):
                 
                 for char_data in characters:
                     logging.info(f"Creating card for character: {char_data.get('name', 'Unknown')}")
-                    card = CharacterProfileCard(self.db_manager, char_data)
+                    card = CharacterProfileCard(self.db_manager, char_data, self.tts_engine)
                     card.character_updated.connect(self._on_character_updated)
                     card.character_deleted.connect(self._on_character_deleted)
                     
@@ -1581,6 +1688,9 @@ IMPORTANT: Return VALID JSON ONLY. No markdown blocks. No conversational text.""
     def _on_character_updated(self, character_id, field, value):
         """Handle character field update."""
         logging.info(f"Character {character_id} updated: {field} = {value[:50] if value else ''}...")
+        
+        if field == 'custom_voice_path':
+            self.voice_updated.emit()
     
     def _on_character_deleted(self, character_id):
         """Handle character deletion."""

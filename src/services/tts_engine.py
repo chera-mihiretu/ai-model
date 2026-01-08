@@ -6,7 +6,9 @@ import threading
 import pyaudio
 import numpy as np
 import wave
+import queue
 import re
+import concurrent.futures
 from typing import List, Optional, Dict
 from pathlib import Path
 
@@ -57,6 +59,10 @@ class TTSEngine:
         # Audio stream
         self.p = pyaudio.PyAudio()
         self.stream = None
+        self.inference_lock = threading.Lock()
+        
+        # Custom Character Voices
+        self.character_voice_map = {} # {character_name: (gpt_cond_latent, speaker_embedding)}
         
         # Load model immediately or lazy load? 
         # User requested: "Initialize the model once at application startup."
@@ -147,17 +153,43 @@ class TTSEngine:
     def list_available_voices(self) -> List[str]:
         """Returns list of supported accents/voices."""
         return list(self.VOICE_MAPPING.keys())
-        
-    def _get_speaker_latents(self, voice: str):
+
+    def extract_speaker_embedding(self, wav_path: str):
         """
-        Get speaker latents for the requested voice.
-        In a real XTTS setup without reference audio files, we rely on the speakers_xtts.safetensors
-        loaded by the model's SpeakerManager.
+        Extracts speaker embedding from a reference WAV file.
+        Returns (gpt_cond_latent, speaker_embedding) or None.
+        """
+        if not self.is_loaded or not self.model:
+            logging.error("Model not loaded.")
+            return None
+            
+        try:
+            logging.info(f"Extracting embedding from: {wav_path}")
+            gpt_cond_latent, speaker_embedding = self.model.get_conditioning_latents(
+                audio_path=[wav_path],
+                gpt_cond_len=self.model.config.gpt_cond_len,
+                max_ref_length=self.model.config.max_ref_len,
+                sound_norm_refs=self.model.config.sound_norm_refs
+            )
+            return gpt_cond_latent, speaker_embedding
+        except Exception as e:
+            logging.error(f"Failed to extract embedding: {e}")
+            return None
+
+    def _get_speaker_latents(self, voice: str, character_name: Optional[str] = None):
+        """
+        Get speaker latents for the requested voice OR character.
+        Prioritizes character_name if a custom voice is loaded.
         """
         if not self.model:
             logging.error("_get_speaker_latents: Model is None")
             return None, None
             
+        # 1. Check Character Map
+        if character_name and character_name in self.character_voice_map:
+            logging.info(f"Using custom voice for character: {character_name}")
+            return self.character_voice_map[character_name]
+
         if self.model.speaker_manager is None:
             logging.error("_get_speaker_latents: Speaker Manager is None")
             return None, None
@@ -177,10 +209,37 @@ class TTSEngine:
         gpt_cond_latent, speaker_embedding = self.model.speaker_manager.speakers[target_speaker].values()
         return gpt_cond_latent, speaker_embedding
 
-    def tts_read_text(self, text: str, voice: str):
+    def _generate_chunk_audio(self, chunk: str, gpt_cond_latent, speaker_embedding):
+        """Helper to generate audio for a single chunk."""
+        try:
+            # logging.debug(f"Generating audio for chunk: {chunk[:30]}...")
+            t0 = time.time()
+            
+            with self.inference_lock:
+                out = self.model.inference(
+                    text=chunk,
+                    language="en",
+                    gpt_cond_latent=gpt_cond_latent,
+                    speaker_embedding=speaker_embedding,
+                    temperature=0.7,
+                )
+            
+            dt = time.time() - t0
+            # logging.debug(f"Inference took {dt:.2f}s")
+            
+            # Extract wav
+            wav = out["wav"]
+            if isinstance(wav, torch.Tensor):
+                wav = wav.cpu().numpy()
+            return wav
+        except Exception as e:
+            logging.error(f"Error generating chunk: {e}")
+            return None
+
+    def tts_read_text(self, text: str, voice: str, character_name: Optional[str] = None):
         """
-        Streams audio to speakers in real-time (chunked).
-        Run in a separate thread usually.
+        Streams audio to speakers in real-time (chunked) using Pipelining and Concurrency.
+        Producer (Generation) -> Queue -> Consumer (Playback).
         """
         if not self.is_loaded:
             logging.warning("TTS Model not loaded.")
@@ -192,54 +251,105 @@ class TTSEngine:
         self.stop_flag = False
         self.is_playing = True
         
+        # Audio Queue for Pipelining
+        audio_queue = queue.Queue(maxsize=20) 
+        playback_thread = threading.Thread(target=self._playback_worker, args=(audio_queue,), daemon=True)
+        playback_thread.start()
+        
         # Chunk text
         chunks = self._split_text_into_chunks(text)
         
-        # Get latents (using the first speaker for now as fallback)
-        gpt_cond_latent, speaker_embedding = self._get_speaker_latents(voice)
+        # Get latents
+        gpt_cond_latent, speaker_embedding = self._get_speaker_latents(voice, character_name)
         
         if gpt_cond_latent is None or speaker_embedding is None:
             logging.error("Could not retrieve speaker latents. Aborting TTS.")
+            self.stop_flag = True
+            audio_queue.put(None) # Signal end
             self.is_playing = False
             return
         
         try:
-            for chunk in chunks:
-                if self.stop_flag:
-                    break
+            # Use ThreadPoolExecutor to pre-fetch chunks
+            # Max workers = 2 to allow overlap (one generating, one finishing/preparing)
+            # Too many might contend for GPU/CPU if inference isn't perfectly thread-safe or GIL-bound
+            with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
+                # Submit all tasks while maintaining order
+                future_to_index = {
+                    executor.submit(self._generate_chunk_audio, chunk, gpt_cond_latent, speaker_embedding): i 
+                    for i, chunk in enumerate(chunks)
+                }
                 
-                # Generate audio for chunk
-                # inference returning wav
-                out = self.model.inference(
-                    text=chunk,
-                    language="en",
-                    gpt_cond_latent=gpt_cond_latent,
-                    speaker_embedding=speaker_embedding,
-                    temperature=0.7, # 0.7 is good for variety
-                )
+                # We must yield results in ORDER
+                # Iterate through futures in submission order
+                sorted_futures = sorted(future_to_index.keys(), key=future_to_index.get)
                 
-                # Convert to numpy and play
-                wav = out["wav"]
-                if isinstance(wav, torch.Tensor):
-                    wav = wav.cpu().numpy()
-                
-                # Debug Audio Stats
-                if len(wav) > 0:
-                    logging.info(f"Audio Chunk Stats: Min={wav.min():.4f}, Max={wav.max():.4f}, Mean={wav.mean():.4f}, Len={len(wav)}")
-                else:
-                    logging.warning("Generated audio chunk is empty.")
-
-                self._play_audio_chunk(wav)
+                for future in sorted_futures:
+                    if self.stop_flag:
+                        # Cancel remaining if possible
+                        future.cancel()
+                        break
+                    
+                    try:
+                        wav = future.result()
+                        if wav is not None:
+                            audio_queue.put(wav)
+                    except Exception as e:
+                        logging.error(f"Error getting future result: {e}")
                 
         except Exception as e:
             logging.error(f"Error during streaming TTS: {e}")
         finally:
+            # Signal playback to stop after queue is empty
+            audio_queue.put(None)
+            if playback_thread.is_alive():
+                playback_thread.join()
             self.is_playing = False
 
-    def _play_audio_chunk(self, wav_data: np.array):
+    def _playback_worker(self, audio_queue: queue.Queue):
         """
-        Plays a single numpy audio chunk using PyAudio.
-        XTTS usually outputs 24000Hz.
+        Consumer thread that plays audio from the queue.
+        Manages the PyAudio stream lifecycle locally to avoid thread safety issues.
+        """
+        stream = None
+        try:
+             stream = self.p.open(
+                format=pyaudio.paInt16,
+                channels=1,
+                rate=24000, # XTTS default
+                output=True
+            )
+             
+             while True:
+                if self.stop_flag:
+                    break
+                    
+                try:
+                    # Timeout allows checking stop_flag periodically if queue is empty
+                    item = audio_queue.get(timeout=0.5)
+                except queue.Empty:
+                    continue
+                    
+                if item is None: # Sentinel for "End of stream"
+                    audio_queue.task_done()
+                    break
+                
+                # Play the audio
+                wav_data = item
+                self._play_audio_chunk(stream, wav_data)
+                audio_queue.task_done()
+                
+        except Exception as e:
+            logging.error(f"Playback worker error: {e}")
+        finally:
+            if stream:
+                stream.stop_stream()
+                stream.close()
+
+    def _play_audio_chunk(self, stream, wav_data: np.array):
+        """
+        Plays a single numpy audio chunk using the provided stream.
+        Writes in small blocks to allow interruption.
         """
         if self.stop_flag:
             return
@@ -249,24 +359,20 @@ class TTSEngine:
         # Convert to int16 for PyAudio
         wav_int16 = (wav_data * 32767).astype(np.int16)
         
-        if self.stream is None:
-            self.stream = self.p.open(
-                format=pyaudio.paInt16,
-                channels=1,
-                rate=24000, # XTTS default
-                output=True
-            )
-            
-        self.stream.write(wav_int16.tobytes())
+        # Write in small chunks to allow stopping mid-sentence
+        chunk_size = 1024
+        data = wav_int16.tobytes()
+        
+        for i in range(0, len(data), chunk_size):
+            if self.stop_flag:
+                break
+            stream.write(data[i:i+chunk_size])
 
     def stop(self):
-        """Stops current playback."""
+        """Stops current playback safely."""
         self.stop_flag = True
-        if self.stream:
-            self.stream.stop_stream()
-            self.stream.close()
-            self.stream = None
         self.is_playing = False
+        # Do NOT close stream here. The worker thread will handle it.
 
     def tts_generate_mp3(self, text: str, voice: str, output_path: str) -> str:
         """
