@@ -801,7 +801,19 @@ class CharacterProfileCard(QWidget):
             if latents:
                 self.character_data['custom_voice_path'] = file_path
                 
-                # Emit update for DB
+                # Update DB directly
+                try:
+                    with self.db_manager.get_connection() as conn:
+                        conn.execute(
+                            "UPDATE characters SET custom_voice_path = ? WHERE id = ?",
+                            (file_path, self.character_id)
+                        )
+                        conn.commit()
+                except Exception as e:
+                    logging.error(f"Failed to save voice path: {e}")
+                    QMessageBox.warning(self, "Warning", "Voice loaded but failed to save to database.")
+                
+                # Emit update
                 self.character_updated.emit(self.character_id, 'custom_voice_path', file_path)
                 
                 # Update TTS map immediately
@@ -870,6 +882,8 @@ class CharacterGenerationThread(QThread):
 
 class CharacterWidget(QWidget):
     """Sudowrite-style character profile page with expandable cards."""
+    
+    voice_updated = pyqtSignal()
     
     def __init__(self, db_manager, ai_engine=None, tts_engine=None, parent=None):
         super().__init__(parent)
@@ -1674,6 +1688,9 @@ IMPORTANT: Return VALID JSON ONLY. No markdown blocks. No conversational text.""
     def _on_character_updated(self, character_id, field, value):
         """Handle character field update."""
         logging.info(f"Character {character_id} updated: {field} = {value[:50] if value else ''}...")
+        
+        if field == 'custom_voice_path':
+            self.voice_updated.emit()
     
     def _on_character_deleted(self, character_id):
         """Handle character deletion."""

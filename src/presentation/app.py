@@ -1823,6 +1823,7 @@ class CenterPanel(QWidget):
         
         # Character widget (pass ai_engine for AI generation features)
         self.character_widget = CharacterWidget(self.db_manager, self.ai_engine, self.tts_engine)
+        self.character_widget.voice_updated.connect(lambda: self._load_character_voices(self.current_project_id) if hasattr(self, 'current_project_id') and self.current_project_id else None)
         card_layout.addWidget(self.character_widget)
         
         # Store reference
