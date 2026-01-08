@@ -1337,7 +1337,15 @@ class CenterPanel(QWidget):
     def _run_tts_thread(self, text):
         """Threaded TTS execution."""
         try:
-            self.tts_engine.tts_read_text(text, self.current_voice)
+            voice = self.current_voice
+            character_name = None
+            
+            # Check if using a character voice
+            if voice and voice.startswith("Character: "):
+                character_name = voice.replace("Character: ", "") 
+                # voice = "default" # Or keep as is, engine ignores voice if char_name set
+            
+            self.tts_engine.tts_read_text(text, voice, character_name=character_name)
         except Exception as e:
             logging.error(f"TTS Error: {e}")
         finally:

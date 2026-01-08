@@ -154,3 +154,17 @@ class AudioControlWidget(QWidget):
             self._style_button(self.read_btn, accent=True)
             self.status_label.setText("")
 
+    def update_voice_list(self, voices: list[str]):
+        """Update the list of available voices."""
+        current = self.voice_combo.currentText()
+        self.voice_combo.blockSignals(True)
+        self.voice_combo.clear()
+        self.voice_combo.addItems(voices)
+        
+        # Restore selection if possible
+        if current in voices:
+            self.voice_combo.setCurrentText(current)
+        
+        self.voice_combo.blockSignals(False)
+        self.voices = voices
+

@@ -743,49 +743,6 @@ class CharacterProfileCard(QWidget):
         if reply == QMessageBox.StandardButton.Yes:
             self.character_deleted.emit(self.character_id)
 
-
-# ============================================================================
-# AI THREAD
-# ============================================================================
-
-class CharacterGenerationThread(QThread):
-    finished = pyqtSignal(str)
-    
-    def __init__(self, ai_engine, prompt, response_queue):
-        super().__init__()
-        self.ai_engine = ai_engine
-        self.prompt = prompt
-        self.response_queue = response_queue
-    
-    def run(self):
-        try:
-            # Use the AI engine to generate response
-            self.ai_engine.stream_response(self.prompt, self.response_queue, "", "")
-            
-            # Collect the full response
-            full_response = ""
-            while True:
-                try:
-                    chunk = self.response_queue.get(timeout=0.1)
-                    if chunk == "[[END]]":
-                        break
-                    full_response += chunk
-                except queue.Empty:
-                    # If logic is synchronous, we might need to rely on the sentinel.
-                    # If we've processed everything and engine is done, we might not get Empty if fast enough, 
-                    # but safest is just wait for [[END]]
-                    continue
-            
-            print(f"\n[AI DEBUG] Full Response:\n{full_response}\n")
-            self.finished.emit(full_response)
-        except Exception as e:
-            self.finished.emit(f"ERROR: {str(e)}")
-
-
-# ============================================================================
-# CHARACTER WIDGET (MAIN CONTAINER)
-# ============================================================================
-
     def _update_voice_button_style(self):
         """Update voice button style based on whether a custom voice is set."""
         has_voice = bool(self.character_data.get('custom_voice_path'))
@@ -862,6 +819,53 @@ class CharacterGenerationThread(QThread):
         finally:
             self.voice_btn.setText("🎤")
             self._update_voice_button_style()
+
+
+# ============================================================================
+# AI THREAD
+# ============================================================================
+
+class CharacterGenerationThread(QThread):
+    finished = pyqtSignal(str)
+    
+    def __init__(self, ai_engine, prompt, response_queue):
+        super().__init__()
+        self.ai_engine = ai_engine
+        self.prompt = prompt
+        self.response_queue = response_queue
+    
+    def run(self):
+        try:
+            # Use the AI engine to generate response
+            self.ai_engine.stream_response(self.prompt, self.response_queue, "", "")
+            
+            # Collect the full response
+            full_response = ""
+            while True:
+                try:
+                    chunk = self.response_queue.get(timeout=0.1)
+                    if chunk == "[[END]]":
+                        break
+                    full_response += chunk
+                except queue.Empty:
+                    # If logic is synchronous, we might need to rely on the sentinel.
+                    # If we've processed everything and engine is done, we might not get Empty if fast enough, 
+                    # but safest is just wait for [[END]]
+                    continue
+            
+            print(f"\n[AI DEBUG] Full Response:\n{full_response}\n")
+            self.finished.emit(full_response)
+        except Exception as e:
+            self.finished.emit(f"ERROR: {str(e)}")
+
+
+# ============================================================================
+# CHARACTER WIDGET (MAIN CONTAINER)
+# ============================================================================
+
+# ============================================================================
+# CHARACTER WIDGET (MAIN CONTAINER)
+# ============================================================================
 
 
 class CharacterWidget(QWidget):
