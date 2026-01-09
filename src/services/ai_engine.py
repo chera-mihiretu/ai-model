@@ -293,7 +293,7 @@ class AIEngine:
             logging.error(f"Compression error: {e}")
             return self.smart_trim(text, max_tokens) # Fallback to strict trim
 
-    def assemble_context(self, instruction: str, chapter_summary: str, bible_summaries: list, recent_summary: str, recent_text: str) -> str:
+    def assemble_context(self, instruction: str, chapter_summary: str, bible_summaries: list, recent_summary: str, recent_text: str, long_form: bool = False) -> str:
         """
         Assembles a strictly budgeted context string.
         Total Limit: 4096 tokens (minus output buffer).
@@ -304,9 +304,13 @@ class AIEngine:
         3. Chapter Summary - Long Term Memory
         4. Bible Summaries - Lore
         """
-        OUTPUT_BUFFER = 800
-        SYSTEM_BUFFER = 200 # For system prompt overhead
+        OUTPUT_BUFFER = 4000 if long_form else 800
+        SYSTEM_BUFFER = 50 if long_form else 200 # Extreme squeeze for long form
         TOTAL_LIMIT = 4096 - OUTPUT_BUFFER - SYSTEM_BUFFER
+        
+        # Ensure we have at least SOME tokens for instruction
+        if TOTAL_LIMIT < 50:
+            TOTAL_LIMIT = 50
         
         instruction_tokens = self.count_tokens(instruction)
         recent_summary_tokens = self.count_tokens(recent_summary)
@@ -427,7 +431,7 @@ class AIEngine:
             "style_notes": "Maintain consistency with established tone and voice."
         }
 
-    def stream_response(self, instruction: str, response_queue: queue.Queue, bible_data: dict = None, current_text: str = "", character_context: dict = None, rag_context: dict = None, style: str = None) -> None:
+    def stream_response(self, instruction: str, response_queue: queue.Queue, bible_data: dict = None, current_text: str = "", character_context: dict = None, rag_context: dict = None, style: str = None, long_form: bool = False) -> None:
         """Streams response tokens using strict context assembly."""
         if not self.llm:
             response_queue.put("Error: AI Model is not loaded check logs.")
@@ -449,7 +453,8 @@ class AIEngine:
             chapter_summary, 
             bible_summaries, 
             recent_summary, 
-            current_text
+            current_text,
+            long_form=long_form
         )
         
         system_prompt = PROSE_SYSTEM_PROMPT
@@ -470,7 +475,7 @@ class AIEngine:
             f"<|start_header_id|>assistant<|end_header_id|>"
         )
 
-        max_output_tokens = 800
+        max_output_tokens = 4000 if long_form else 800
         # Verify total
         total_input = self.count_tokens(full_prompt)
         if total_input + max_output_tokens > 4096:

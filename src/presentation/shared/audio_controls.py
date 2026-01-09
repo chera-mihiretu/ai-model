@@ -16,6 +16,8 @@ class AudioControlWidget(QWidget):
     stop_clicked = pyqtSignal()
     download_clicked = pyqtSignal()
     voice_changed = pyqtSignal(str)
+    add_voice_clicked = pyqtSignal()
+    delete_voice_triggered = pyqtSignal(str) # voice name
     
     def __init__(self, voices: list[str], parent=None):
         super().__init__(parent)
@@ -65,6 +67,16 @@ class AudioControlWidget(QWidget):
         self.voice_combo.setFixedWidth(120)
         self.voice_combo.setCursor(Qt.CursorShape.PointingHandCursor)
         self.voice_combo.currentTextChanged.connect(self.voice_changed.emit)
+        self.voice_combo.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.voice_combo.customContextMenuRequested.connect(self._show_voice_context_menu)
+        
+        # 4. Add Voice Button
+        self.add_voice_btn = QPushButton("+")
+        self.add_voice_btn.setToolTip("Add Custom Cloned Voice")
+        self.add_voice_btn.setFixedSize(30, 32)
+        self.add_voice_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.add_voice_btn.clicked.connect(self.add_voice_clicked.emit)
+        self._style_button(self.add_voice_btn, accent=False)
         
         # Style ComboBox (Glass)
         self.voice_combo.setStyleSheet(f"""
@@ -101,6 +113,7 @@ class AudioControlWidget(QWidget):
         inner.addStretch()
         inner.addWidget(QLabel("Voice:"))
         inner.addWidget(self.voice_combo)
+        inner.addWidget(self.add_voice_btn)
         inner.addWidget(self.download_btn)
         
         layout.addWidget(container)
@@ -167,4 +180,18 @@ class AudioControlWidget(QWidget):
         
         self.voice_combo.blockSignals(False)
         self.voices = voices
+
+    def _show_voice_context_menu(self, pos):
+        """Show context menu for deleting cloned voices."""
+        voice = self.voice_combo.currentText()
+        if not voice.startswith("Cloned: "):
+            return
+            
+        from PyQt6.QtWidgets import QMenu
+        menu = QMenu(self)
+        delete_action = menu.addAction("Delete Cloned Voice")
+        action = menu.exec(self.voice_combo.mapToGlobal(pos))
+        
+        if action == delete_action:
+            self.delete_voice_triggered.emit(voice)
 
