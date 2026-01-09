@@ -140,12 +140,13 @@ tensorboard==2.20.0
 tensorboard-data-server==0.7.2
 thinc==8.3.10
 threadpoolctl==3.6.0
-tokenizers==0.22.2
+tokenizers==0.19.1
 torch==2.9.1
 torchaudio==2.9.1
+torchcodec==0.9.1
 tqdm==4.67.1
 trainer==0.0.36
-transformers==4.57.3
+transformers==4.42.4
 triton==3.5.1
 TTS==0.22.0
 typeguard==4.4.4

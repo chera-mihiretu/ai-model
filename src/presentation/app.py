@@ -1263,6 +1263,8 @@ class CenterPanel(QWidget):
         self.audio_controls.stop_clicked.connect(self._handle_stop_reading)
         self.audio_controls.download_clicked.connect(self._handle_download_mp3)
         self.audio_controls.voice_changed.connect(self._handle_voice_change)
+        self.audio_controls.add_voice_clicked.connect(self._handle_add_custom_voice)
+        self.audio_controls.delete_voice_triggered.connect(self._handle_delete_voice)
         self.content_layout.addWidget(self.audio_controls)
 
         
@@ -1414,6 +1416,65 @@ class CenterPanel(QWidget):
 
     def _handle_voice_change(self, voice):
         self.current_voice = voice
+
+    def _handle_add_custom_voice(self):
+        """Opens dialogs to clone a new paragraph voice."""
+        from PyQt6.QtWidgets import QInputDialog, QFileDialog, QMessageBox
+        
+        name, ok = QInputDialog.getText(self, "Add Cloned Voice", "Enter a name for the new voice:")
+        if not ok or not name.strip():
+            return
+            
+        name = name.strip()
+        if f"Cloned: {name}" in self.tts_engine.list_available_voices():
+             QMessageBox.warning(self, "Duplicate Name", f"A voice named '{name}' already exists.")
+             return
+             
+        file_path, _ = QFileDialog.getOpenFileName(
+            self, "Select Voice Sample", "", "Audio Files (*.wav)"
+        )
+        if not file_path:
+            return
+            
+        # UI Feedback
+        self.audio_controls.status_label.setText("Cloning Voice...")
+        
+        def run_cloning():
+            success, msg = self.tts_engine.add_paragraph_voice(name, file_path)
+            QTimer.singleShot(0, lambda: self._on_cloning_complete(success, msg, name))
+            
+        threading.Thread(target=run_cloning, daemon=True).start()
+
+    def _on_cloning_complete(self, success, msg, name):
+        self.audio_controls.status_label.setText("")
+        if success:
+            QMessageBox.information(self, "Success", f"Voice '{name}' cloned successfully.")
+            # Refresh dropdown
+            self.audio_controls.update_voice_list(self.tts_engine.list_available_voices())
+            # Select it
+            self.audio_controls.voice_combo.setCurrentText(f"Cloned: {name}")
+        else:
+            QMessageBox.critical(self, "Error", f"Failed to clone voice: {msg}")
+
+    def _handle_delete_voice(self, voice_name_with_prefix):
+        """Deletes a custom cloned voice."""
+        from PyQt6.QtWidgets import QMessageBox
+        
+        pure_name = voice_name_with_prefix.replace("Cloned: ", "")
+        
+        reply = QMessageBox.question(
+            self, "Delete Voice", 
+            f"Are you sure you want to delete the voice '{pure_name}'?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+        )
+        
+        if reply == QMessageBox.StandardButton.Yes:
+            if self.tts_engine.delete_paragraph_voice(pure_name):
+                # Refresh dropdown
+                self.audio_controls.update_voice_list(self.tts_engine.list_available_voices())
+                QMessageBox.information(self, "Deleted", f"Voice '{pure_name}' has been removed.")
+            else:
+                QMessageBox.critical(self, "Error", "Could not delete voice file.")
 
     def _create_formatting_toolbar(self) -> QWidget:
         """Create formatting toolbar with even distribution."""

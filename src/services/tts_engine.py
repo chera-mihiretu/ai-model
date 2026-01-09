@@ -64,9 +64,15 @@ class TTSEngine:
         # Custom Character Voices
         self.character_voice_map = {} # {character_name: (gpt_cond_latent, speaker_embedding)}
         
+        # Paragraph Cloned Voices
+        self.paragraph_voice_map = {} # {voice_name: (gpt_cond_latent, speaker_embedding)}
+        self.voice_dir = self.model_dir.parent.parent / "data" / "voices" / "paragraphs"
+        self.voice_dir.mkdir(parents=True, exist_ok=True)
+        
         # Load model immediately or lazy load? 
         # User requested: "Initialize the model once at application startup."
         self._load_model()
+        self._load_paragraph_voices()
 
     def _load_model(self):
         """Loads XTTS-v2 model from local path."""
@@ -150,9 +156,26 @@ class TTSEngine:
             import traceback
             traceback.print_exc()
 
+    def _load_paragraph_voices(self):
+        """Loads stored paragraph voices from disk."""
+        try:
+            logging.info(f"Loading paragraph voices from {self.voice_dir}")
+            for pth_file in self.voice_dir.glob("*.pth"):
+                voice_name = pth_file.stem
+                try:
+                    latents = torch.load(str(pth_file), weights_only=False)
+                    self.paragraph_voice_map[voice_name] = latents
+                    logging.info(f"Loaded cloned voice: {voice_name}")
+                except Exception as e:
+                    logging.error(f"Failed to load voice {voice_name}: {e}")
+        except Exception as e:
+            logging.error(f"Error loading paragraph voices: {e}")
+
     def list_available_voices(self) -> List[str]:
-        """Returns list of supported accents/voices."""
-        return list(self.VOICE_MAPPING.keys())
+        """Returns list of supported accents/voices + cloned voices."""
+        voices = list(self.VOICE_MAPPING.keys())
+        cloned = [f"Cloned: {v}" for v in self.paragraph_voice_map.keys()]
+        return voices + cloned
 
     def extract_speaker_embedding(self, wav_path: str):
         """
@@ -176,16 +199,60 @@ class TTSEngine:
             logging.error(f"Failed to extract embedding: {e}")
             return None
 
+    def add_paragraph_voice(self, name: str, wav_path: str):
+        """Extracts speaker embedding from WAV and saves it for persistence."""
+        if name in self.paragraph_voice_map:
+            logging.warning(f"Voice name already exists: {name}")
+            return False, "Duplicate name"
+            
+        latents = self.extract_speaker_embedding(wav_path)
+        if latents:
+            self.paragraph_voice_map[name] = latents
+            # Save to disk
+            save_path = self.voice_dir / f"{name}.pth"
+            try:
+                torch.save(latents, str(save_path))
+                logging.info(f"Saved cloned voice {name} to {save_path}")
+                return True, "Success"
+            except Exception as e:
+                logging.error(f"Failed to save voice {name}: {e}")
+                return False, f"Save failed: {e}"
+        return False, "Extraction failed"
+
+    def delete_paragraph_voice(self, name: str):
+        """Deletes a cloned voice from disk and memory."""
+        if name in self.paragraph_voice_map:
+            del self.paragraph_voice_map[name]
+            save_path = self.voice_dir / f"{name}.pth"
+            if save_path.exists():
+                try:
+                    save_path.unlink()
+                    logging.info(f"Deleted cloned voice {name} from disk.")
+                    return True
+                except Exception as e:
+                    logging.error(f"Failed to delete voice {name} from disk: {e}")
+        return False
+
+        gpt_cond_latent, speaker_embedding = self.model.speaker_manager.speakers[target_speaker].values()
+        return gpt_cond_latent, speaker_embedding
+
     def _get_speaker_latents(self, voice: str, character_name: Optional[str] = None):
         """
         Get speaker latents for the requested voice OR character.
-        Prioritizes character_name if a custom voice is loaded.
+        Prioritizes paragraph_voice_map if voice starts with 'Cloned: '.
         """
         if not self.model:
             logging.error("_get_speaker_latents: Model is None")
             return None, None
             
-        # 1. Check Character Map
+        # 1. Check Paragraph Voice Map
+        if voice.startswith("Cloned: "):
+            pure_name = voice.replace("Cloned: ", "")
+            if pure_name in self.paragraph_voice_map:
+                logging.info(f"Using cloned paragraph voice: {pure_name}")
+                return self.paragraph_voice_map[pure_name]
+
+        # 2. Check Character Map
         if character_name and character_name in self.character_voice_map:
             logging.info(f"Using custom voice for character: {character_name}")
             return self.character_voice_map[character_name]
@@ -209,6 +276,27 @@ class TTSEngine:
         gpt_cond_latent, speaker_embedding = self.model.speaker_manager.speakers[target_speaker].values()
         return gpt_cond_latent, speaker_embedding
 
+    def _trim_silence(self, wav: np.ndarray, threshold: float = 0.01) -> np.ndarray:
+        """Trims leading and trailing silence from a numpy audio array."""
+        if wav.size == 0:
+            return wav
+            
+        # Find first and last indices above threshold
+        mask = np.abs(wav) > threshold
+        if not np.any(mask):
+            return wav[:0] # All silence
+            
+        first = np.argmax(mask)
+        last = wav.size - np.argmax(mask[::-1])
+        
+        # Add a tiny bit of padding (e.g., 50ms) to avoid clipping words too abruptly
+        # 24000 samples/sec * 0.05 = 1200 samples
+        padding = 1200
+        start = max(0, first - padding)
+        end = min(wav.size, last + padding)
+        
+        return wav[start:end]
+
     def _generate_chunk_audio(self, chunk: str, gpt_cond_latent, speaker_embedding):
         """Helper to generate audio for a single chunk."""
         try:
@@ -231,6 +319,10 @@ class TTSEngine:
             wav = out["wav"]
             if isinstance(wav, torch.Tensor):
                 wav = wav.cpu().numpy()
+            
+            # Trim silence to reduce pauses between sentences
+            wav = self._trim_silence(wav)
+            
             return wav
         except Exception as e:
             logging.error(f"Error generating chunk: {e}")
@@ -432,7 +524,7 @@ class TTSEngine:
             logging.error(f"Failed to save audio: {e}")
             return ""
 
-    def _split_text_into_chunks(self, text: str, max_chars: int = 250) -> List[str]:
+    def _split_text_into_chunks(self, text: str, max_chars: int = 500) -> List[str]:
         """
         Splits text into chunks to avoid memory spikes and long pauses.
         Uses regex to split by sentences while preserving punctuation.
