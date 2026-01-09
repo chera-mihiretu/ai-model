@@ -3984,30 +3984,37 @@ class StoryBibleApp(QMainWindow):
                     self.is_generating = False
                     self.toolbar.set_save_status(True)
                     
-                    # If target was assistant, finalize the message bubble
+                    # 1. Summarization & Persistence (Long-form)
+                    if self.current_ai_response_text and self.current_chapter_id:
+                        # Generate summary for the chunk
+                        summary = self.ai_engine.generate_summary(self.current_ai_response_text)
+                        # Save to generation_chunks
+                        self.db_manager.save_generation_chunk(self.current_chapter_id, self.current_ai_response_text, summary)
+                        logging.info(f"LONG-FORM: Saved chunk for chapter {self.current_chapter_id} with summary: {summary}")
+
+                    # 2. UI Finalization
                     if self.target_panel == 'assistant':
                         # Clean up formatting if needed
                         final_text = self.current_ai_response_text.strip()
                         if final_text:
                             self.right_panel.add_message(final_text, "assistant")
-                        # Reset for next time
-                        self.current_ai_response_text = ""
                     elif self.target_panel == 'editor':
                         # TRIGGER PIPELINE: Immediate Summarization for Canvas
-                        # Force check (since we just generated text)
-                        # We notify SmartEditor that AI finished so it can start debounce
                         if hasattr(self.center_panel.editor_textbox, 'handle_ai_completion'):
                             self.center_panel.editor_textbox.handle_ai_completion()
-                        else:
-                             # Fallback if for some reason it's not smart
-                            pass
+                    
+                    # 3. Cleanup for next time
+                    self.current_ai_response_text = ""
                     
                 else:
+                    # Accumulate tokens for all targets to allow summarization at the end
+                    self.current_ai_response_text += token
+                    
                     if self.target_panel == 'editor':
                         self.center_panel.insert_editor_content(token)
                     elif self.target_panel == 'assistant':
-                        # Accumulate tokens
-                        self.current_ai_response_text += token
+                        # Already accumulated above
+                        pass
                         # We don't stream directly to UI anymore to allow bubble creation at end?
                         # Or we could update a "streaming" bubble.
                         # For "clear separation", buffering and showing at end is safest for now.
@@ -4045,6 +4052,7 @@ class StoryBibleApp(QMainWindow):
         
         self.is_generating = True
         self.target_panel = target
+        self.last_action_target = target # Store for completion logic
         self.toolbar.set_save_status(False)
         
         current_text = self.center_panel.get_editor_content() if target == 'editor' else ""
@@ -4074,11 +4082,26 @@ class StoryBibleApp(QMainWindow):
                 # Strict Output Rule enforcement
                 instruction += " Output ONLY the generated story text. No headers, no preambles, no 'Here is the text'."
                 
+                # Fetch RAG context and last chunk summary
+                rag_context = {}
+                if self.current_project_id and self.current_chapter_id:
+                    rag_context = self.db_manager.get_context_window(self.current_project_id, self.current_chapter_id)
+                    last_summary = self.db_manager.get_last_chunk_summary(self.current_chapter_id)
+                    if last_summary:
+                        rag_context['recent_summary'] = last_summary
+                
+                # Fetch Bible Data
+                bible_data = {}
+                if self.current_project_id:
+                    bible_data = self.db_manager.get_story_bible(self.current_project_id)
+
                 self.ai_engine.stream_response(
                     instruction, 
                     self.response_queue, 
+                    bible_data=bible_data,
                     current_text=context,
-                    style=style
+                    rag_context=rag_context,
+                    long_form=True
                 )
             
             elif prompt.startswith("DESCRIBE::"):

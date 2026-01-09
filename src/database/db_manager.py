@@ -144,6 +144,18 @@ class DatabaseManager:
                         FOREIGN KEY (project_id) REFERENCES projects (id)
                     )
                 """)
+
+                cursor.execute("""
+                    CREATE TABLE IF NOT EXISTS generation_chunks (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        chapter_id INTEGER NOT NULL,
+                        chunk_order INTEGER NOT NULL,
+                        raw_text TEXT NOT NULL,
+                        summary TEXT,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        FOREIGN KEY (chapter_id) REFERENCES chapters (id)
+                    )
+                """)
                 
                 cursor.execute("CREATE INDEX IF NOT EXISTS idx_story_bible_project_id ON story_bible (project_id)")
                 
@@ -160,6 +172,22 @@ class DatabaseManager:
                     conn.execute("ALTER TABLE chapters ADD COLUMN updated_at DATETIME")
                     conn.execute("UPDATE schema_version SET version = 2")
                     current_version = 2
+
+                if current_version < 3:
+                    logging.info("Running migration: Version 3 (Generation Chunks)")
+                    conn.execute("""
+                        CREATE TABLE IF NOT EXISTS generation_chunks (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            chapter_id INTEGER NOT NULL,
+                            chunk_order INTEGER NOT NULL,
+                            raw_text TEXT NOT NULL,
+                            summary TEXT,
+                            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                            FOREIGN KEY (chapter_id) REFERENCES chapters (id)
+                        )
+                    """)
+                    conn.execute("UPDATE schema_version SET version = 3")
+                    current_version = 3
                 
                 conn.commit()
                 logging.info(f"Database setup complete at version {current_version}")
@@ -684,6 +712,42 @@ class DatabaseManager:
                 return row[0] if row and row[0] else ""
         except sqlite3.Error as e:
             logging.error(f"Get chapter beats error: {e}")
+            return ""
+
+    # --- Generation Chunk Methods ---
+    def save_generation_chunk(self, chapter_id: int, raw_text: str, summary: str):
+        """Save a raw generation chunk and its summary."""
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                # Get next chunk order
+                cursor.execute("SELECT MAX(chunk_order) FROM generation_chunks WHERE chapter_id = ?", (chapter_id,))
+                res = cursor.fetchone()[0]
+                next_order = 1 if res is None else res + 1
+                
+                cursor.execute(
+                    "INSERT INTO generation_chunks (chapter_id, chunk_order, raw_text, summary) VALUES (?, ?, ?, ?)",
+                    (chapter_id, next_order, raw_text, summary)
+                )
+                conn.commit()
+                return True
+        except sqlite3.Error as e:
+            logging.error(f"Save generation chunk error: {e}")
+            return False
+
+    def get_last_chunk_summary(self, chapter_id: int) -> str:
+        """Retrieve the summary of the most recent generation chunk for a chapter."""
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    "SELECT summary FROM generation_chunks WHERE chapter_id = ? ORDER BY chunk_order DESC LIMIT 1",
+                    (chapter_id,)
+                )
+                row = cursor.fetchone()
+                return row[0] if row and row[0] else ""
+        except sqlite3.Error as e:
+            logging.error(f"Get last chunk summary error: {e}")
             return ""
 
     def get_chapter_content(self, chapter_id: int):
