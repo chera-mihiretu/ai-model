@@ -1299,7 +1299,15 @@ class CenterPanel(QWidget):
         editor_viewport.setAutoFillBackground(True)  # TRUE to render RGBA
         editor_viewport.setStyleSheet(f"background-color: {QtTheme.OVERLAY_LIGHT};")
         
+        # Create debounced autosave timer for editor (2 seconds)
+        self.editor_save_timer = QTimer(self)
+        self.editor_save_timer.setInterval(2000)
+        self.editor_save_timer.setSingleShot(True)
+        self.editor_save_timer.timeout.connect(self._save_editor_content)
+        
+        # Connect signals
         self.editor_textbox.textChanged.connect(self.content_changed.emit)
+        self.editor_textbox.textChanged.connect(self._on_editor_text_changed)
         self.editor_textbox.selectionChanged.connect(self._handle_selection_change)
         
         # Enable mouse tracking for comment tooltips
@@ -1307,10 +1315,31 @@ class CenterPanel(QWidget):
         self.editor_textbox.viewport().setMouseTracking(True)
         
         self.content_layout.addWidget(self.editor_textbox)
+
         
         # Action buttons
         actions_widget = self._create_action_buttons()
         self.content_layout.addWidget(actions_widget)
+    
+    
+    def _on_editor_text_changed(self):
+        """Handle editor text changes - start debounced save timer."""
+        if hasattr(self.editor_textbox, 'is_loading') and self.editor_textbox.is_loading:
+            return
+        self.editor_save_timer.start()
+    
+    def _save_editor_content(self):
+        """Save editor content to database (debounced)."""
+        if not self.current_chapter_id:
+            return
+        
+        text = self.editor_textbox.toPlainText()
+        try:
+            logging.info(f"AUTOSAVE: Saving editor content to chapter {self.current_chapter_id} ({len(text)} chars)")
+            self.db_manager.update_chapter_content(self.current_chapter_id, text)
+            logging.info("AUTOSAVE: Editor content saved successfully")
+        except Exception as e:
+            logging.error(f"AUTOSAVE: Failed to save editor content: {e}")
     
     def _handle_read_aloud(self):
         """Start reading current text."""
@@ -2083,6 +2112,12 @@ class CenterPanel(QWidget):
         
         def run_summary():
             try:
+                # CRITICAL: Save raw text FIRST to ensure persistence
+                # Even if summarization fails, we don't lose the content
+                full_text_to_save = self.editor_textbox.toPlainText() if self.current_chapter_id == chapter_id else full_text
+                logging.info(f"SmartSummary: Saving raw chapter text FIRST ({len(full_text_to_save)} chars)")
+                self.db_manager.update_chapter_content(chapter_id, full_text_to_save)
+                
                 # 1. Incremental Summary
                 incremental_summary = self.ai_engine.generate_summary(new_text_chunk, mode='incremental')
                 
@@ -4065,12 +4100,15 @@ class StoryBibleApp(QMainWindow):
     
     @pyqtSlot()
     def _auto_save(self):
-        """Auto-save current content."""
+        """Auto-save current content (30-second timer backup)."""
         if self.current_chapter_id:
             text = self.center_panel.get_editor_content()
+            logging.info(f"AUTOSAVE_TIMER: Saving chapter {self.current_chapter_id} ({len(text)} chars)")
             self.db_manager.update_chapter_content(self.current_chapter_id, text)
-            # No need to manually trigger summarization; 
-            # SmartEditor handles it on focus loss/debounce.
+        else:
+            logging.debug("AUTOSAVE_TIMER: Skipped - no current chapter loaded")
+        # No need to manually trigger summarization; 
+        # SmartEditor handles it on focus loss/debounce.
     
     # ========================================================================
     # HELPER METHODS
