@@ -8,7 +8,7 @@ from PyQt6.QtCore import Qt
 sys.path.append(str(Path(__file__).resolve().parent / "src"))
 
 from src.config.manager import ConfigManager
-from src.data.database import DatabaseManager
+from src.database.db_manager import DatabaseManager
 from src.services.ai_engine import AIEngine
 from src.presentation.app import StoryBibleApp
 

@@ -24,7 +24,7 @@ def test_memory():
     
     # 4. Fetch Memory
     print("\n--- FETCHING MEMORY ---")
-    memory = db.get_project_memory(pid)
+    memory = db.get_deep_memory(pid, "Zorg")
     print(memory)
     print("-----------------------")
     

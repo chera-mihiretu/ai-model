@@ -1141,6 +1141,7 @@ class CenterPanel(QWidget):
         self.ai_engine = ai_engine
         self.current_project_id = None
         self.current_chapter_id = None
+        self.is_loading = False
         self.story_bible_container = None
         self.bible_section_widgets = {}
         self._last_hovered_block = None
@@ -2054,8 +2055,8 @@ class CenterPanel(QWidget):
             source_key: 'chapter' or a bible tab key (e.g. 'characters').
             callback: Function to call on success (clears dirty flags).
         """
-        if not text.strip():
-            # If empty, just clear flags
+        if not text.strip() or self.is_loading:
+            # If empty or still loading, just clear flags
             callback() 
             return
 
@@ -2110,13 +2111,15 @@ class CenterPanel(QWidget):
         
         logging.info(f"SmartSummary: Processing Chapter (New Chars: {new_char_count})...")
         
+        # CRITICAL FIX: Capture full text on the MAIN THREAD 
+        # Accessing UI widgets from background threads causes segfaults.
+        full_text_snapshot = self.editor_textbox.toPlainText() if self.current_chapter_id == chapter_id else full_text
+        
         def run_summary():
             try:
-                # CRITICAL: Save raw text FIRST to ensure persistence
-                # Even if summarization fails, we don't lose the content
-                full_text_to_save = self.editor_textbox.toPlainText() if self.current_chapter_id == chapter_id else full_text
-                logging.info(f"SmartSummary: Saving raw chapter text FIRST ({len(full_text_to_save)} chars)")
-                self.db_manager.update_chapter_content(chapter_id, full_text_to_save)
+                # CRITICAL: Use the snapshot we captured on the main thread
+                logging.info(f"SmartSummary: Saving raw chapter text FIRST ({len(full_text_snapshot)} chars)")
+                self.db_manager.update_chapter_content(chapter_id, full_text_snapshot)
                 
                 # 1. Incremental Summary
                 incremental_summary = self.ai_engine.generate_summary(new_text_chunk, mode='incremental')
@@ -2240,19 +2243,72 @@ class CenterPanel(QWidget):
     
     def load_project(self, project_id: int, chapter_id: Optional[int] = None):
         """Load project data into UI."""
-        self.current_project_id = project_id
-        self.current_chapter_id = chapter_id
-        
-        # ALWAYS set project_id on character widget (even if Story Bible not expanded)
-        if hasattr(self, 'character_widget') and self.character_widget:
-            self.character_widget.set_project_id(project_id)
-            # logging.info(f"Set character_widget project_id to {project_id}")
+        self.is_loading = True
+        try:
+            self.current_project_id = project_id
+            self.current_chapter_id = chapter_id
             
-        # Load Character Voices
-        self._load_character_voices(project_id)
-        
-        # Load Story Bible data if container exists
-    
+            if hasattr(self, "character_widget") and self.character_widget:
+                self.character_widget.set_project_id(project_id)
+                
+            self._load_character_voices(project_id)
+            
+            if self.story_bible_container:
+                try:
+                    bible_data = self.db_manager.get_story_bible(project_id)
+                    if bible_data:
+                        for field in ["braindump", "genre", "synopsis", "worldbuilding", "outline"]:
+                            field_data = bible_data.get(field, "")
+                            if field not in self.bible_section_widgets: continue
+                            widget_data = self.bible_section_widgets[field]
+                            widget = widget_data.get("widget")
+                            if not widget: continue
+                            if hasattr(widget, "is_loading"): widget.is_loading = True
+                            widget.blockSignals(True)
+                            widget.setPlainText(field_data if field_data else "")
+                            widget.blockSignals(False)
+                            if hasattr(widget, "is_loading"): widget.is_loading = False
+                            if hasattr(widget, "adjust_height"): widget.adjust_height()
+                        
+                        if "style" in bible_data and bible_data["style"]:
+                            self._select_style(bible_data["style"])
+                        
+                        for field in ["braindump", "genre", "synopsis", "worldbuilding", "outline"]:
+                            if field in self.bible_section_widgets:
+                                has_text = bible_data.get(field, "").strip()
+                                has_summary = bible_data.get(f"{field}_summary", "").strip()
+                                if has_text and not has_summary:
+                                    widget_data = self.bible_section_widgets[field]
+                                    widget = widget_data["widget"]
+                                    if hasattr(widget, "is_globally_dirty"):
+                                        widget.is_globally_dirty = True
+                                        if hasattr(widget, "debounce_timer"):
+                                            widget.debounce_timer.start(500)
+                        self.db_manager.dump_story_bible_contents(project_id)
+                except Exception as e:
+                    logging.error(f"Failed to load story bible: {e}")
+            
+            if chapter_id:
+                try:
+                    content = self.db_manager.get_chapter_content(chapter_id)
+                    title = "Untitled"
+                    projects = self.db_manager.get_projects_with_chapters()
+                    for p in projects:
+                        if p["id"] == project_id:
+                            for ch in p["chapters"]:
+                                if ch["id"] == chapter_id:
+                                    title = ch["title"]
+                                    break
+                            break
+                    self.document_title.setText(title)
+                    self.editor_textbox.blockSignals(True)
+                    self.editor_textbox.setPlainText(content if content else "")
+                    self.editor_textbox.blockSignals(False)
+                except Exception as e:
+                    logging.error(f"Failed to load chapter: {e}")
+        finally:
+            self.is_loading = False
+
     def _load_character_voices(self, project_id: int):
         """Load character voices for the project into TTS engine."""
         try:
@@ -2260,166 +2316,26 @@ class CenterPanel(QWidget):
                 cursor = conn.cursor()
                 cursor.execute("SELECT name, custom_voice_path FROM characters WHERE project_id = ? AND custom_voice_path IS NOT NULL", (project_id,))
                 rows = cursor.fetchall()
-                
-            if not rows:
-                return
-
+            if not rows: return
             logging.info(f"Loading {len(rows)} character voices for Project {project_id}...")
-            
-            # Update Voice List in UI
             current_voices = self.tts_engine.list_available_voices()
-            
-            # Helper to run extraction in background
             def load_voices_task():
                 loaded_count = 0
                 for name, path in rows:
-                    if not path or not os.path.exists(path):
-                        continue
-                        
-                    # Extract/Load embedding
+                    if not path or not os.path.exists(path): continue
                     latents = self.tts_engine.extract_speaker_embedding(path)
                     if latents:
                         self.tts_engine.character_voice_map[name] = latents
                         loaded_count += 1
-                        
-                if loaded_count > 0:
-                    logging.info(f"Loaded {loaded_count} character voices.")
-                    # Update UI on main thread
-                    # We need to signal back. 
-                    # For simplicity, we can just invoke method if thread-safe or use QTimer
-                    pass
-
+                if loaded_count > 0: logging.info(f"Loaded {loaded_count} character voices.")
             threading.Thread(target=load_voices_task, daemon=True).start()
-            
-            # Add placeholders to Voice List immediately? 
-            # Or wait? 
-            # Better to add them to the dropdown so user can select them.
-            # Even if embedding isn't quite ready (race condition), prompt them?
-            # tts_read_text handles missing map by falling back to default voice.
-            
             character_voices = [f"Character: {row[0]}" for row in rows]
             all_voices = current_voices + character_voices
-            
-            # Update Audio Controls
-            if hasattr(self.audio_controls, 'update_voice_list'):
+            if hasattr(self.audio_controls, "update_voice_list"):
                  QTimer.singleShot(0, lambda: self.audio_controls.update_voice_list(all_voices))
-            
         except Exception as e:
             logging.error(f"Failed to load character voices: {e}")
-        if self.story_bible_container:
-            try:
-                # logging.info(f"Loading Story Bible for project {project_id}...")
-                bible_data = self.db_manager.get_story_bible(project_id)
-                # logging.info(f"Story Bible data retrieved: {list(bible_data.keys()) if bible_data else 'None'}")
-                if bible_data:
-                    for field in ["braindump", "genre", "synopsis", "worldbuilding", "outline"]:
-                        field_data = bible_data.get(field, "")
-                        # logging.info(f"LOAD: Field '{field}': {len(field_data) if field_data else 0} characters in DB")
-                        
-                        # Check if widget exists
-                        if field not in self.bible_section_widgets:
-                            logging.warning(f"LOAD: No widget found for field '{field}' - skipping")
-                            continue
-                        
-                        widget_data = self.bible_section_widgets[field]
-                        widget = widget_data.get('widget')
-                        
-                        if not widget:
-                            logging.warning(f"LOAD: Widget for '{field}' is None - skipping")
-                            continue
-                        
-                        if not isinstance(widget, QTextEdit):
-                            logging.warning(f"LOAD: Widget for '{field}' is not QTextEdit (type: {type(widget).__name__}) - skipping")
-                            continue
-                        
-                        # Load the text regardless of whether it's empty or not (to clear old data)
-                        # logging.info(f"LOAD: Loading '{field}' text into widget...")
-                        
-                        # Use SmartEditor specific flag (blockSignals doesn't catch document changes)
-                        if hasattr(widget, 'is_loading'):
-                            widget.is_loading = True
-                        
-                        widget.blockSignals(True)
-                        widget.setPlainText(field_data if field_data else "")
-                        widget.blockSignals(False)
-                        
-                        if hasattr(widget, 'is_loading'):
-                            widget.is_loading = False
-                            
-                        # FORCE RESIZE: blockSignals(True) prevented auto-resize
-                        if hasattr(widget, 'adjust_height'):
-                            widget.adjust_height()
-                            
-                        # logging.info(f"LOAD: Successfully loaded {len(field_data) if field_data else 0} chars into '{field}' widget")
-                    
-                    # Load style
-                    if 'style' in bible_data and bible_data['style']:
-                        self._select_style(bible_data['style'])
-                    
-                    # STARTUP SUMMARY CHECK: Generate summaries for tabs that don't have them
-                    # This happens AFTER text is loaded and signals are unblocked
-                    for field in ["braindump", "genre", "synopsis", "worldbuilding", "outline"]:
-                        if field in self.bible_section_widgets:
-                            # Check if we have text but no summary
-                            has_text = bible_data.get(field, "").strip()
-                            has_summary = bible_data.get(f"{field}_summary", "").strip()
-                            
-                            if has_text and not has_summary:
-                                logging.info(f"Startup: Missing summary for {field}, triggering auto-generation")
-                                log_payload = {
-                                    "tab_name": field,
-                                    "summary_generated": True,
-                                    "reason": "Missing summary in DB"
-                                }
-                                logging.info(f"Summary Condition: {log_payload}")
-                                
-                                # Mark as dirty and trigger automation
-                                widget_data = self.bible_section_widgets[field]
-                                widget = widget_data['widget']
-                                if hasattr(widget, 'is_globally_dirty'):
-                                    widget.is_globally_dirty = True
-                                    # Explicitly start timer to trigger pipeline automatically
-                                    if hasattr(widget, 'debounce_timer'):
-                                        widget.debounce_timer.start(500) # Short delay 
-                            elif has_summary:
-                                # Log that we are skipping
-                                log_payload = {
-                                    "tab_name": field,
-                                    "summary_generated": False,
-                                    "reason": "Summary exists in DB"
-                                }
-                                logging.info(f"Summary Condition: {log_payload}")
-                    
-                    # DIAGNOSTIC: Dump entire database contents for verification
-                    self.db_manager.dump_story_bible_contents(project_id)
-            except Exception as e:
-                logging.error(f"Failed to load story bible: {e}")
-        
-        # Load chapter content
-        if chapter_id:
-            try:
-                content = self.db_manager.get_chapter_content(chapter_id)
-                
-                # Get chapter title
-                title = "Untitled"
-                projects = self.db_manager.get_projects_with_chapters()
-                for p in projects:
-                    if p['id'] == project_id:
-                        for ch in p['chapters']:
-                            if ch['id'] == chapter_id:
-                                title = ch['title']
-                                break
-                        break
-                
-                self.document_title.setText(title)
-                
-                # Block signals for editor load too
-                self.editor_textbox.blockSignals(True)
-                self.editor_textbox.setPlainText(content if content else "")
-                self.editor_textbox.blockSignals(False)
-            except Exception as e:
-                logging.error(f"Failed to load chapter: {e}")
-    
+
     def get_editor_content(self) -> str:
         """Get current editor content."""
         return self.editor_textbox.toPlainText()
@@ -3803,6 +3719,7 @@ class StoryBibleApp(QMainWindow):
         
         self.current_project_id = None
         self.current_chapter_id = None
+        self.is_loading = False
         self.is_generating = False
         self.response_queue = queue.Queue()
         self.target_panel = None
@@ -3997,6 +3914,7 @@ class StoryBibleApp(QMainWindow):
     @pyqtSlot(int, int)
     def _load_chapter(self, chapter_id: int, project_id: int):
         """Load chapter into center panel."""
+        self.is_loading = True
         self.current_chapter_id = chapter_id
         self.current_project_id = project_id
         
@@ -4004,6 +3922,7 @@ class StoryBibleApp(QMainWindow):
         self._on_content_change()
         
         self.left_panel.refresh_tree(chapter_id, project_id=project_id)
+        self.is_loading = False
     
     @pyqtSlot(str)
     def _scroll_to_bible_section(self, section: str):
@@ -4100,11 +4019,16 @@ class StoryBibleApp(QMainWindow):
     
     @pyqtSlot()
     def _auto_save(self):
-        """Auto-save current content (30-second timer backup)."""
+        """Timer-based auto-save for entire state."""
+        if self.is_loading:
+            return
+
+        # Save current chapter if active
         if self.current_chapter_id:
             text = self.center_panel.get_editor_content()
-            logging.info(f"AUTOSAVE_TIMER: Saving chapter {self.current_chapter_id} ({len(text)} chars)")
-            self.db_manager.update_chapter_content(self.current_chapter_id, text)
+            if text: # ONLY save if there is content to avoid accidental wipe
+                logging.info(f"AUTOSAVE_TIMER: Saving chapter {self.current_chapter_id} ({len(text)} chars)")
+                self.db_manager.update_chapter_content(self.current_chapter_id, text)
         else:
             logging.debug("AUTOSAVE_TIMER: Skipped - no current chapter loaded")
         # No need to manually trigger summarization; 
@@ -4343,27 +4267,31 @@ class StoryBibleApp(QMainWindow):
     
     def _open_project(self, project_id: int):
         """Open a project from dashboard."""
-        # Save layout before switching
-        if hasattr(self, 'main_splitter'):
-            self.main_splitter.save_sizes()
+        self.is_loading = True
+        try:
+            # Save layout before switching
+            if hasattr(self, 'main_splitter'):
+                self.main_splitter.save_sizes()
+                
+            self.current_project_id = project_id
             
-        self.current_project_id = project_id
-        
-        # Refresh sidebar tree - show only this project
-        self.left_panel.refresh_tree(project_id=project_id)
-        
-        # Load first chapter if exists
-        chapters = self.db_manager.get_chapters(project_id)
-        if chapters:
-            first_chapter = chapters[0]
-            chapter_id = first_chapter.get('id', first_chapter.get('chapter_id'))
-            self._load_chapter(chapter_id, project_id)
-        else:
-            # No chapters - just load project data in center panel
-            self.center_panel.load_project(project_id)
-        
-        # Transition to editor
-        self._show_editor()
+            # Refresh sidebar tree - show only this project
+            self.left_panel.refresh_tree(project_id=project_id)
+            
+            # Load first chapter if exists
+            chapters = self.db_manager.get_chapters(project_id)
+            if chapters:
+                first_chapter = chapters[0]
+                chapter_id = first_chapter.get('id', first_chapter.get('chapter_id'))
+                self._load_chapter(chapter_id, project_id)
+            else:
+                # No chapters - just load project data in center panel
+                self.center_panel.load_project(project_id)
+            
+            # Transition to editor
+            self._show_editor()
+        finally:
+            self.is_loading = False
     
     def _create_new_project(self):
         """Create a new project from dashboard."""
@@ -4532,14 +4460,20 @@ class StoryBibleApp(QMainWindow):
     
     def closeEvent(self, event):
         """Handle window close event - FORCE SAVE ALL DATA."""
+        if self.is_loading:
+            logging.info("PERSIST: App closing while loading - skip auto-save to prevent corruption")
+            event.accept()
+            return
+
         # logging.info("PERSIST: Application closing - forcing save of all content")
         
         # Save Writing Canvas content
         if self.current_chapter_id:
             text = self.center_panel.get_editor_content()
-            # logging.info(f"PERSIST: Saving Writing Canvas (chapter={self.current_chapter_id}, length={len(text)} chars)")
-            self.db_manager.update_chapter_content(self.current_chapter_id, text)
-            # logging.info(f"PERSIST: Writing Canvas saved")
+            if text:
+                 # logging.info(f"PERSIST: Saving Writing Canvas (chapter={self.current_chapter_id}, length={len(text)} chars)")
+                 self.db_manager.update_chapter_content(self.current_chapter_id, text)
+                 # logging.info(f"PERSIST: Writing Canvas saved")
         
         # CRITICAL: Force save all Story Bible tabs
         if self.current_project_id and hasattr(self.center_panel, 'bible_section_widgets'):
