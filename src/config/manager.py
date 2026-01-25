@@ -37,7 +37,7 @@ class ConfigManager:
             model_path=model_path,
             n_ctx=4096,
             n_batch=512,
-            temperature=0.7,
+            temperature=0.5,  # Lower temperature for more coherent output
             n_gpu_layers=-1
         )
 

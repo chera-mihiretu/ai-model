@@ -1,0 +1,644 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ============================================================
+   EXELSIAS - ELECTRIC VIOLET GLASSMORPHISM THEME
+   High-end dark mode with violet accents
+   ============================================================ */
+
+/* Electric Violet color palette */
+:root {
+  --violet-50: #F5F3FF;
+  --violet-100: #EDE9FE;
+  --violet-200: #DDD6FE;
+  --violet-300: #C4B5FD;
+  --violet-400: #A78BFA;
+  --violet-500: #8B5CF6; /* Electric Violet - Primary */
+  --violet-600: #7C3AED;
+  --violet-700: #6D28D9; /* Deep Indigo */
+  --violet-800: #5B21B6;
+  --violet-900: #4C1D95;
+  --violet-950: #2E1065;
+  
+  --dark-bg: #000000;
+  --dark-card: rgba(10, 10, 15, 0.8);
+  --dark-sidebar: rgba(5, 5, 8, 0.95);
+  --dark-hover: rgba(139, 92, 246, 0.1);
+  --dark-border: rgba(255, 255, 255, 0.1);
+  --glass-violet: rgba(139, 92, 246, 0.05);
+}
+
+/* Base styles */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body, #root {
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+}
+
+body {
+  font-family: 'Inter', 'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background-color: #000000;
+  color: #F8FAFC;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ============================================================
+   GLASSMORPHISM COMPONENTS
+   ============================================================ */
+
+.glass {
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  background: var(--dark-card);
+  border: 1px solid var(--dark-border);
+}
+
+.glass-card {
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  background: rgba(10, 10, 15, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 16px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4),
+              inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+.glass-card:hover {
+  border-color: rgba(139, 92, 246, 0.4);
+  box-shadow: 0 8px 32px rgba(139, 92, 246, 0.15),
+              inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.glass-sidebar {
+  backdrop-filter: blur(30px);
+  -webkit-backdrop-filter: blur(30px);
+  background: var(--dark-sidebar);
+  border-right: 1px solid var(--dark-border);
+}
+
+.glass-heavy {
+  backdrop-filter: blur(40px);
+  -webkit-backdrop-filter: blur(40px);
+  background: rgba(5, 5, 10, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.glass-hover {
+  @apply transition-all duration-300;
+}
+
+.glass-hover:hover {
+  background: var(--dark-hover);
+  border-color: rgba(139, 92, 246, 0.3);
+}
+
+/* ============================================================
+   SCROLLBARS - Violet accent
+   ============================================================ */
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.3), rgba(109, 40, 217, 0.3));
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.5), rgba(109, 40, 217, 0.5));
+}
+
+/* Selection */
+::selection {
+  background: rgba(139, 92, 246, 0.4);
+  color: #FFFFFF;
+}
+
+/* Focus styles */
+*:focus {
+  outline: none;
+}
+
+*:focus-visible {
+  outline: 2px solid var(--violet-500);
+  outline-offset: 2px;
+}
+
+/* ============================================================
+   BUTTONS - Violet gradient theme
+   ============================================================ */
+
+.btn {
+  @apply px-4 py-2 rounded-xl font-medium transition-all duration-300 cursor-pointer;
+  @apply flex items-center justify-center gap-2;
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, var(--violet-600), var(--violet-700));
+  color: #FFFFFF;
+  box-shadow: 0 4px 20px rgba(139, 92, 246, 0.4),
+              inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+.btn-primary:hover {
+  background: linear-gradient(135deg, var(--violet-500), var(--violet-600));
+  box-shadow: 0 6px 30px rgba(139, 92, 246, 0.5),
+              inset 0 1px 0 rgba(255, 255, 255, 0.15);
+  transform: translateY(-2px);
+}
+
+.btn-secondary {
+  background: rgba(139, 92, 246, 0.1);
+  color: var(--violet-300);
+  border: 1px solid rgba(139, 92, 246, 0.3);
+}
+
+.btn-secondary:hover {
+  background: rgba(139, 92, 246, 0.2);
+  border-color: var(--violet-400);
+  color: var(--violet-200);
+}
+
+.btn-ghost {
+  @apply bg-transparent border;
+  color: #94A3B8;
+  border-color: var(--dark-border);
+}
+
+.btn-ghost:hover {
+  background: var(--dark-hover);
+  border-color: rgba(139, 92, 246, 0.4);
+  color: var(--violet-300);
+}
+
+.btn-danger {
+  @apply bg-red-500/20 text-red-400 border border-red-500/30 hover:bg-red-500/30;
+}
+
+/* ============================================================
+   INPUTS - Glassmorphism style
+   ============================================================ */
+
+.input {
+  @apply w-full px-4 py-3 rounded-xl;
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid var(--dark-border);
+  color: #F8FAFC;
+  @apply transition-all duration-300;
+}
+
+.input::placeholder {
+  color: #64748B;
+}
+
+.input:focus {
+  border-color: var(--violet-500);
+  box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.15),
+              0 0 20px rgba(139, 92, 246, 0.1);
+}
+
+.input-textarea {
+  @apply input resize-none;
+}
+
+/* ============================================================
+   DROPDOWNS - Glassmorphism
+   ============================================================ */
+
+.dropdown-menu {
+  @apply absolute mt-2 py-2 rounded-xl;
+  background: rgba(10, 10, 15, 0.95);
+  backdrop-filter: blur(20px);
+  border: 1px solid var(--dark-border);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6),
+              0 0 1px rgba(139, 92, 246, 0.3);
+  @apply animate-fade-in;
+  z-index: 9999 !important;
+}
+
+.dropdown-item {
+  @apply px-4 py-2.5 cursor-pointer;
+  color: #94A3B8;
+  @apply transition-all duration-200;
+}
+
+.dropdown-item:hover {
+  background: var(--dark-hover);
+  color: var(--violet-300);
+}
+
+/* ============================================================
+   TOOLTIPS
+   ============================================================ */
+
+.tooltip {
+  @apply absolute z-50 px-3 py-2 rounded-lg;
+  background: rgba(10, 10, 15, 0.95);
+  backdrop-filter: blur(10px);
+  border: 1px solid var(--dark-border);
+  color: #F8FAFC;
+  @apply text-sm;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+  @apply animate-fade-in;
+}
+
+/* ============================================================
+   WINDOW CONTROLS (macOS style)
+   ============================================================ */
+
+.window-controls {
+  @apply flex items-center gap-2;
+  -webkit-app-region: no-drag;
+}
+
+.window-btn {
+  @apply w-3 h-3 rounded-full transition-colors duration-150;
+}
+
+.window-btn-close {
+  @apply bg-red-500 hover:bg-red-600;
+}
+
+.window-btn-minimize {
+  @apply bg-yellow-500 hover:bg-yellow-600;
+}
+
+.window-btn-maximize {
+  @apply bg-green-500 hover:bg-green-600;
+}
+
+.drag-region {
+  -webkit-app-region: drag;
+}
+
+.no-drag {
+  -webkit-app-region: no-drag;
+}
+
+/* ============================================================
+   EDITOR STYLES
+   ============================================================ */
+
+.editor-content {
+  @apply leading-relaxed;
+  color: #E2E8F0;
+  font-size: 1.05rem;
+}
+
+.editor-content p {
+  @apply mb-4;
+}
+
+.editor-content h1 {
+  @apply text-3xl font-bold mb-4;
+  color: var(--violet-300);
+}
+
+.editor-content h2 {
+  @apply text-2xl font-semibold mb-3;
+  color: var(--violet-400);
+}
+
+.editor-content h3 {
+  @apply text-xl font-medium mb-2;
+  color: var(--violet-400);
+}
+
+.editor-content ul, .editor-content ol {
+  @apply ml-6 mb-4;
+}
+
+.editor-content li {
+  @apply mb-1;
+}
+
+.editor-content blockquote {
+  @apply pl-4 italic;
+  border-left: 4px solid var(--violet-500);
+  color: #94A3B8;
+}
+
+/* TipTap editor specific */
+.ProseMirror {
+  @apply outline-none min-h-full;
+}
+
+.ProseMirror p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  color: #475569;
+  float: left;
+  height: 0;
+  pointer-events: none;
+}
+
+/* ============================================================
+   COMPONENT CARDS
+   ============================================================ */
+
+.character-card {
+  @apply glass-card p-4 cursor-pointer;
+  @apply transition-all duration-300;
+}
+
+.character-card:hover {
+  @apply transform -translate-y-1;
+  border-color: var(--violet-500);
+  box-shadow: 0 12px 40px rgba(139, 92, 246, 0.2);
+}
+
+/* ============================================================
+   TOGGLE SWITCH
+   ============================================================ */
+
+.toggle-switch {
+  @apply relative w-12 h-6 rounded-full cursor-pointer;
+  background: rgba(255, 255, 255, 0.1);
+  @apply transition-colors duration-300;
+}
+
+.toggle-switch.active {
+  background: linear-gradient(135deg, var(--violet-500), var(--violet-600));
+}
+
+.toggle-switch::after {
+  content: '';
+  @apply absolute top-1 left-1 w-4 h-4 rounded-full;
+  background: #FFFFFF;
+  @apply transition-transform duration-300;
+}
+
+.toggle-switch.active::after {
+  @apply translate-x-6;
+}
+
+/* ============================================================
+   LOADING SPINNER
+   ============================================================ */
+
+.spinner {
+  @apply w-6 h-6 border-2 rounded-full animate-spin;
+  border-color: rgba(139, 92, 246, 0.2);
+  border-top-color: var(--violet-500);
+}
+
+/* ============================================================
+   ANIMATIONS
+   ============================================================ */
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from { 
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to { 
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideRight {
+  from { 
+    opacity: 0;
+    transform: translateX(-10px);
+  }
+  to { 
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
+
+@keyframes glow {
+  0%, 100% { box-shadow: 0 0 20px rgba(139, 92, 246, 0.3); }
+  50% { box-shadow: 0 0 40px rgba(139, 92, 246, 0.6); }
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+/* ============================================================
+   SHIMMER TEXT EFFECT
+   ============================================================ */
+
+.shimmer-text {
+  background: linear-gradient(
+    90deg,
+    #F8FAFC 0%,
+    var(--violet-300) 25%,
+    var(--violet-400) 50%,
+    var(--violet-300) 75%,
+    #F8FAFC 100%
+  );
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: shimmer 3s linear infinite;
+}
+
+/* ============================================================
+   STORY BIBLE TABS
+   ============================================================ */
+
+.bible-tab {
+  @apply px-4 py-2.5 rounded-xl cursor-pointer;
+  color: #64748B;
+  @apply transition-all duration-300;
+}
+
+.bible-tab:hover {
+  background: var(--dark-hover);
+  color: var(--violet-400);
+}
+
+.bible-tab.active {
+  background: rgba(139, 92, 246, 0.15);
+  color: var(--violet-300);
+  border-left: 2px solid var(--violet-500);
+}
+
+/* ============================================================
+   PROJECT TREE
+   ============================================================ */
+
+.project-item {
+  @apply flex items-center gap-2 px-3 py-2.5 rounded-xl cursor-pointer;
+  color: #E2E8F0;
+  @apply transition-all duration-300;
+}
+
+.project-item:hover {
+  background: var(--dark-hover);
+}
+
+.project-item.active {
+  background: rgba(139, 92, 246, 0.15);
+  color: var(--violet-300);
+}
+
+.chapter-item {
+  @apply flex items-center gap-2 px-3 py-2 pl-6 rounded-xl cursor-pointer;
+  color: #64748B;
+  @apply text-sm transition-all duration-300;
+}
+
+.chapter-item:hover {
+  background: var(--dark-hover);
+  color: #E2E8F0;
+}
+
+.chapter-item.active {
+  background: rgba(139, 92, 246, 0.15);
+  color: var(--violet-300);
+}
+
+/* ============================================================
+   FORMATTING TOOLBAR
+   ============================================================ */
+
+.format-btn {
+  @apply w-10 h-10 flex items-center justify-center;
+  @apply rounded-xl cursor-pointer;
+  background: rgba(10, 10, 15, 0.8);
+  color: #94A3B8;
+  border: 1px solid var(--dark-border);
+  @apply transition-all duration-200;
+  @apply font-bold text-sm;
+}
+
+.format-btn:hover {
+  background: var(--dark-hover);
+  border-color: var(--violet-500);
+  color: var(--violet-400);
+}
+
+.format-btn.active {
+  background: linear-gradient(135deg, var(--violet-600), var(--violet-700));
+  border-color: var(--violet-500);
+  color: #FFFFFF;
+}
+
+/* ============================================================
+   AI STATUS INDICATOR
+   ============================================================ */
+
+.ai-status {
+  @apply flex items-center gap-2 px-3 py-1 rounded-full;
+  @apply text-xs font-medium;
+}
+
+.ai-status.ready {
+  background: rgba(34, 197, 94, 0.15);
+  color: #4ADE80;
+}
+
+.ai-status.loading {
+  background: rgba(139, 92, 246, 0.15);
+  color: var(--violet-400);
+}
+
+.ai-status.error {
+  @apply bg-red-500/20 text-red-400;
+}
+
+/* ============================================================
+   FLOATING ACTION BUTTON
+   ============================================================ */
+
+.fab {
+  @apply fixed bottom-6 right-6 w-14 h-14 rounded-full;
+  background: linear-gradient(135deg, var(--violet-600), var(--violet-700));
+  color: #FFFFFF;
+  @apply flex items-center justify-center;
+  box-shadow: 0 8px 30px rgba(139, 92, 246, 0.5);
+  @apply transition-all duration-300;
+  @apply z-50;
+}
+
+.fab:hover {
+  background: linear-gradient(135deg, var(--violet-500), var(--violet-600));
+  transform: scale(1.1);
+  box-shadow: 0 12px 40px rgba(139, 92, 246, 0.6);
+}
+
+/* ============================================================
+   GLOW EFFECTS
+   ============================================================ */
+
+.violet-glow {
+  box-shadow: 0 0 20px rgba(139, 92, 246, 0.3),
+              0 0 40px rgba(139, 92, 246, 0.2),
+              0 0 60px rgba(139, 92, 246, 0.1);
+}
+
+.violet-glow-sm {
+  box-shadow: 0 0 10px rgba(139, 92, 246, 0.3);
+}
+
+.violet-glow-lg {
+  box-shadow: 0 0 40px rgba(139, 92, 246, 0.4),
+              0 0 80px rgba(139, 92, 246, 0.2);
+}
+
+/* Text colors */
+.text-violet-300 { color: var(--violet-300); }
+.text-violet-400 { color: var(--violet-400); }
+.text-violet-500 { color: var(--violet-500); }
+
+/* ============================================================
+   HERO SECTION STYLES
+   ============================================================ */
+
+.hero-title {
+  @apply text-6xl font-bold tracking-tight;
+  line-height: 1.1;
+}
+
+.hero-subtitle {
+  @apply text-xl text-gray-400 max-w-2xl mx-auto;
+  line-height: 1.6;
+}
+
+/* ============================================================
+   RESPONSIVE UTILITIES
+   ============================================================ */
+
+@media (max-width: 768px) {
+  .hero-title {
+    @apply text-4xl;
+  }
+  
+  .hero-subtitle {
+    @apply text-lg;
+  }
+}

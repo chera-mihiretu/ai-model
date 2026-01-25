@@ -1,0 +1,87 @@
+{
+  "name": "exelsias",
+  "version": "1.0.0",
+  "description": "Exelsias - Professional Story Bible and AI Writing Assistant",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron . --no-sandbox",
+    "dev": "concurrently \"cd ../frontend && npm run dev\" \"wait-on http://localhost:5173 && electron . --no-sandbox\"",
+    "build:frontend": "cd ../frontend && npm run build",
+    "build": "npm run build:frontend && electron-builder",
+    "build:win": "npm run build:frontend && electron-builder --win",
+    "build:mac": "npm run build:frontend && electron-builder --mac",
+    "build:linux": "npm run build:frontend && electron-builder --linux",
+    "build:all": "npm run build:frontend && electron-builder --win --linux"
+  },
+  "author": "Exelsias",
+  "license": "MIT",
+  "devDependencies": {
+    "concurrently": "^8.2.2",
+    "electron": "^28.1.0",
+    "electron-builder": "^24.9.1",
+    "wait-on": "^7.2.0"
+  },
+  "build": {
+    "appId": "com.exelsias.app",
+    "productName": "Exelsias",
+    "directories": {
+      "output": "/home/chera/Documents/Exelsias-Build"
+    },
+    "files": [
+      "main.js",
+      "preload.js"
+    ],
+    "extraResources": [
+      {
+        "from": "../frontend/dist/",
+        "to": "frontend/",
+        "filter": ["**/*"]
+      },
+      {
+        "from": "../backend/",
+        "to": "backend/",
+        "filter": ["**/*", "!__pycache__/**", "!*.pyc"]
+      },
+      {
+        "from": "../../src/",
+        "to": "src/",
+        "filter": ["**/*", "!__pycache__/**", "!*.pyc"]
+      },
+      {
+        "from": "../../models/",
+        "to": "models/",
+        "filter": ["**/*"]
+      },
+      {
+        "from": "../../data/",
+        "to": "data/",
+        "filter": ["**/*", "!*.db"]
+      }
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64"]
+        }
+      ],
+      "icon": "icon.png"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Exelsias"
+    },
+    "mac": {
+      "target": "dmg",
+      "icon": "icon.png"
+    },
+    "linux": {
+      "target": ["AppImage"],
+      "icon": "icon.png",
+      "category": "Office"
+    }
+  }
+}

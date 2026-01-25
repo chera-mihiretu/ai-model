@@ -1,12 +1,10 @@
 """
-Story Bible Pro - AI Writing Assistant
+Exelsias - AI Writing Assistant
 
 Clean Architecture Structure:
-- presentation/  : UI Layer (PyQt6)
-- domain/        : Business logic and models
-- data/          : Database and persistence
-- services/      : External services (AI, TTS)
-- config/        : Configuration management
+- database/     : Database management and persistence
+- services/     : AI Engine, TTS, Import Parser
+- config/       : Configuration management
+
+Note: UI is now handled by Electron (story-bible-electron/)
 """
-
-

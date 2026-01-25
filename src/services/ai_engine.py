@@ -11,7 +11,7 @@ except ImportError:
 
 from ..config.manager import ConfigManager
 
-MIMIC_SYSTEM_PROMPT = """<|start_header_id|>system<|end_header_id|>
+MIMIC_SYSTEM_PROMPT = """<|begin_of_text|><|start_header_id|>system<|end_header_id|>
 You are now roleplaying as {name}.
 RELATIONSHIP TO AUTHOR: {relationship}
 TRAITS: {traits}
@@ -19,47 +19,46 @@ SPEECH STYLE: {speech}
 Respond to the user as THIS character would. Never break character.
 <|eot_id|>"""
 
-PROSE_SYSTEM_PROMPT = """<|start_header_id|>system<|end_header_id|>
-You are the Story Bible Continuity Engine. 
-Your identity is that of a professional co-author and lore expert.
+PROSE_SYSTEM_PROMPT = """<|begin_of_text|><|start_header_id|>system<|end_header_id|>
+You are a professional creative writer and story continuity expert.
 RULES:
-1. NO greetings. NO "I can help with that." NO "Sure!"
-2. If the user provides a scene, continue the prose in the same style.
-3. If the user asks a question, answer based ONLY on the provided context.
-4. Always maintain a literary, narrative tone.
+1. NO greetings, NO "I can help with that", NO meta-commentary.
+2. Write in the same style and tone as the provided text.
+3. Continue the story naturally with vivid prose.
+4. Maintain literary, narrative quality.
 <|eot_id|>"""
 
-PROMPT_DESCRIBE_SIGHT = """<|start_header_id|>system<|end_header_id|>
+PROMPT_DESCRIBE_SIGHT = """<|begin_of_text|><|start_header_id|>system<|end_header_id|>
 Describe the following object or scene focusing ONLY on VISUAL details.
 Focus on light, color, shadow, texture, and geometry.
 Be vivid and poetic. Do not include other senses or plot action.
 <|eot_id|>"""
 
-PROMPT_DESCRIBE_SMELL = """<|start_header_id|>system<|end_header_id|>
+PROMPT_DESCRIBE_SMELL = """<|begin_of_text|><|start_header_id|>system<|end_header_id|>
 Describe the following object or scene focusing ONLY on OLFACTORY details.
 Focus on scents, aromas, musk, dampness, and air quality.
 Be visceral. Do not include visual descriptions.
 <|eot_id|>"""
 
-PROMPT_REWRITE_DRAMATIC = """<|start_header_id|>system<|end_header_id|>
+PROMPT_REWRITE_DRAMATIC = """<|begin_of_text|><|start_header_id|>system<|end_header_id|>
 Rewrite the following text to be more DRAMATIC and HIGH STAKES.
 Enhance emotional resonance, tension, and pacing.
 Make it feel cinematic.
 <|eot_id|>"""
 
-PROMPT_SENSORY_LAB = """<|start_header_id|>system<|end_header_id|>
+PROMPT_SENSORY_LAB = """<|begin_of_text|><|start_header_id|>system<|end_header_id|>
 You are a Sensory Lab Assistant.
 Given a setting, provide 5 distinct, atmospheric details relative to that setting.
 Format as a bulleted list.
 <|eot_id|>"""
 
-PROMPT_EXPAND_SCENE = """<|start_header_id|>system<|end_header_id|>
+PROMPT_EXPAND_SCENE = """<|begin_of_text|><|start_header_id|>system<|end_header_id|>
 You are a Co-Author. Continue the scene naturally from the provided text.
 Maintain the current tone, style, and character voices.
 Focus on action and dialogue.
 <|eot_id|>"""
 
-PROMPT_DESCRIBE_MASTER = """<|start_header_id|>system<|end_header_id|>
+PROMPT_DESCRIBE_MASTER = """<|begin_of_text|><|start_header_id|>system<|end_header_id|>
 You are a sensory-focused prose editor.
 INPUT: A selected snippet of text and a specific sense: {sense}.
 CONTEXT: 
@@ -75,7 +74,7 @@ STYLING RULES:
 - Output format: separated by "---"
 <|eot_id|>"""
 
-PROMPT_REWRITE_MASTER = """<|start_header_id|>system<|end_header_id|>
+PROMPT_REWRITE_MASTER = """<|begin_of_text|><|start_header_id|>system<|end_header_id|>
 Rewrite the following text applying this style: {style}.
 CONTEXT:
 - Genre: {genre}
@@ -84,7 +83,7 @@ GOAL: Provide 3 variations of the rewrite.
 Output format: separated by "---"
 <|eot_id|>"""
 
-PROMPT_WRITER_GODMODE = """<|start_header_id|>system<|end_header_id|>
+PROMPT_WRITER_GODMODE = """<|begin_of_text|><|start_header_id|>system<|end_header_id|>
 You are a professional novelist co-writing a {genre} book.
 
 BIBLE DATA (Character Details):
@@ -153,7 +152,7 @@ TASK: Suggest 5-7 beats for the NEXT chapter that:
 - Format as clean numbered list
 <|eot_id|>"""
 
-PROMPT_COMPRESS = """<|start_header_id|>system<|end_header_id|>
+PROMPT_COMPRESS = """<|begin_of_text|><|start_header_id|>system<|end_header_id|>
 You are a Context Compressor.
 Your task is to compress the provided text to strictly fit within {max_tokens} tokens.
 Preserve:
@@ -168,14 +167,14 @@ Discard:
 STRICT OUTPUT FORMAT: Output ONLY the compressed summary.
 <|eot_id|>"""
 
-PROMPT_INCREMENTAL_SUMMARY = """<|start_header_id|>system<|end_header_id|>
+PROMPT_INCREMENTAL_SUMMARY = """<|begin_of_text|><|start_header_id|>system<|end_header_id|>
 You are a Narrative Summarizer.
 Summarize the following new text chunk in 1-2 sentences.
 Focus on: Action, Key Dialogue, and State Changes.
 Output ONLY the summary.
 <|eot_id|>"""
 
-PROMPT_SUMMARIZE_CONTEXT = """<|start_header_id|>system<|end_header_id|>
+PROMPT_SUMMARIZE_CONTEXT = """<|begin_of_text|><|start_header_id|>system<|end_header_id|>
 You are a Context Compressor.
 Your task is to summarize the following text to fit within {char_limit} characters while preserving key facts, names, specific terminology, and relationships.
 STRICT RULES:
@@ -547,29 +546,41 @@ class AIEngine:
             return "Error."
 
     def ask_lore_assistant(self, query: str, response_queue: queue.Queue, project_memory: str, project_name: str = "Current Project") -> None:
-        """Lore Assistant with budgeting."""
+        """Lore Assistant with budgeting - enhanced for chapter writing."""
         if not self.llm:
             response_queue.put("Error: AI Model is not loaded.")
             response_queue.put("[[END]]")
             return
 
-        max_output_tokens = 600
+        max_output_tokens = 1200  # Increased for longer responses when writing chapters
         # Increased safety buffer to 250
         total_budget = 4096 - max_output_tokens - 250
         
         sys_prefix = f"""<|begin_of_text|><|start_header_id|>system<|end_header_id|>
-You are the OMNISCIENT LORE KEEPER for the story '{project_name}'.
-You have perfect memory of every event, character, and detail in this story.
+You are the OMNISCIENT LORE KEEPER and WRITING ASSISTANT for the story '{project_name}'.
+You have perfect memory of every character, world element, plot point, and story detail.
+
+YOUR CAPABILITIES:
+1. Answer questions about the story's characters, world, and plot
+2. Write detailed chapter content based on the outline
+3. Help expand scenes with vivid descriptions
+4. Maintain consistency with established character traits and world rules
+5. Generate dialogue that matches each character's speech pattern
 
 STORY DATA:
 """
         sys_suffix = """
-RULES:
+
+WRITING RULES:
 1. Answer questions DIRECTLY. Never say "According to the database".
-2. If information is missing, say so naturally.
+2. When writing chapter content, use the outline as your guide
+3. Include sensory details from the world elements
+4. Write dialogue that reflects each character's personality and speech pattern
+5. Keep events consistent with the established plot
+6. If asked to write a chapter, produce engaging narrative prose
 <|eot_id|>"""
         
-        query_part = f"<|start_header_id|>user<|end_header_id|>\nQUESTION: {query}\n<|eot_id|>\n<|start_header_id|>assistant<|end_header_id|>"
+        query_part = f"<|start_header_id|>user<|end_header_id|>\n{query}\n<|eot_id|>\n<|start_header_id|>assistant<|end_header_id|>"
         fixed_tokens = self.count_tokens(sys_prefix + sys_suffix + query_part)
         trimmed_memory = self.smart_trim(project_memory, total_budget - fixed_tokens)
 
@@ -800,3 +811,602 @@ RULES:
         except Exception as e:
             logging.error(f"Beat suggestion error: {e}")
             return f"Error: {e}"
+
+    def generate_characters_from_synopsis(self, synopsis: str, genre: str = "fiction") -> list:
+        """Generate character profiles from a synopsis."""
+        if not self.llm:
+            return []
+        
+        max_output_tokens = 2000
+        total_budget = 4096 - max_output_tokens - 250
+        
+        system_prompt = """<|begin_of_text|><|start_header_id|>system<|end_header_id|>
+You are a literary analyst creating character profiles from a story synopsis.
+For each character mentioned or implied in the synopsis, create a detailed profile.
+Output ONLY valid JSON.
+<|eot_id|>"""
+
+        user_prompt = f"""<|start_header_id|>user<|end_header_id|>
+Based on this {genre} story synopsis, identify all characters and create profiles for each:
+
+SYNOPSIS:
+{self.smart_trim(synopsis, total_budget - 300)}
+
+For each character provide:
+- name: Full name
+- role: (protagonist, antagonist, supporting, minor)
+- personality_traits: Key personality characteristics (2-3 sentences)
+- physical_description: Physical appearance if implied (1-2 sentences)
+- backstory: Background if implied (1-2 sentences)
+- motivations: What drives this character
+- speech_pattern: How they might talk based on their role
+
+Return a JSON array of character objects.
+<|eot_id|><|start_header_id|>assistant<|end_header_id|>
+["""
+        
+        try:
+            with self.lock:
+                output = self.llm(system_prompt + user_prompt, max_tokens=max_output_tokens, 
+                                 stop=["<|eot_id|>"], echo=False, temperature=0.7)
+            
+            json_str = "[" + output['choices'][0]['text'].strip()
+            
+            # Clean up JSON
+            if not json_str.endswith("]"):
+                last_bracket = json_str.rfind("}")
+                if last_bracket > 0:
+                    json_str = json_str[:last_bracket + 1] + "]"
+            
+            import json
+            characters = json.loads(json_str)
+            
+            # Helper to ensure value is string (convert lists to comma-separated string)
+            def ensure_string(val):
+                if isinstance(val, list):
+                    return ', '.join(str(v) for v in val)
+                return str(val) if val else ''
+            
+            # Validate and clean
+            cleaned = []
+            for char in characters:
+                if isinstance(char, dict) and char.get('name'):
+                    cleaned.append({
+                        'name': ensure_string(char.get('name', '')),
+                        'role': ensure_string(char.get('role', 'supporting')),
+                        'personality_traits': ensure_string(char.get('personality_traits', '')),
+                        'physical_description': ensure_string(char.get('physical_description', '')),
+                        'backstory': ensure_string(char.get('backstory', '')),
+                        'motivations': ensure_string(char.get('motivations', '')),
+                        'speech_pattern': ensure_string(char.get('speech_pattern', '')),
+                        'is_visible': 1
+                    })
+            
+            logging.info(f"Generated {len(cleaned)} characters from synopsis")
+            return cleaned
+        except json.JSONDecodeError as e:
+            logging.error(f"Character JSON parse error: {e}")
+            logging.error(f"Raw JSON string: {json_str[:500]}...")
+            return []
+        except Exception as e:
+            logging.error(f"Character generation error: {e}")
+            return []
+
+    def generate_single_character(self, description: str, genre: str = "fiction") -> dict:
+        """Generate a complete character profile from a simple description prompt."""
+        import json
+        import re
+        
+        if not self.llm:
+            logging.error("LLM not loaded for character generation")
+            return {"error": "AI model not loaded"}
+        
+        if not description or not description.strip():
+            return {"error": "No description provided"}
+        
+        max_output_tokens = 2000
+        
+        # Simplified, more reliable prompt
+        full_prompt = f"""<|begin_of_text|><|start_header_id|>system<|end_header_id|>
+You are a character creator. Create a detailed character profile as JSON.
+<|eot_id|><|start_header_id|>user<|end_header_id|>
+Create a {genre} character based on: "{description}"
+
+Return ONLY a JSON object with these exact keys (no markdown, no explanation):
+{{
+  "name": "character's full name",
+  "role": "protagonist/antagonist/mentor/sidekick/supporting/villain",
+  "pronouns": "he/him or she/her or they/them",
+  "personality_traits": "3-5 personality traits described in 2-3 sentences",
+  "physical_description": "physical appearance in 2-3 sentences",
+  "backstory": "character history in 3-4 sentences",
+  "motivations": "what drives them in 2-3 sentences",
+  "internal_conflicts": "inner struggles in 2-3 sentences",
+  "strengths": "abilities and positive traits in 2-3 sentences",
+  "weaknesses": "flaws and vulnerabilities in 2-3 sentences",
+  "speech_pattern": "how they talk in 1-2 sentences",
+  "character_arc": "how they change in 2-3 sentences"
+}}
+<|eot_id|><|start_header_id|>assistant<|end_header_id|>
+{{"""
+        
+        try:
+            logging.info(f"Generating character from description: {description[:50]}...")
+            
+            with self.lock:
+                output = self.llm(full_prompt, max_tokens=max_output_tokens, 
+                                 stop=["<|eot_id|>", "```"], echo=False, temperature=0.7)
+            
+            raw_text = output['choices'][0]['text'].strip()
+            logging.info(f"Raw AI output (first 200 chars): {raw_text[:200]}")
+            
+            # Prepend the opening brace we used in the prompt
+            json_str = "{" + raw_text
+            
+            # Clean up the JSON string
+            # Remove any trailing text after the last }
+            last_brace = json_str.rfind("}")
+            if last_brace > 0:
+                json_str = json_str[:last_brace + 1]
+            
+            # Remove any markdown code blocks
+            json_str = re.sub(r'```json\s*', '', json_str)
+            json_str = re.sub(r'```\s*', '', json_str)
+            
+            # Fix common JSON issues
+            json_str = json_str.replace('\n', ' ')
+            json_str = re.sub(r',\s*}', '}', json_str)  # Remove trailing commas
+            json_str = re.sub(r',\s*]', ']', json_str)  # Remove trailing commas in arrays
+            
+            logging.info(f"Cleaned JSON (first 300 chars): {json_str[:300]}")
+            
+            try:
+                character = json.loads(json_str)
+            except json.JSONDecodeError as je:
+                logging.error(f"JSON parse error: {je}")
+                logging.error(f"Attempted to parse: {json_str[:500]}")
+                
+                # Try to extract fields manually using regex as fallback
+                character = {}
+                
+                # Extract name
+                name_match = re.search(r'"name"\s*:\s*"([^"]+)"', json_str)
+                if name_match:
+                    character['name'] = name_match.group(1)
+                
+                # Extract other fields
+                for field in ['role', 'pronouns', 'personality_traits', 'physical_description', 
+                             'backstory', 'motivations', 'internal_conflicts', 'strengths', 
+                             'weaknesses', 'speech_pattern', 'character_arc']:
+                    match = re.search(rf'"{field}"\s*:\s*"([^"]*(?:[^"\\]|\\.)*)"', json_str, re.DOTALL)
+                    if match:
+                        character[field] = match.group(1).replace('\\n', '\n').replace('\\"', '"')
+                
+                if not character.get('name'):
+                    return {"error": f"Failed to parse AI response: {str(je)}"}
+            
+            # Validate we have at least a name
+            if not character.get('name'):
+                logging.error("No name found in generated character")
+                return {"error": "AI did not generate a valid character name"}
+            
+            # Helper to ensure value is string (convert lists to comma-separated string)
+            def to_string(val):
+                if isinstance(val, list):
+                    return ', '.join(str(v) for v in val)
+                return str(val).strip() if val else ''
+            
+            # Build the final character dict with all fields
+            result = {
+                'name': to_string(character.get('name', 'Unnamed Character')),
+                'role': to_string(character.get('role', 'supporting')),
+                'pronouns': to_string(character.get('pronouns', '')),
+                'personality_traits': to_string(character.get('personality_traits', '')),
+                'physical_description': to_string(character.get('physical_description', '')),
+                'backstory': to_string(character.get('backstory', '')),
+                'motivations': to_string(character.get('motivations', '')),
+                'internal_conflicts': to_string(character.get('internal_conflicts', '')),
+                'strengths': to_string(character.get('strengths', '')),
+                'weaknesses': to_string(character.get('weaknesses', '')),
+                'speech_pattern': to_string(character.get('speech_pattern', '')),
+                'character_arc': to_string(character.get('character_arc', '')),
+                'is_visible': 1
+            }
+            
+            logging.info(f"Successfully generated character: {result['name']}")
+            return result
+            
+        except Exception as e:
+            logging.error(f"Single character generation error: {e}", exc_info=True)
+            return {"error": f"Generation failed: {str(e)}"}
+
+    def generate_world_from_synopsis(self, synopsis: str, genre: str = "fiction") -> list:
+        """Generate world building elements from a synopsis."""
+        if not self.llm:
+            return []
+        
+        max_output_tokens = 2000
+        total_budget = 4096 - max_output_tokens - 250
+        
+        system_prompt = """<|begin_of_text|><|start_header_id|>system<|end_header_id|>
+You are a worldbuilding expert extracting story elements from a synopsis.
+Identify settings, locations, important events, systems (magic, political, etc.), and significant items.
+Output ONLY valid JSON.
+<|eot_id|>"""
+
+        user_prompt = f"""<|start_header_id|>user<|end_header_id|>
+Based on this {genre} story synopsis, identify all worldbuilding elements:
+
+SYNOPSIS:
+{self.smart_trim(synopsis, total_budget - 300)}
+
+For each element provide:
+- name: Element name
+- element_type: One of (setting, location, event, system, item, other)
+- description: What it is (2-3 sentences)
+- sensory_details: Visual, auditory, or atmospheric details (1-2 sentences)
+- significance: Why it matters to the story
+
+Return a JSON array of element objects.
+<|eot_id|><|start_header_id|>assistant<|end_header_id|>
+["""
+        
+        try:
+            with self.lock:
+                output = self.llm(system_prompt + user_prompt, max_tokens=max_output_tokens, 
+                                 stop=["<|eot_id|>"], echo=False, temperature=0.7)
+            
+            json_str = "[" + output['choices'][0]['text'].strip()
+            
+            # Clean up JSON
+            if not json_str.endswith("]"):
+                last_bracket = json_str.rfind("}")
+                if last_bracket > 0:
+                    json_str = json_str[:last_bracket + 1] + "]"
+            
+            import json
+            elements = json.loads(json_str)
+            
+            # Helper to ensure value is string (convert lists to comma-separated string)
+            def to_str(val):
+                if isinstance(val, list):
+                    return ', '.join(str(v) for v in val)
+                return str(val).strip() if val else ''
+            
+            # Validate and clean
+            cleaned = []
+            for elem in elements:
+                if isinstance(elem, dict) and elem.get('name'):
+                    cleaned.append({
+                        'name': to_str(elem.get('name', '')),
+                        'element_type': to_str(elem.get('element_type', 'other')),
+                        'description': to_str(elem.get('description', '')),
+                        'sensory_details': to_str(elem.get('sensory_details', '')),
+                        'significance': to_str(elem.get('significance', '')),
+                        'is_visible': 1
+                    })
+            
+            logging.info(f"Generated {len(cleaned)} world elements from synopsis")
+            return cleaned
+        except Exception as e:
+            logging.error(f"World generation error: {e}")
+            return []
+
+    def generate_single_world_element(self, description: str, element_type: str = "location", genre: str = "fiction") -> dict:
+        """Generate a complete world element from a simple description prompt."""
+        import json
+        
+        if not self.llm:
+            return {"error": "AI Model not loaded."}
+        
+        if not description.strip():
+            return {"error": "Description cannot be empty."}
+
+        max_output_tokens = 1200
+        
+        # Map element types to more descriptive names for the AI
+        type_descriptions = {
+            'setting': 'a world setting or environment',
+            'location': 'a specific location or place',
+            'event': 'a historical or significant event',
+            'system': 'a system (magic, political, economic, etc.)',
+            'item': 'an important item or artifact',
+            'other': 'a worldbuilding element'
+        }
+        type_desc = type_descriptions.get(element_type, 'a worldbuilding element')
+        
+        system_prompt = """<|begin_of_text|><|start_header_id|>system<|end_header_id|>
+You are a creative worldbuilding expert for fiction stories.
+Given a simple description, create a complete, detailed world element profile.
+Be creative and fill in all the gaps with interesting, consistent details.
+Output ONLY valid JSON with no additional text.
+<|eot_id|>"""
+
+        user_prompt = f"""<|start_header_id|>user<|end_header_id|>
+Create a complete worldbuilding element profile for a {genre} story based on this description:
+
+"{description}"
+
+This should be {type_desc}.
+
+Generate a detailed JSON object with these exact fields:
+- name: A fitting name for this element
+- element_type: "{element_type}"
+- description: Detailed description of what this is, its nature and characteristics (3-4 sentences)
+- sensory_details: Rich sensory details - what it looks like, sounds like, feels like, smells like (2-3 sentences)
+- significance: Why this matters to the story, how it affects the world or characters (2-3 sentences)
+- custom_traits: Additional unique properties or characteristics as a formatted string
+
+Be creative and make the element interesting, vivid, and memorable!
+<|eot_id|><|start_header_id|>assistant<|end_header_id|>
+{{"""
+        
+        try:
+            logging.info(f"Generating single world element for: {description}")
+            with self.lock:
+                output = self.llm(system_prompt + user_prompt, max_tokens=max_output_tokens, 
+                                 stop=["<|eot_id|>"], echo=False, temperature=0.8)
+            
+            raw_ai_output = output['choices'][0]['text'].strip()
+            logging.debug(f"Raw AI output for single world element: {raw_ai_output}")
+
+            json_str = "{" + raw_ai_output
+            
+            # Clean up JSON
+            import re
+            json_str = re.sub(r'```json\s*', '', json_str, flags=re.IGNORECASE)
+            json_str = re.sub(r'\s*```', '', json_str)
+
+            if not json_str.endswith("}"):
+                last_bracket = json_str.rfind("}")
+                if last_bracket > 0:
+                    json_str = json_str[:last_bracket + 1]
+
+            logging.debug(f"Cleaned JSON string for single world element: {json_str}")
+
+            element = json.loads(json_str)
+            
+            # Helper to ensure value is string (convert lists to comma-separated string)
+            def to_str(val):
+                if isinstance(val, list):
+                    return ', '.join(str(v) for v in val)
+                return str(val).strip() if val else ''
+            
+            # Validate and ensure all fields exist
+            return {
+                'name': to_str(element.get('name', 'Unnamed Element')),
+                'element_type': to_str(element.get('element_type', element_type)),
+                'description': to_str(element.get('description', '')),
+                'sensory_details': to_str(element.get('sensory_details', '')),
+                'significance': to_str(element.get('significance', '')),
+                'custom_traits': to_str(element.get('custom_traits', '')),
+                'is_visible': 1
+            }
+        except json.JSONDecodeError as e:
+            logging.error(f"JSON decoding error in single world element generation: {e}")
+            return {"error": f"Failed to parse AI response as JSON: {e}"}
+        except Exception as e:
+            logging.error(f"Single world element generation error: {e}")
+            return {"error": f"An unexpected error occurred: {e}"}
+
+    def generate_synopsis(self, story_elements: str, genre: str = "fiction", target_words: str = "300-500") -> str:
+        """Generate a complete synopsis from structured story elements."""
+        if not self.llm:
+            return {"error": "AI Model not loaded."}
+        
+        if not story_elements.strip():
+            return {"error": "Story elements cannot be empty."}
+
+        max_output_tokens = 1500
+        
+        system_prompt = """<|begin_of_text|><|start_header_id|>system<|end_header_id|>
+You are an expert story writer and editor specializing in creating compelling synopses.
+Given structured story elements, craft a cohesive, engaging synopsis that flows naturally.
+Write in third person, present tense. Include emotional stakes and character motivations.
+Do not include section headers or labels - write it as flowing prose.
+<|eot_id|>"""
+
+        user_prompt = f"""<|start_header_id|>user<|end_header_id|>
+Create a {genre} story synopsis of approximately {target_words} words based on these story elements:
+
+{story_elements}
+
+Write a compelling synopsis that:
+1. Opens with a hook that establishes the protagonist and their world
+2. Clearly establishes the main conflict and stakes
+3. Shows the protagonist's journey and key challenges
+4. Builds to a climax
+5. Resolves with a satisfying ending
+6. Weaves in the theme naturally
+
+Write the synopsis as smooth, engaging prose without any headers or labels.
+<|eot_id|><|start_header_id|>assistant<|end_header_id|>
+"""
+        
+        try:
+            logging.info(f"Generating synopsis for genre: {genre}, target words: {target_words}")
+            with self.lock:
+                output = self.llm(system_prompt + user_prompt, max_tokens=max_output_tokens, 
+                                 stop=["<|eot_id|>"], echo=False, temperature=0.7)
+            
+            synopsis = output['choices'][0]['text'].strip()
+            logging.debug(f"Generated synopsis: {synopsis[:200]}...")
+            
+            return synopsis
+        except Exception as e:
+            logging.error(f"Synopsis generation error: {e}")
+            return {"error": f"Failed to generate synopsis: {e}"}
+
+    def generate_outline_from_synopsis(self, synopsis: str, chapter_count: int = 10, genre: str = "fiction") -> list:
+        """Generate a chapter outline from a synopsis as structured JSON array."""
+        if not self.llm:
+            return []
+        
+        import json
+        
+        max_output_tokens = 2000
+        total_budget = 4096 - max_output_tokens - 250
+        
+        system_prompt = """<|begin_of_text|><|start_header_id|>system<|end_header_id|>
+You are a story structure expert creating chapter outlines.
+Given a synopsis, break it down into a logical chapter structure.
+Output ONLY valid JSON array with no additional text.
+<|eot_id|>"""
+
+        user_prompt = f"""<|start_header_id|>user<|end_header_id|>
+Based on this {genre} story synopsis, create a {chapter_count}-chapter outline as a JSON array:
+
+SYNOPSIS:
+{self.smart_trim(synopsis, total_budget - 400)}
+
+For each chapter create a JSON object with:
+- "chapter_number": the chapter number (1, 2, 3, etc.)
+- "title": a compelling chapter title
+- "summary": 2-4 sentences describing what happens in this chapter
+- "key_events": brief list of key events or turning points
+
+Return a JSON array of chapter objects.
+<|eot_id|><|start_header_id|>assistant<|end_header_id|>
+["""
+        
+        try:
+            with self.lock:
+                output = self.llm(system_prompt + user_prompt, max_tokens=max_output_tokens, 
+                                 stop=["<|eot_id|>"], echo=False, temperature=0.7)
+            
+            raw_output = output['choices'][0]['text'].strip()
+            json_str = "[" + raw_output
+            
+            # Clean up JSON
+            import re
+            json_str = re.sub(r'```json\s*', '', json_str, flags=re.IGNORECASE)
+            json_str = re.sub(r'\s*```', '', json_str)
+            
+            if not json_str.endswith("]"):
+                last_bracket = json_str.rfind("}")
+                if last_bracket > 0:
+                    json_str = json_str[:last_bracket + 1] + "]"
+            
+            chapters = json.loads(json_str)
+            
+            # Validate and clean
+            cleaned = []
+            for i, ch in enumerate(chapters):
+                if isinstance(ch, dict):
+                    cleaned.append({
+                        'chapter_number': ch.get('chapter_number', i + 1),
+                        'title': ch.get('title', f'Chapter {i + 1}'),
+                        'summary': ch.get('summary', ''),
+                        'key_events': ch.get('key_events', '')
+                    })
+            
+            return cleaned
+        except json.JSONDecodeError as e:
+            logging.error(f"Outline JSON parse error: {e}")
+            # Fallback: try to parse as plain text and convert
+            return self._parse_outline_text_to_json(raw_output, chapter_count)
+        except Exception as e:
+            logging.error(f"Outline generation error: {e}")
+            return []
+
+    def _parse_outline_text_to_json(self, text: str, chapter_count: int) -> list:
+        """Fallback: Parse plain text outline into structured JSON."""
+        import re
+        chapters = []
+        
+        # Try to find chapter patterns like "Chapter 1: Title" or "1. Title"
+        pattern = r'(?:Chapter\s*)?(\d+)[:\.\)]\s*([^\n]+)\n((?:(?!(?:Chapter\s*)?\d+[:\.\)]).)*)' 
+        matches = re.findall(pattern, text, re.IGNORECASE | re.DOTALL)
+        
+        if matches:
+            for match in matches:
+                num, title, summary = match
+                chapters.append({
+                    'chapter_number': int(num),
+                    'title': title.strip(),
+                    'summary': summary.strip(),
+                    'key_events': ''
+                })
+        else:
+            # Last resort: split by double newlines and create generic chapters
+            parts = text.split('\n\n')
+            for i, part in enumerate(parts[:chapter_count]):
+                if part.strip():
+                    lines = part.strip().split('\n')
+                    title = lines[0] if lines else f'Chapter {i + 1}'
+                    summary = '\n'.join(lines[1:]) if len(lines) > 1 else ''
+                    chapters.append({
+                        'chapter_number': i + 1,
+                        'title': title.strip(),
+                        'summary': summary.strip(),
+                        'key_events': ''
+                    })
+        
+        return chapters if chapters else [{'chapter_number': 1, 'title': 'Chapter 1', 'summary': text[:500], 'key_events': ''}]
+
+    def update_chapter_summary(self, chapter_content: str) -> str:
+        """Generate/update a summary for a chapter."""
+        if not self.llm:
+            return ""
+        
+        max_output_tokens = 300
+        total_budget = 4096 - max_output_tokens - 250
+        
+        system_prompt = """<|begin_of_text|><|start_header_id|>system<|end_header_id|>
+You are a literary assistant creating concise chapter summaries.
+Focus on plot events, character actions, and important developments.
+<|eot_id|>"""
+
+        user_prompt = f"""<|start_header_id|>user<|end_header_id|>
+Summarize this chapter in 2-3 sentences, focusing on key plot events and character actions:
+
+CHAPTER CONTENT:
+{self.smart_trim(chapter_content, total_budget - 200)}
+<|eot_id|><|start_header_id|>assistant<|end_header_id|>
+"""
+        
+        try:
+            with self.lock:
+                output = self.llm(system_prompt + user_prompt, max_tokens=max_output_tokens, 
+                                 stop=["<|eot_id|>"], echo=False, temperature=0.5)
+            return output['choices'][0]['text'].strip()
+        except Exception as e:
+            logging.error(f"Chapter summary error: {e}")
+            return ""
+
+    def expand_scene_from_summary(self, scene_summary: str, context: str = "", genre: str = "fiction") -> str:
+        """Expand a scene summary into full prose."""
+        if not self.llm:
+            return ""
+        
+        max_output_tokens = 1000
+        total_budget = 4096 - max_output_tokens - 250
+        
+        system_prompt = f"""<|begin_of_text|><|start_header_id|>system<|end_header_id|>
+You are a professional {genre} author expanding scene summaries into vivid prose.
+Write in third person limited POV with a mix of dialogue, action, and description.
+<|eot_id|>"""
+
+        context_section = ""
+        if context:
+            context_section = f"\nPREVIOUS CONTEXT:\n{self.smart_trim(context, int(total_budget * 0.3))}\n"
+
+        user_prompt = f"""<|start_header_id|>user<|end_header_id|>
+{context_section}
+Expand this scene summary into full prose:
+
+SCENE SUMMARY:
+{self.smart_trim(scene_summary, int(total_budget * 0.4))}
+
+Write 3-4 paragraphs of vivid narrative prose:
+<|eot_id|><|start_header_id|>assistant<|end_header_id|>
+"""
+        
+        try:
+            with self.lock:
+                output = self.llm(system_prompt + user_prompt, max_tokens=max_output_tokens, 
+                                 stop=["<|eot_id|>"], echo=False, temperature=0.8)
+            return output['choices'][0]['text'].strip()
+        except Exception as e:
+            logging.error(f"Scene expansion error: {e}")
+            return ""

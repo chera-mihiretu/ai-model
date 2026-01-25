@@ -30,10 +30,16 @@ env/
 # IDEs
 .vscode/
 .idea/
+.cursor/
 
 # Project Specific
 # Database
 data/*.db
+data/*.db-shm
+data/*.db-wal
+data/database/*.db
+data/database/*.db-shm
+data/database/*.db-wal
 
 # Models (keep structure but ignore binaries)
 models/llama/*
@@ -41,7 +47,38 @@ models/tts/*.pth
 !models/llama/.gitkeep
 models/tts/*
 !models/tts/.gitkeep
+
+# Build outputs
 dist/*
 deskapp/*
 logs/*
+
+# Node modules (Electron)
+node_modules/
+**/node_modules/
+story-bible-electron/electron/node_modules/
+story-bible-electron/frontend/node_modules/
+story-bible-electron/dist/
+
+# Frontend build artifacts
+story-bible-electron/frontend/dist/
+
+# Documentation (auto-generated)
+*.md
+!README.md
+!DEPLOYMENT.md
+!DEPLOYMENT_LINUX.md
+!story-bible-electron/README.md
+
+# Debug files
+debug_*.py
+clear_characters.py
+
+# Misc
 *.pdf
+*.log
+.DS_Store
+Thumbs.db
+
+# Data files for voices
+data/voices/paragraphs/*.pth
