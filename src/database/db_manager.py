@@ -1,16 +1,27 @@
 import sqlite3
 import logging
+import os
 from pathlib import Path
 
 class DatabaseManager:
     def __init__(self, db_name="app.db"):
         import sys
-        if getattr(sys, 'frozen', False):
+        
+        # Check for environment variable path first (set by Electron)
+        data_path = os.environ.get('EXELSIAS_DATA_PATH')
+        
+        if data_path:
+            # Production: use path provided by Electron
+            self.base_dir = Path(data_path).parent
+            self.db_path = Path(data_path) / "database" / db_name
+        elif getattr(sys, 'frozen', False):
+            # Frozen (PyInstaller) without Electron env var
             self.base_dir = Path(sys.executable).parent
+            self.db_path = self.base_dir / "data" / "database" / db_name
         else:
+            # Development mode
             self.base_dir = Path(__file__).resolve().parent.parent.parent
-            
-        self.db_path = self.base_dir / "data" / "database" / db_name
+            self.db_path = self.base_dir / "data" / "database" / db_name
         
         db_existed = self.db_path.exists()
         self.db_path.parent.mkdir(parents=True, exist_ok=True)

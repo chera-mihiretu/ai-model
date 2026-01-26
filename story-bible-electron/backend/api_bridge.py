@@ -1,11 +1,12 @@
 """
-Python JSON-RPC API Bridge for Story Bible Pro
-===============================================
+Python JSON-RPC API Bridge for Exelsias
+=======================================
 Exposes all backend services via stdin/stdout JSON-RPC protocol.
 This allows Electron to communicate with Python services.
 """
 
 import sys
+import os
 import json
 import queue
 import logging
@@ -14,8 +15,12 @@ import traceback
 from pathlib import Path
 from typing import Any, Dict, Optional
 
-# Add parent directory to path for imports
-sys.path.insert(0, str(Path(__file__).parent.parent))
+# Determine project root from environment or file location
+project_root = os.environ.get('EXELSIAS_PROJECT_ROOT')
+if project_root:
+    sys.path.insert(0, project_root)
+else:
+    sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from src.database.db_manager import DatabaseManager
 from src.services.ai_engine import AIEngine
@@ -23,8 +28,12 @@ from src.services.tts_engine import get_engine as get_tts_engine
 from src.config.manager import ConfigManager
 from src.domain.usecases.import_parser import ImportParser
 
-# Configure logging
-log_dir = Path(__file__).parent.parent / "logs"
+# Configure logging - use data path if available
+data_path = os.environ.get('EXELSIAS_DATA_PATH')
+if data_path:
+    log_dir = Path(data_path).parent / "logs"
+else:
+    log_dir = Path(__file__).parent.parent / "logs"
 log_dir.mkdir(parents=True, exist_ok=True)
 
 logging.basicConfig(
@@ -35,6 +44,11 @@ logging.basicConfig(
         logging.StreamHandler(sys.stderr)
     ]
 )
+
+# Log environment info for debugging
+logging.info(f"EXELSIAS_PROJECT_ROOT: {os.environ.get('EXELSIAS_PROJECT_ROOT')}")
+logging.info(f"EXELSIAS_DATA_PATH: {os.environ.get('EXELSIAS_DATA_PATH')}")
+logging.info(f"EXELSIAS_MODELS_PATH: {os.environ.get('EXELSIAS_MODELS_PATH')}")
 
 
 class APIBridge:

@@ -22,16 +22,33 @@ class ConfigManager:
 
     def _init_config(self):
         import sys
-        if getattr(sys, 'frozen', False):
+        
+        # Check for environment variable paths first (set by Electron)
+        models_path = os.environ.get('EXELSIAS_MODELS_PATH')
+        
+        if models_path:
+            # Production: use path provided by Electron
+            self.base_dir = os.path.dirname(models_path)
+            self.models_dir = os.path.join(models_path, "llama")
+        elif getattr(sys, 'frozen', False):
+            # Frozen (PyInstaller) without Electron env var
             self.base_dir = os.path.dirname(sys.executable)
+            self.models_dir = os.path.join(self.base_dir, "models", "llama")
         else:
+            # Development mode
             self.base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-            
-        self.models_dir = os.path.join(self.base_dir, "models", "llama")
+            self.models_dir = os.path.join(self.base_dir, "models", "llama")
+        
+        # Ensure models directory exists
+        os.makedirs(self.models_dir, exist_ok=True)
         
         # Auto-detect first .gguf file
         found_models = glob.glob(os.path.join(self.models_dir, "*.gguf"))
         model_path = found_models[0] if found_models else None
+        
+        print(f"ConfigManager: models_dir = {self.models_dir}")
+        print(f"ConfigManager: found_models = {found_models}")
+        print(f"ConfigManager: model_path = {model_path}")
         
         self.ai_config = AIConfig(
             model_path=model_path,

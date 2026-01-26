@@ -1,6 +1,6 @@
 /**
- * Story Bible Pro - Electron Main Process
- * ========================================
+ * Exelsias - Electron Main Process
+ * ================================
  * Manages window lifecycle, spawns Python backend, and handles IPC.
  */
 
@@ -20,14 +20,17 @@ let requestId = 0;
 const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged;
 
 /**
- * Get the path to the Python backend
+ * Get the path to the Python backend executable
  */
 function getPythonPath() {
   if (app.isPackaged) {
     // Production: use bundled Python executable
     const platform = process.platform;
     const ext = platform === 'win32' ? '.exe' : '';
-    return path.join(process.resourcesPath, 'backend', `api_bridge${ext}`);
+    const backendPath = path.join(process.resourcesPath, 'backend', `api_bridge${ext}`);
+    console.log('Looking for backend at:', backendPath);
+    console.log('Backend exists:', fs.existsSync(backendPath));
+    return backendPath;
   } else {
     // Development: use system Python
     return process.platform === 'win32' ? 'python' : 'python3';
@@ -45,7 +48,7 @@ function getPythonScript() {
 }
 
 /**
- * Get the path to the project root (for Python imports)
+ * Get the path to the project root (for Python imports and data)
  */
 function getProjectRoot() {
   if (app.isPackaged) {
@@ -56,6 +59,47 @@ function getProjectRoot() {
 }
 
 /**
+ * Get the data directory path
+ */
+function getDataPath() {
+  if (app.isPackaged) {
+    // In production, use user's app data directory for writable data
+    return path.join(app.getPath('userData'), 'data');
+  }
+  return path.join(__dirname, '..', '..', 'data');
+}
+
+/**
+ * Get the models directory path
+ */
+function getModelsPath() {
+  if (app.isPackaged) {
+    return path.join(process.resourcesPath, 'models');
+  }
+  return path.join(__dirname, '..', '..', 'models');
+}
+
+/**
+ * Ensure data directories exist
+ */
+function ensureDataDirectories() {
+  const dataPath = getDataPath();
+  const dirs = [
+    dataPath,
+    path.join(dataPath, 'database'),
+    path.join(dataPath, 'voices'),
+    path.join(dataPath, 'voices', 'paragraphs')
+  ];
+  
+  for (const dir of dirs) {
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+      console.log('Created directory:', dir);
+    }
+  }
+}
+
+/**
  * Start the Python backend process
  */
 function startPythonBackend() {
@@ -63,23 +107,43 @@ function startPythonBackend() {
     const pythonPath = getPythonPath();
     const scriptPath = getPythonScript();
     const projectRoot = getProjectRoot();
+    const dataPath = getDataPath();
+    const modelsPath = getModelsPath();
+    
+    // Ensure data directories exist
+    ensureDataDirectories();
     
     console.log('Starting Python backend...');
     console.log('Python path:', pythonPath);
     console.log('Script path:', scriptPath);
     console.log('Project root:', projectRoot);
+    console.log('Data path:', dataPath);
+    console.log('Models path:', modelsPath);
+    console.log('Is packaged:', app.isPackaged);
+    
+    // Check if backend exists
+    if (app.isPackaged && !fs.existsSync(pythonPath)) {
+      const errorMsg = `Backend executable not found at: ${pythonPath}\n\nPlease make sure the application was installed correctly.`;
+      console.error(errorMsg);
+      reject(new Error(errorMsg));
+      return;
+    }
     
     // Set environment variables for Python
     const env = {
       ...process.env,
       PYTHONPATH: projectRoot,
-      PYTHONUNBUFFERED: '1'
+      PYTHONUNBUFFERED: '1',
+      // Pass paths to the backend
+      EXELSIAS_DATA_PATH: dataPath,
+      EXELSIAS_MODELS_PATH: modelsPath,
+      EXELSIAS_PROJECT_ROOT: projectRoot
     };
     
     // Spawn Python process
     const args = scriptPath ? [scriptPath] : [];
     pythonProcess = spawn(pythonPath, args, {
-      cwd: projectRoot,
+      cwd: app.isPackaged ? path.dirname(pythonPath) : projectRoot,
       env: env,
       stdio: ['pipe', 'pipe', 'pipe']
     });
@@ -151,7 +215,7 @@ function startPythonBackend() {
       if (!pythonReady) {
         reject(new Error('Python backend startup timeout'));
       }
-    }, 30000);
+    }, 60000); // 60 seconds for slow machines
   });
 }
 
@@ -221,6 +285,7 @@ function createWindow() {
     // Production: load from bundled files in resources
     const frontendPath = path.join(process.resourcesPath, 'frontend', 'index.html');
     console.log('Loading frontend from:', frontendPath);
+    console.log('Frontend exists:', fs.existsSync(frontendPath));
     mainWindow.loadFile(frontendPath);
   }
   
@@ -260,7 +325,9 @@ function setupIPC() {
     return {
       version: app.getVersion(),
       platform: process.platform,
-      isDev: isDev
+      isDev: isDev,
+      dataPath: getDataPath(),
+      modelsPath: getModelsPath()
     };
   });
   
@@ -298,7 +365,7 @@ app.whenReady().then(async () => {
     });
   } catch (error) {
     console.error('Failed to start application:', error);
-    dialog.showErrorBox('Startup Error', error.message);
+    dialog.showErrorBox('Startup Error', `${error.message}\n\nPlease check the logs for more details.`);
     app.quit();
   }
 });
@@ -322,4 +389,3 @@ app.on('before-quit', () => {
 process.on('uncaughtException', (error) => {
   console.error('Uncaught exception:', error);
 });
-

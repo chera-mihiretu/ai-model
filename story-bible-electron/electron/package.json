@@ -25,7 +25,7 @@
     "appId": "com.exelsias.app",
     "productName": "Exelsias",
     "directories": {
-      "output": "/home/chera/Documents/Exelsias-Build"
+      "output": "../dist"
     },
     "files": [
       "main.js",
@@ -38,14 +38,9 @@
         "filter": ["**/*"]
       },
       {
-        "from": "../backend/",
+        "from": "../backend/dist-win/",
         "to": "backend/",
-        "filter": ["**/*", "!__pycache__/**", "!*.pyc"]
-      },
-      {
-        "from": "../../src/",
-        "to": "src/",
-        "filter": ["**/*", "!__pycache__/**", "!*.pyc"]
+        "filter": ["**/*"]
       },
       {
         "from": "../../models/",
@@ -55,7 +50,7 @@
       {
         "from": "../../data/",
         "to": "data/",
-        "filter": ["**/*", "!*.db"]
+        "filter": ["**/*", "!*.db", "!*.db-shm", "!*.db-wal"]
       }
     ],
     "win": {
@@ -72,7 +67,9 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "Exelsias"
+      "shortcutName": "Exelsias",
+      "perMachine": true,
+      "allowElevation": true
     },
     "mac": {
       "target": "dmg",
