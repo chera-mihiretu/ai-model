@@ -1,4 +1,4 @@
-# Story Bible Pro - Electron Edition
+# Exelsias - AI-Powered Writing Assistant
 
 A professional AI-powered writing assistant with Story Bible management, character tracking, and neural text-to-speech.
 
@@ -20,7 +20,7 @@ This is an Electron application with a Python backend for AI processing.
 │  ┌─────────────────────────────────────────────────────┐   │
 │  │           Electron Renderer (UI)                     │   │
 │  │  • React frontend with Tailwind CSS                 │   │
-│  │  • Beautiful glass-effect theme                     │   │
+│  │  • Beautiful violet glass-effect theme              │   │
 │  │  • TipTap rich text editor                          │   │
 │  └─────────────────────────────────────────────────────┘   │
 │                          ↕ IPC                              │
@@ -37,112 +37,239 @@ This is an Electron application with a Python backend for AI processing.
 
 ### Prerequisites
 
-- Node.js 18+ and npm
-- Python 3.10+
-- Git
+- **Node.js** 18+ and npm
+- **Python** 3.10+ (3.11 recommended)
+- **Git**
+- **Visual Studio Build Tools** (Windows only - for compiling native modules)
 
-### Install Dependencies
+---
+
+## Windows Installation
+
+### Step 1: Install Visual Studio Build Tools (Required for llama-cpp-python)
+
+1. Download [Visual Studio Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/)
+2. Run the installer and select **"Desktop development with C++"**
+3. Restart your computer after installation
+
+### Step 2: Clone the Project
+
+```powershell
+git clone <repository-url>
+cd ricardoo
+```
+
+### Step 3: Set Up Python Environment
+
+```powershell
+# Create virtual environment
+python -m venv venv
+
+# Activate the virtual environment
+venv\Scripts\activate
+
+# Upgrade pip first
+python -m pip install --upgrade pip
+
+# Install llama-cpp-python (pre-built wheel for Windows CPU)
+pip install llama-cpp-python --extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cpu
+
+# If you have NVIDIA GPU with CUDA, use this instead:
+# pip install llama-cpp-python --extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cu121
+
+# Install remaining requirements
+pip install -r requirements.txt
+
+# Download spaCy language model
+python -m spacy download en_core_web_sm
+```
+
+### Step 4: Install Node.js Dependencies
+
+```powershell
+# Install frontend dependencies
+cd story-bible-electron\frontend
+npm install
+
+# Install Electron dependencies
+cd ..\electron
+npm install
+```
+
+### Step 5: Run the Application
+
+```powershell
+# Make sure you're in the electron folder
+cd story-bible-electron\electron
+
+# Start the app (this will start frontend and electron together)
+npm run dev
+```
+
+---
+
+## Linux / macOS Installation
+
+### Step 1: Clone the Project
+
+```bash
+git clone <repository-url>
+cd ricardoo
+```
+
+### Step 2: Set Up Python Environment
+
+```bash
+# Create virtual environment
+python3 -m venv venv
+
+# Activate the virtual environment
+source venv/bin/activate
+
+# Upgrade pip
+pip install --upgrade pip
+
+# Install requirements
+pip install -r requirements.txt
+
+# Download spaCy language model
+python -m spacy download en_core_web_sm
+```
+
+### Step 3: Install Node.js Dependencies
 
 ```bash
 # Install frontend dependencies
-cd frontend
+cd story-bible-electron/frontend
 npm install
 
 # Install Electron dependencies
 cd ../electron
 npm install
-
-# Set up Python environment (from project root)
-cd ..
-python -m venv deskapp
-source deskapp/bin/activate  # Linux/Mac
-# or: deskapp\Scripts\activate  # Windows
-pip install -r ../requirements.txt
 ```
 
-### Development Mode
-
-Run the app in development mode with hot reloading:
+### Step 4: Run the Application
 
 ```bash
-# Terminal 1: Start the frontend dev server
-cd frontend
+cd story-bible-electron/electron
 npm run dev
-
-# Terminal 2: Start Electron (after frontend is ready)
-cd ../electron
-npm start
 ```
 
-Or use the combined command:
+---
 
+## Troubleshooting
+
+### Windows: "Failed to build llama-cpp-python"
+
+This error occurs when Visual Studio Build Tools are not installed. Follow Step 1 in the Windows installation guide.
+
+Alternatively, use the pre-built wheel:
+```powershell
+pip install llama-cpp-python --extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cpu
+```
+
+### Windows: "numpy version conflict"
+
+If you see numpy-related errors:
+```powershell
+pip uninstall numpy -y
+pip install numpy==1.26.4
+```
+
+### Windows: "Microsoft Visual C++ 14.0 or greater is required"
+
+Install Visual Studio Build Tools with C++ development tools selected.
+
+### Linux: "ImportError: libGL.so.1"
+
+Install OpenGL libraries:
 ```bash
-cd electron
-npm run dev
+# Ubuntu/Debian
+sudo apt-get install libgl1-mesa-glx
+
+# Fedora
+sudo dnf install mesa-libGL
 ```
+
+### macOS: "xcrun: error: invalid active developer path"
+
+Install Xcode command line tools:
+```bash
+xcode-select --install
+```
+
+### "Port 5173 is already in use"
+
+Kill the existing process or use a different port:
+```bash
+# Find and kill the process
+# Linux/macOS
+lsof -ti:5173 | xargs kill -9
+
+# Windows PowerShell
+Get-Process -Id (Get-NetTCPConnection -LocalPort 5173).OwningProcess | Stop-Process -Force
+```
+
+---
 
 ## Building for Production
 
-### Full Build
-
-Use the build scripts to create a distributable package:
+### Build Windows Executable (from Windows or Linux with Wine)
 
 ```bash
-# Linux/Mac
-chmod +x build/build.sh
-./build/build.sh
-
-# Windows (PowerShell)
-.\build\build.ps1
+cd story-bible-electron/electron
+npm run build:win
 ```
 
-### Build Options
+### Build Linux AppImage
 
 ```bash
-# Build for current platform only
-./build/build.sh
-
-# Build for all platforms
-./build/build.sh --all
-
-# Development build (skip packaging)
-./build/build.sh --dev
+cd story-bible-electron/electron
+npm run build:linux
 ```
+
+### Build macOS DMG
+
+```bash
+cd story-bible-electron/electron
+npm run build:mac
+```
+
+---
 
 ## Project Structure
 
 ```
-story-bible-electron/
-├── electron/
-│   ├── main.js           # Electron main process
-│   ├── preload.js        # Context bridge for IPC
-│   └── package.json      # Electron dependencies
-├── frontend/
-│   ├── src/
-│   │   ├── App.jsx       # Main React component
-│   │   ├── components/   # UI components
-│   │   │   ├── Toolbar.jsx
-│   │   │   ├── ProjectSidebar.jsx
-│   │   │   ├── Editor.jsx
-│   │   │   ├── StoryBible.jsx
-│   │   │   ├── CharacterManager.jsx
-│   │   │   ├── AssistantPanel.jsx
-│   │   │   └── Notifications.jsx
-│   │   ├── hooks/
-│   │   │   ├── useStore.js         # Zustand state
-│   │   │   └── usePythonBridge.js  # Python IPC
-│   │   └── styles/
-│   │       └── index.css           # Tailwind + custom styles
-│   ├── index.html
-│   └── package.json
-├── backend/
-│   ├── api_bridge.py     # Python JSON-RPC server
-│   └── backend.spec      # PyInstaller configuration
-├── build/
-│   ├── build.sh          # Linux/Mac build script
-│   └── build.ps1         # Windows build script
-└── README.md
+ricardoo/
+├── src/                      # Python backend source
+│   ├── database/
+│   │   └── db_manager.py     # SQLite database management
+│   └── services/
+│       ├── ai_engine.py      # LLaMA AI integration
+│       └── tts_engine.py     # Text-to-speech
+├── models/
+│   └── llama/                # Place LLaMA model here
+│       └── Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf
+├── data/
+│   └── database/             # SQLite database files
+├── story-bible-electron/
+│   ├── electron/
+│   │   ├── main.js           # Electron main process
+│   │   ├── preload.js        # Context bridge for IPC
+│   │   └── package.json      # Electron dependencies
+│   ├── frontend/
+│   │   ├── src/
+│   │   │   ├── App.jsx       # Main React component
+│   │   │   ├── components/   # UI components
+│   │   │   ├── hooks/        # React hooks
+│   │   │   └── styles/       # CSS files
+│   │   └── package.json      # Frontend dependencies
+│   └── backend/
+│       └── api_bridge.py     # Python JSON-RPC server
+└── requirements.txt          # Python dependencies
 ```
+
+---
 
 ## Features
 
@@ -156,10 +283,10 @@ story-bible-electron/
 - **Braindump**: Free-form notes and ideas
 - **Genre**: Set story genre and conventions
 - **Style**: Define writing style and tone
-- **Synopsis**: Story overview
+- **Synopsis**: Story overview with AI generation
 - **Characters**: Character profiles with AI generation
 - **Worldbuilding**: World details and rules
-- **Outline**: Plot structure
+- **Outline**: Plot structure with chapter cards
 
 ### AI Features
 - Local LLaMA 3.1 8B model (runs offline)
@@ -170,9 +297,19 @@ story-bible-electron/
 ### Text-to-Speech
 - Neural voices via Edge TTS
 - Multiple voice options (US, UK, Australian, Indian)
-- Offline fallback with pyttsx3
+
+---
+
+## Required Model
+
+Download the LLaMA model and place it in `models/llama/`:
+
+**Model**: `Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf`
+
+Download from: [HuggingFace](https://huggingface.co/lmstudio-community/Meta-Llama-3.1-8B-Instruct-GGUF)
+
+---
 
 ## License
 
 MIT License - See LICENSE file for details.
-

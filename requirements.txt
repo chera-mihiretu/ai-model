@@ -2,43 +2,45 @@
 # Note: GUI is now handled by Electron
 
 # Database
-pydantic>=2.5.0
+pydantic>=2.5.0,<3.0.0
 
 # AI/LLM
+# For Windows: pip install llama-cpp-python --extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cpu
+# For CUDA: pip install llama-cpp-python --extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cu121
 llama_cpp_python>=0.2.0
-transformers>=4.36.0
-tokenizers>=0.15.0
-safetensors>=0.4.0
-huggingface-hub>=0.20.0
+transformers>=4.36.0,<5.0.0
+tokenizers>=0.15.0,<1.0.0
+safetensors>=0.4.0,<1.0.0
+huggingface-hub>=0.20.0,<1.0.0
 
 # NLP
-spacy>=3.7.0
-nltk>=3.8.0
+spacy>=3.7.0,<4.0.0
+nltk>=3.8.0,<4.0.0
 
 # Data processing
-numpy>=2.0.0
-pandas>=2.2.0
+numpy>=1.24.0,<2.0.0
+pandas>=2.0.0,<3.0.0
 
 # Image processing (for import)
-pillow>=10.4.0
+pillow>=10.0.0,<11.0.0
 
 # PDF/EPUB processing
-fpdf2>=2.7.0
-ebooklib>=0.18
+fpdf2>=2.7.0,<3.0.0
+ebooklib>=0.18,<1.0.0
 
 # Utilities
-requests>=2.31.0
-tqdm>=4.66.0
-PyYAML>=6.0.0
+requests>=2.31.0,<3.0.0
+tqdm>=4.66.0,<5.0.0
+PyYAML>=6.0.0,<7.0.0
 regex>=2023.0.0
-filelock>=3.13.0
-packaging>=23.0
-typing_extensions>=4.9.0
+filelock>=3.13.0,<4.0.0
+packaging>=23.0,<25.0
+typing_extensions>=4.9.0,<5.0.0
 
 # Audio/TTS
-soundfile>=0.12.0
-edge-tts>=6.1.0
-pygame>=2.5.0
+soundfile>=0.12.0,<1.0.0
+edge-tts>=6.1.0,<7.0.0
+pygame>=2.5.0,<3.0.0
 
 # Build/Deploy (optional)
 # pyinstaller>=6.0.0
