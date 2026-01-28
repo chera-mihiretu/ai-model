@@ -388,6 +388,15 @@ function Dashboard() {
             >
               {Icons.PLUS} New Project
             </button>
+            
+            {/* Exit App Button */}
+            <button
+              className="w-10 h-10 flex items-center justify-center rounded-lg bg-[rgba(12,15,20,0.8)] border border-golden-500/20 text-text-muted hover:bg-red-500/20 hover:border-red-500/50 hover:text-red-400 transition-all duration-200"
+              onClick={() => window.api?.windowClose?.()}
+              title="Exit Application"
+            >
+              ✕
+            </button>
           </div>
         </div>
       </header>

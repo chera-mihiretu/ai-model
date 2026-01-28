@@ -429,6 +429,15 @@ function Toolbar() {
         >
           💬
         </button>
+        
+        {/* Exit App Button */}
+        <button
+          className="w-10 h-10 flex items-center justify-center rounded-lg text-text-muted hover:bg-red-500/20 hover:text-red-400 transition-colors"
+          onClick={() => window.api?.windowClose?.()}
+          title="Exit Application"
+        >
+          ✕
+        </button>
       </div>
     </header>
   )

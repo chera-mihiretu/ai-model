@@ -50,6 +50,7 @@ models/tts/*
 
 # Build outputs
 dist/*
+dist-win/*
 deskapp/*
 logs/*
 

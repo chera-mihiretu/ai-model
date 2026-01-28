@@ -24,6 +24,7 @@
   "build": {
     "appId": "com.exelsias.app",
     "productName": "Exelsias",
+    "forceCodeSigning": false,
     "directories": {
       "output": "../dist"
     },
@@ -56,11 +57,12 @@
     "win": {
       "target": [
         {
-          "target": "nsis",
+          "target": "zip",
           "arch": ["x64"]
         }
       ],
-      "icon": "icon.png"
+      "icon": "icon.png",
+      "signAndEditExecutable": false
     },
     "nsis": {
       "oneClick": false,

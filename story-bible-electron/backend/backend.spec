@@ -12,12 +12,26 @@ from pathlib import Path
 # Get the project root (parent of story-bible-electron)
 project_root = Path(SPECPATH).parent.parent
 
+# Get the virtual environment site-packages path
+venv_site_packages = project_root / 'deskapp' / 'Lib' / 'site-packages'
+
+# Find llama_cpp lib directory with DLLs
+llama_cpp_lib = venv_site_packages / 'llama_cpp' / 'lib'
+
 block_cipher = None
+
+# Collect binary files (DLLs)
+binaries = []
+if llama_cpp_lib.exists():
+    for dll in llama_cpp_lib.glob('*.dll'):
+        binaries.append((str(dll), 'llama_cpp/lib'))
 
 # Collect data files
 datas = [
     # Include source code modules
     (str(project_root / 'src'), 'src'),
+    # Include the entire llama_cpp package to ensure lib folder is included
+    (str(venv_site_packages / 'llama_cpp'), 'llama_cpp'),
 ]
 
 # Analysis
@@ -27,7 +41,7 @@ a = Analysis(
         str(project_root),
         str(project_root / 'src'),
     ],
-    binaries=[],
+    binaries=binaries,
     datas=datas,
     hiddenimports=[
         # Core dependencies
