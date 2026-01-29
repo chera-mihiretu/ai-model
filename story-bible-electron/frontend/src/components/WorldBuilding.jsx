@@ -207,7 +207,7 @@ function EditableField({ label, value, onChange, onSave, onRewrite, placeholder,
 }
 
 // World Element Row Component
-function WorldElementRow({ element, onToggleVisibility, onDuplicate, onDelete, onSave, onRewriteField }) {
+function WorldElementRow({ element, onToggleVisibility, onDuplicate, onDelete, onSave, onRewriteField, isFromSeries = false, sourceProjectName = '' }) {
   const [isExpanded, setIsExpanded] = useState(false)
   const [showMenu, setShowMenu] = useState(false)
   const [menuPosition, setMenuPosition] = useState({ top: 0, right: 0 })
@@ -283,14 +283,25 @@ function WorldElementRow({ element, onToggleVisibility, onDuplicate, onDelete, o
         </button>
         
         {/* Element Name - Editable */}
-        <input
-          type="text"
-          className="flex-1 font-medium text-gold-soft bg-transparent border-none focus:outline-none focus:ring-0 hover:bg-dark-700 focus:bg-dark-700 px-2 py-1 rounded"
-          value={editData.name || ''}
-          onChange={(e) => handleChange('name', e.target.value)}
-          onBlur={handleNameBlur}
-          placeholder="Element name..."
-        />
+        <div className="flex-1 flex items-center gap-2">
+          <input
+            type="text"
+            className={clsx(
+              "flex-1 font-medium bg-transparent border-none focus:outline-none focus:ring-0 hover:bg-dark-700 focus:bg-dark-700 px-2 py-1 rounded",
+              isFromSeries ? "text-gray-400" : "text-gold-soft"
+            )}
+            value={editData.name || ''}
+            onChange={(e) => handleChange('name', e.target.value)}
+            onBlur={handleNameBlur}
+            placeholder="Element name..."
+            disabled={isFromSeries}
+          />
+          {isFromSeries && sourceProjectName && (
+            <span className="text-xs px-2 py-0.5 rounded bg-gold-rich/10 text-gold-rich/80 border border-gold-rich/20 whitespace-nowrap">
+              from {sourceProjectName}
+            </span>
+          )}
+        </div>
         
         {/* Type Dropdown */}
         <div className="relative">
@@ -634,7 +645,13 @@ function CreateElementModal({ isOpen, onClose, onCreate }) {
 }
 
 function WorldBuilding() {
-  const { currentProjectId, addNotification } = useStore()
+  const { 
+    currentProjectId, 
+    currentSeriesId,
+    currentSeriesProjects,
+    projects,
+    addNotification 
+  } = useStore()
   const { 
     getWorldElements, 
     createWorldElement, 
@@ -644,6 +661,7 @@ function WorldBuilding() {
   } = usePythonBridge()
   
   const [elements, setElements] = useState([])
+  const [seriesElements, setSeriesElements] = useState([]) // Elements from other series projects
   const [isLoading, setIsLoading] = useState(true)
   const [isSectionExpanded, setIsSectionExpanded] = useState(true)
   const [showSectionMenu, setShowSectionMenu] = useState(false)
@@ -651,6 +669,9 @@ function WorldBuilding() {
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [isGenerating, setIsGenerating] = useState(false)
   const sectionMenuRef = useRef(null)
+  
+  // Check if current project is part of a series
+  const isInSeries = currentSeriesId !== null && currentSeriesProjects.length > 0
   
   useEffect(() => {
     function handleClickOutside(event) {
@@ -662,14 +683,37 @@ function WorldBuilding() {
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
   
-  // Load elements
+  // Load elements (including series elements if applicable)
   useEffect(() => {
     async function loadElements() {
       if (!currentProjectId) return
       setIsLoading(true)
       try {
+        // Load current project's elements
         const data = await getWorldElements(currentProjectId, null, null)
         setElements(data || [])
+        
+        // If part of a series, also load elements from other series projects
+        if (isInSeries && currentSeriesProjects.length > 1) {
+          const otherProjectIds = currentSeriesProjects.filter(id => id !== currentProjectId)
+          const allSeriesElements = []
+          
+          for (const projectId of otherProjectIds) {
+            const projectElements = await getWorldElements(projectId, null, null)
+            const projectName = projects.find(p => p.id === projectId)?.name || 'Unknown Project'
+            const elementsWithSource = (projectElements || []).map(e => ({
+              ...e,
+              _sourceProjectId: projectId,
+              _sourceProjectName: projectName,
+              _isFromSeries: true
+            }))
+            allSeriesElements.push(...elementsWithSource)
+          }
+          
+          setSeriesElements(allSeriesElements)
+        } else {
+          setSeriesElements([])
+        }
       } catch (error) {
         console.error('Failed to load world elements:', error)
       } finally {
@@ -677,7 +721,7 @@ function WorldBuilding() {
       }
     }
     loadElements()
-  }, [currentProjectId])
+  }, [currentProjectId, currentSeriesId, currentSeriesProjects])
   
   // Create new element
   const handleCreateElement = async (name, elementType) => {
@@ -897,7 +941,7 @@ Please rewrite following the instruction. Only output the rewritten content.`
                 <div className="w-8 h-8 border-2 border-gold-rich/20 border-t-gold-rich rounded-full animate-spin mx-auto mb-3" />
                 <p className="text-gray-400">Loading elements...</p>
               </div>
-            ) : elements.length === 0 ? (
+            ) : elements.length === 0 && seriesElements.length === 0 ? (
               <div className="text-center py-12">
                 <div className="text-5xl mb-4 opacity-50">{Icons.WORLD}</div>
                 <h2 className="text-lg font-semibold text-gray-200 mb-2">No Elements Yet</h2>
@@ -920,17 +964,52 @@ Please rewrite following the instruction. Only output the rewritten content.`
                 </div>
               </div>
             ) : (
-              elements.map(element => (
-                <WorldElementRow
-                  key={element.id}
-                  element={element}
-                  onToggleVisibility={handleToggleVisibility}
-                  onDuplicate={handleDuplicateElement}
-                  onDelete={handleDeleteElement}
-                  onSave={handleSaveElement}
-                  onRewriteField={handleRewriteField}
-                />
-              ))
+              <>
+                {/* Current Project Elements */}
+                {elements.length > 0 && (
+                  <>
+                    {isInSeries && (
+                      <div className="px-4 py-2 text-xs font-semibold text-gold-pale/70 uppercase tracking-wider bg-dark-750/50 rounded-lg mb-3">
+                        This Project ({elements.length})
+                      </div>
+                    )}
+                    {elements.map(element => (
+                      <WorldElementRow
+                        key={element.id}
+                        element={element}
+                        onToggleVisibility={handleToggleVisibility}
+                        onDuplicate={handleDuplicateElement}
+                        onDelete={handleDeleteElement}
+                        onSave={handleSaveElement}
+                        onRewriteField={handleRewriteField}
+                      />
+                    ))}
+                  </>
+                )}
+                
+                {/* Series Elements from other projects */}
+                {isInSeries && seriesElements.length > 0 && (
+                  <>
+                    <div className="px-4 py-2 text-xs font-semibold text-gold-pale/70 uppercase tracking-wider bg-dark-750/50 rounded-lg mb-3 mt-4 flex items-center gap-2">
+                      <span className="text-base">🔗</span>
+                      <span>Shared from Series ({seriesElements.length})</span>
+                    </div>
+                    {seriesElements.map(element => (
+                      <WorldElementRow
+                        key={`series-${element._sourceProjectId}-${element.id}`}
+                        element={element}
+                        onToggleVisibility={handleToggleVisibility}
+                        onDuplicate={handleDuplicateElement}
+                        onDelete={handleDeleteElement}
+                        onSave={handleSaveElement}
+                        onRewriteField={handleRewriteField}
+                        isFromSeries={true}
+                        sourceProjectName={element._sourceProjectName}
+                      />
+                    ))}
+                  </>
+                )}
+              </>
             )}
           </div>
         )}

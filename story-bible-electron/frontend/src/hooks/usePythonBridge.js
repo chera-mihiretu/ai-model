@@ -625,6 +625,30 @@ export function usePythonBridge() {
     }
   }, [isElectronApi, api])
   
+  const getSeriesCharacters = useCallback(async (seriesId) => {
+    try {
+      const result = isElectronApi 
+        ? await api.getSeriesCharacters(seriesId)
+        : api.getSeriesCharacters(seriesId)
+      return result || []
+    } catch (error) {
+      console.error('Failed to get series characters:', error)
+      return []
+    }
+  }, [isElectronApi, api])
+  
+  const getSeriesWorldElements = useCallback(async (seriesId) => {
+    try {
+      const result = isElectronApi 
+        ? await api.getSeriesWorldElements(seriesId)
+        : api.getSeriesWorldElements(seriesId)
+      return result || []
+    } catch (error) {
+      console.error('Failed to get series world elements:', error)
+      return []
+    }
+  }, [isElectronApi, api])
+  
   // ==================== SCENE METHODS ====================
   
   const getScenes = useCallback(async (chapterId) => {
@@ -861,6 +885,8 @@ export function usePythonBridge() {
     removeProjectFromSeries,
     getSeriesTimeline,
     updateSeriesTimeline,
+    getSeriesCharacters,
+    getSeriesWorldElements,
     
     // Scenes
     getScenes,

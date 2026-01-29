@@ -222,7 +222,7 @@ function EditableField({ label, value, onChange, onSave, onRewrite, placeholder,
   )
 }
 
-function CharacterRow({ character, onToggleVisibility, onDuplicate, onDelete, onRoleChange, onSave, onRewriteField }) {
+function CharacterRow({ character, onToggleVisibility, onDuplicate, onDelete, onRoleChange, onSave, onRewriteField, isFromSeries = false, sourceProjectName = '' }) {
   const [isExpanded, setIsExpanded] = useState(false)
   const [showMenu, setShowMenu] = useState(false)
   const [menuPosition, setMenuPosition] = useState({ top: 0, right: 0 })
@@ -319,14 +319,25 @@ function CharacterRow({ character, onToggleVisibility, onDuplicate, onDelete, on
         </button>
         
         {/* Character Name - Editable */}
-        <input
-          type="text"
-          className="flex-1 font-medium text-text-primary bg-transparent border-none focus:outline-none focus:ring-0 hover:bg-dark-700/50 focus:bg-dark-700 px-2 py-1 rounded"
-          value={editData.name || ''}
-          onChange={(e) => handleChange('name', e.target.value)}
-          onBlur={handleNameBlur}
-          placeholder="Character name..."
-        />
+        <div className="flex-1 flex items-center gap-2">
+          <input
+            type="text"
+            className={clsx(
+              "flex-1 font-medium bg-transparent border-none focus:outline-none focus:ring-0 hover:bg-dark-700/50 focus:bg-dark-700 px-2 py-1 rounded",
+              isFromSeries ? "text-text-secondary" : "text-text-primary"
+            )}
+            value={editData.name || ''}
+            onChange={(e) => handleChange('name', e.target.value)}
+            onBlur={handleNameBlur}
+            placeholder="Character name..."
+            disabled={isFromSeries}
+          />
+          {isFromSeries && sourceProjectName && (
+            <span className="text-xs px-2 py-0.5 rounded bg-gold-rich/10 text-gold-rich/80 border border-gold-rich/20 whitespace-nowrap">
+              from {sourceProjectName}
+            </span>
+          )}
+        </div>
         
         {/* Role Dropdown */}
         <div className="relative">
@@ -788,6 +799,9 @@ function CharacterManager() {
     characters,
     selectedCharacterId,
     currentProjectId,
+    currentSeriesId,
+    currentSeriesProjects,
+    projects,
     setCharacters,
     setSelectedCharacter,
     addCharacter,
@@ -811,7 +825,11 @@ function CharacterManager() {
   const [showImportModal, setShowImportModal] = useState(false)
   const [isSectionExpanded, setIsSectionExpanded] = useState(true)
   const [showSectionMenu, setShowSectionMenu] = useState(false)
+  const [seriesCharacters, setSeriesCharacters] = useState([]) // Characters from other projects in series
   const sectionMenuRef = useRef(null)
+  
+  // Check if current project is part of a series
+  const isInSeries = currentSeriesId !== null && currentSeriesProjects.length > 0
   
   // Close section menu when clicking outside
   useEffect(() => {
@@ -824,15 +842,40 @@ function CharacterManager() {
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
   
-  // Refresh characters
+  // Refresh characters (including series characters if applicable)
   useEffect(() => {
     async function loadCharacters() {
       if (!currentProjectId) return
+      
+      // Load current project's characters
       const chars = await getCharacters(currentProjectId)
       setCharacters(chars)
+      
+      // If part of a series, also load characters from other series projects
+      if (isInSeries && currentSeriesProjects.length > 1) {
+        const otherProjectIds = currentSeriesProjects.filter(id => id !== currentProjectId)
+        const allSeriesChars = []
+        
+        for (const projectId of otherProjectIds) {
+          const projectChars = await getCharacters(projectId)
+          // Add source project info to each character
+          const projectName = projects.find(p => p.id === projectId)?.name || 'Unknown Project'
+          const charsWithSource = projectChars.map(c => ({
+            ...c,
+            _sourceProjectId: projectId,
+            _sourceProjectName: projectName,
+            _isFromSeries: true
+          }))
+          allSeriesChars.push(...charsWithSource)
+        }
+        
+        setSeriesCharacters(allSeriesChars)
+      } else {
+        setSeriesCharacters([])
+      }
     }
     loadCharacters()
-  }, [currentProjectId])
+  }, [currentProjectId, currentSeriesId, currentSeriesProjects])
   
   // Handle create new blank character
   const handleCreateBlankCharacter = () => {
@@ -1215,7 +1258,7 @@ Please rewrite the ${fieldLabel} following the user's instruction. Keep it conci
         {/* Character List */}
         {isSectionExpanded && (
           <div className="max-h-[calc(100vh-250px)] overflow-y-auto">
-            {characters.length === 0 ? (
+            {characters.length === 0 && seriesCharacters.length === 0 ? (
               <div className="text-center py-12">
                 <div className="text-5xl mb-4 opacity-50">👥</div>
                 <h2 className="text-lg font-semibold text-text-primary mb-2">
@@ -1240,18 +1283,54 @@ Please rewrite the ${fieldLabel} following the user's instruction. Keep it conci
                 </div>
               </div>
             ) : (
-              characters.map(character => (
-                <CharacterRow
-                  key={character.id || character.name}
-                  character={character}
-                  onToggleVisibility={handleToggleVisibility}
-                  onDuplicate={handleDuplicateCharacter}
-                  onDelete={handleDeleteCharacter}
-                  onRoleChange={handleRoleChange}
-                  onSave={handleSaveCharacter}
-                  onRewriteField={handleRewriteField}
-                />
-              ))
+              <>
+                {/* Current Project Characters */}
+                {characters.length > 0 && (
+                  <>
+                    {isInSeries && (
+                      <div className="px-4 py-2 text-xs font-semibold text-gold-pale/70 uppercase tracking-wider bg-dark-750/50 border-b border-gold-rich/10">
+                        This Project ({characters.length})
+                      </div>
+                    )}
+                    {characters.map(character => (
+                      <CharacterRow
+                        key={character.id || character.name}
+                        character={character}
+                        onToggleVisibility={handleToggleVisibility}
+                        onDuplicate={handleDuplicateCharacter}
+                        onDelete={handleDeleteCharacter}
+                        onRoleChange={handleRoleChange}
+                        onSave={handleSaveCharacter}
+                        onRewriteField={handleRewriteField}
+                      />
+                    ))}
+                  </>
+                )}
+                
+                {/* Series Characters from other projects */}
+                {isInSeries && seriesCharacters.length > 0 && (
+                  <>
+                    <div className="px-4 py-2 text-xs font-semibold text-gold-pale/70 uppercase tracking-wider bg-dark-750/50 border-y border-gold-rich/10 flex items-center gap-2">
+                      <span className="text-base">🔗</span>
+                      <span>Shared from Series ({seriesCharacters.length})</span>
+                    </div>
+                    {seriesCharacters.map(character => (
+                      <CharacterRow
+                        key={`series-${character._sourceProjectId}-${character.id || character.name}`}
+                        character={character}
+                        onToggleVisibility={handleToggleVisibility}
+                        onDuplicate={handleDuplicateCharacter}
+                        onDelete={handleDeleteCharacter}
+                        onRoleChange={handleRoleChange}
+                        onSave={handleSaveCharacter}
+                        onRewriteField={handleRewriteField}
+                        isFromSeries={true}
+                        sourceProjectName={character._sourceProjectName}
+                      />
+                    ))}
+                  </>
+                )}
+              </>
             )}
           </div>
         )}

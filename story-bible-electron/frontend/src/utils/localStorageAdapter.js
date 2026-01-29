@@ -582,6 +582,50 @@ export function updateSeriesTimeline(seriesId, timelineData) {
   return updateSeries(seriesId, { timeline_data: JSON.stringify(timelineData) })
 }
 
+export function getSeriesCharacters(seriesId) {
+  const series = getSeries(seriesId)
+  if (!series || !series.projects) return []
+  
+  const allCharacters = []
+  const projects = getStorage(STORAGE_KEYS.PROJECTS) || []
+  
+  for (const project of series.projects) {
+    const projectName = projects.find(p => p.id === project.id)?.name || 'Unknown'
+    const chars = getCharacters(project.id)
+    chars.forEach(char => {
+      allCharacters.push({
+        ...char,
+        source_project_id: project.id,
+        source_project_name: projectName
+      })
+    })
+  }
+  
+  return allCharacters
+}
+
+export function getSeriesWorldElements(seriesId) {
+  const series = getSeries(seriesId)
+  if (!series || !series.projects) return []
+  
+  const allElements = []
+  const projects = getStorage(STORAGE_KEYS.PROJECTS) || []
+  
+  for (const project of series.projects) {
+    const projectName = projects.find(p => p.id === project.id)?.name || 'Unknown'
+    const elements = getWorldElements(project.id, null, null)
+    elements.forEach(elem => {
+      allElements.push({
+        ...elem,
+        source_project_id: project.id,
+        source_project_name: projectName
+      })
+    })
+  }
+  
+  return allElements
+}
+
 // ==================== SCENE METHODS ====================
 
 export function getScenes(chapterId) {
@@ -848,6 +892,8 @@ const localStorageAdapter = {
   removeProjectFromSeries,
   getSeriesTimeline,
   updateSeriesTimeline,
+  getSeriesCharacters,
+  getSeriesWorldElements,
   
   // Scenes
   getScenes,

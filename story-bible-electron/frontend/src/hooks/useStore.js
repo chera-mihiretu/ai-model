@@ -12,11 +12,24 @@ export const useStore = create((set, get) => ({
   currentProjectId: null,
   currentChapterId: null,
   
+  // Series context - tracks if current project is part of a series
+  currentSeriesId: null,
+  currentSeriesProjects: [], // All project IDs in the current series (for shared elements)
+  
   setProjects: (projects) => set({ projects }),
   
   setCurrentProject: (projectId) => set({ currentProjectId: projectId }),
   
   setCurrentChapter: (chapterId) => set({ currentChapterId: chapterId }),
+  
+  // Set series context when entering a project that belongs to a series
+  setSeriesContext: (seriesId, projectIds) => set({ 
+    currentSeriesId: seriesId, 
+    currentSeriesProjects: projectIds || [] 
+  }),
+  
+  // Clear series context
+  clearSeriesContext: () => set({ currentSeriesId: null, currentSeriesProjects: [] }),
   
   // ==================== EDITOR STATE ====================
   editorContent: '',
@@ -170,6 +183,9 @@ export const useStore = create((set, get) => ({
     editorContent: '',
     isEditorDirty: false,
     wordCount: 0,
+    // Also clear series context
+    currentSeriesId: null,
+    currentSeriesProjects: [],
   }),
   
   toggleSidebar: () => set((state) => ({ sidebarCollapsed: !state.sidebarCollapsed })),

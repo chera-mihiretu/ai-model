@@ -889,6 +889,301 @@ function FolderView({ folder, onBack, onSelectProject, onCreateProject, onDelete
   )
 }
 
+// Series Timeline Item - draggable project in timeline
+function SeriesTimelineItem({ project, index, onDragStart, onDragOver, onDragEnd, onDrop, isDragging, onMoveToHome }) {
+  const [showMenu, setShowMenu] = useState(false)
+  const menuRef = useRef(null)
+  
+  // Close menu when clicking outside
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (menuRef.current && !menuRef.current.contains(event.target)) {
+        setShowMenu(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
+  
+  return (
+    <div
+      className={clsx(
+        'flex items-center gap-3 px-4 py-3 rounded-lg bg-dark-700/50 border border-gold-rich/10',
+        'transition-all duration-200 cursor-grab active:cursor-grabbing',
+        isDragging ? 'opacity-50 scale-95' : 'hover:bg-dark-700 hover:border-gold-rich/30'
+      )}
+      draggable
+      onDragStart={(e) => onDragStart(e, index)}
+      onDragOver={(e) => onDragOver(e, index)}
+      onDragEnd={onDragEnd}
+      onDrop={(e) => onDrop(e, index)}
+    >
+      {/* Drag Handle */}
+      <span className="text-text-muted text-sm select-none">⋮⋮</span>
+      
+      {/* Project Name */}
+      <span className="flex-1 text-text-primary font-medium truncate">
+        {project.name || 'Untitled Project'}
+      </span>
+      
+      {/* Book order indicator */}
+      <span className="text-xs text-text-muted px-2 py-0.5 rounded bg-dark-800">
+        Book {index + 1}
+      </span>
+      
+      {/* Menu */}
+      <div className="relative" ref={menuRef}>
+        <button
+          className="w-6 h-6 rounded flex items-center justify-center text-text-muted hover:text-gold-rich hover:bg-gold-rich/10 text-xs"
+          onClick={(e) => {
+            e.stopPropagation()
+            setShowMenu(!showMenu)
+          }}
+        >
+          ⋯
+        </button>
+        
+        {showMenu && (
+          <div 
+            className="absolute right-0 top-8 bg-dark-800 rounded-xl shadow-lg shadow-black/50 border border-gold-rich/20 min-w-[140px] py-2"
+            style={{ zIndex: 99999 }}
+          >
+            <button
+              className="dropdown-item flex items-center gap-2 w-full text-sm"
+              onClick={(e) => {
+                e.stopPropagation()
+                onMoveToHome(project)
+                setShowMenu(false)
+              }}
+            >
+              🏠 Move to Home
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// Series Timeline Component - collapsible, draggable project list
+function SeriesTimelineSection({ projects, isExpanded, onToggle, onReorder, onMoveToHome }) {
+  const [draggedIndex, setDraggedIndex] = useState(null)
+  const [dragOverIndex, setDragOverIndex] = useState(null)
+  
+  const handleDragStart = (e, index) => {
+    setDraggedIndex(index)
+    e.dataTransfer.effectAllowed = 'move'
+  }
+  
+  const handleDragOver = (e, index) => {
+    e.preventDefault()
+    if (draggedIndex !== null && draggedIndex !== index) {
+      setDragOverIndex(index)
+    }
+  }
+  
+  const handleDragEnd = () => {
+    setDraggedIndex(null)
+    setDragOverIndex(null)
+  }
+  
+  const handleDrop = (e, dropIndex) => {
+    e.preventDefault()
+    if (draggedIndex !== null && draggedIndex !== dropIndex) {
+      // Create new order
+      const newProjects = [...projects]
+      const [draggedProject] = newProjects.splice(draggedIndex, 1)
+      newProjects.splice(dropIndex, 0, draggedProject)
+      onReorder(newProjects)
+    }
+    setDraggedIndex(null)
+    setDragOverIndex(null)
+  }
+  
+  return (
+    <div className="bg-dark-800/80 rounded-xl border border-gold-rich/20 overflow-hidden">
+      {/* Header */}
+      <button
+        className="w-full px-5 py-4 flex items-center justify-between hover:bg-dark-700/50 transition-colors"
+        onClick={onToggle}
+      >
+        <div className="flex items-center gap-3">
+          <span className="text-xl">📚</span>
+          <div className="text-left">
+            <h3 className="font-semibold text-text-primary">Series Timeline</h3>
+            <p className="text-xs text-text-muted">Drag your projects into the correct order for an accurate timeline.</p>
+          </div>
+        </div>
+        <span className={clsx(
+          'text-text-muted transition-transform duration-200',
+          isExpanded ? 'rotate-180' : ''
+        )}>
+          ▼
+        </span>
+      </button>
+      
+      {/* Timeline List */}
+      {isExpanded && (
+        <div className="px-4 pb-4 space-y-2">
+          {projects.length === 0 ? (
+            <div className="text-center py-6 text-text-muted text-sm">
+              No projects in this series yet
+            </div>
+          ) : (
+            projects.map((project, index) => (
+              <SeriesTimelineItem
+                key={project.id}
+                project={project}
+                index={index}
+                onDragStart={handleDragStart}
+                onDragOver={handleDragOver}
+                onDragEnd={handleDragEnd}
+                onDrop={handleDrop}
+                isDragging={draggedIndex === index}
+                onMoveToHome={onMoveToHome}
+              />
+            ))
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// Series View - when inside a series folder (different from regular folder)
+function SeriesView({ 
+  series, 
+  onBack, 
+  onSelectProject, 
+  onCreateProject, 
+  onDeleteProject, 
+  onRenameProject, 
+  onDuplicateProject,
+  onReorderProjects,
+  onMoveProjectToHome
+}) {
+  const [timelineExpanded, setTimelineExpanded] = useState(true)
+  
+  const formatTime = (timestamp) => {
+    if (!timestamp) return 'Just now'
+    const date = new Date(timestamp)
+    const now = new Date()
+    const diff = now - date
+    
+    if (diff < 60000) return 'Just now'
+    if (diff < 3600000) return `${Math.floor(diff / 60000)}m`
+    if (diff < 86400000) return `${Math.floor(diff / 3600000)}h`
+    return date.toLocaleDateString()
+  }
+  
+  const projects = series.projects || []
+  
+  return (
+    <div className="h-full flex flex-col">
+      {/* Series Header */}
+      <div className="px-8 py-6">
+        <div className="max-w-5xl mx-auto">
+          {/* Breadcrumb */}
+          <div className="flex items-center gap-2 text-text-muted mb-2">
+            <button 
+              className="hover:text-gold-rich transition-colors"
+              onClick={onBack}
+            >
+              Home
+            </button>
+            <span className="text-text-light">›</span>
+            <span className="text-gold-rich">{series.name}</span>
+          </div>
+          
+          {/* Series Title */}
+          <div className="flex items-start justify-between">
+            <div>
+              <h1 className="text-4xl font-serif font-medium text-gold-rich">
+                {series.name}
+              </h1>
+              <p className="text-text-muted mt-1">
+                {projects.length} project{projects.length !== 1 ? 's' : ''} • Last edited {formatTime(series.updated_at)}
+              </p>
+            </div>
+            
+            <div className="flex items-center gap-2">
+              <button className="w-8 h-8 rounded-lg flex items-center justify-center text-text-muted hover:text-gold-rich hover:bg-gold-rich/10">
+                {Icons.MENU}
+              </button>
+              <button 
+                className="w-8 h-8 rounded-lg flex items-center justify-center text-text-muted hover:text-gold-rich hover:bg-gold-rich/10"
+                onClick={onBack}
+              >
+                {Icons.CLOSE}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      {/* Series Content */}
+      <div className="flex-1 overflow-y-auto px-8 pb-8">
+        <div className="max-w-5xl mx-auto space-y-6">
+          {/* Series Timeline Section */}
+          <SeriesTimelineSection
+            projects={projects}
+            isExpanded={timelineExpanded}
+            onToggle={() => setTimelineExpanded(!timelineExpanded)}
+            onReorder={onReorderProjects}
+            onMoveToHome={onMoveProjectToHome}
+          />
+          
+          {/* Shared Elements Info Banner */}
+          <div className="flex items-center gap-3 px-4 py-3 rounded-lg bg-gold-rich/10 border border-gold-rich/30">
+            <span className="text-lg">🔗</span>
+            <p className="text-sm text-gold-pale">
+              <span className="font-medium">Shared Story Bible:</span> Characters, Worldbuilding, and Outline are shared across all projects in this series.
+            </p>
+          </div>
+          
+          {/* Projects Grid */}
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+            {projects.map(project => (
+              <ProjectCard
+                key={project.id}
+                project={project}
+                onSelect={onSelectProject}
+                onDelete={onDeleteProject}
+                onRename={onRenameProject}
+                onDuplicate={onDuplicateProject}
+              />
+            ))}
+            
+            {/* Add Project Button */}
+            <button
+              className={clsx(
+                'min-h-[180px] rounded-xl',
+                'border-2 border-dashed border-gold-rich/30',
+                'flex flex-col items-center justify-center',
+                'text-text-muted hover:text-gold-rich hover:border-gold-rich/50',
+                'transition-all duration-200'
+              )}
+              onClick={onCreateProject}
+            >
+              <span className="text-3xl mb-2">+</span>
+              <span className="text-sm font-medium">New Project</span>
+            </button>
+          </div>
+          
+          {/* Empty State */}
+          {projects.length === 0 && (
+            <div className="text-center py-12">
+              <div className="text-5xl mb-4 opacity-50">📚</div>
+              <p className="text-text-muted">This series is empty</p>
+              <p className="text-text-light text-sm mt-1">Create a project to start your series</p>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function StorageModeIndicator({ mode }) {
   const isLocal = mode === 'local'
   
@@ -921,6 +1216,8 @@ function Dashboard() {
     setCurrentView,
     addNotification,
     storageMode,
+    setSeriesContext,
+    clearSeriesContext,
   } = useStore()
   
   const {
@@ -1012,6 +1309,18 @@ function Dashboard() {
   
   // Handle select project
   const handleSelectProject = (project) => {
+    // Check if this project is part of a series
+    const parentSeries = series.find(s => s.projects?.some(p => p.id === project.id))
+    
+    if (parentSeries) {
+      // Set series context so shared elements are available
+      const seriesProjectIds = parentSeries.projects?.map(p => p.id) || []
+      setSeriesContext(parentSeries.id, seriesProjectIds)
+    } else {
+      // Not part of a series, clear any existing context
+      clearSeriesContext()
+    }
+    
     setCurrentProject(project.id)
     setCurrentView('editor')
   }
@@ -1271,6 +1580,59 @@ function Dashboard() {
     }
   }
   
+  // Handle reorder projects in series (drag and drop timeline)
+  const handleReorderSeriesProjects = (newProjectsOrder) => {
+    if (!currentSeries) return
+    
+    setSeries(prev => {
+      const updated = prev.map(s => 
+        s.id === currentSeries.id 
+          ? { ...s, projects: newProjectsOrder, updated_at: new Date().toISOString() }
+          : s
+      )
+      localStorage.setItem('exelsias_series', JSON.stringify(updated))
+      return updated
+    })
+    
+    // Update current series view
+    setCurrentSeries(prev => ({
+      ...prev,
+      projects: newProjectsOrder,
+      updated_at: new Date().toISOString()
+    }))
+    
+    addNotification({ type: 'success', message: 'Series timeline updated' })
+  }
+  
+  // Handle move project from series to home (standalone)
+  const handleMoveProjectToHome = (project) => {
+    if (!currentSeries) return
+    
+    if (!confirm(`Remove "${project.name}" from this series? It will become a standalone project and lose access to shared Story Bible data.`)) {
+      return
+    }
+    
+    // Remove from series
+    setSeries(prev => {
+      const updated = prev.map(s => 
+        s.id === currentSeries.id 
+          ? { ...s, projects: s.projects?.filter(p => p.id !== project.id) || [], updated_at: new Date().toISOString() }
+          : s
+      )
+      localStorage.setItem('exelsias_series', JSON.stringify(updated))
+      return updated
+    })
+    
+    // Update current series view
+    setCurrentSeries(prev => ({
+      ...prev,
+      projects: prev.projects?.filter(p => p.id !== project.id) || [],
+      updated_at: new Date().toISOString()
+    }))
+    
+    addNotification({ type: 'success', message: `"${project.name}" moved to Home` })
+  }
+  
   // Open folder
   const handleOpenFolder = (folder) => {
     // Sync folder projects with current project data
@@ -1378,8 +1740,8 @@ function Dashboard() {
           </div>
         </header>
         
-        <FolderView
-          folder={currentSeries}
+        <SeriesView
+          series={currentSeries}
           onBack={() => setCurrentSeries(null)}
           onSelectProject={handleSelectProject}
           onCreateProject={() => {
@@ -1389,6 +1751,8 @@ function Dashboard() {
           onDeleteProject={handleDeleteProject}
           onRenameProject={handleRenameProject}
           onDuplicateProject={(p) => handleDuplicateProject(p, currentSeries)}
+          onReorderProjects={handleReorderSeriesProjects}
+          onMoveProjectToHome={handleMoveProjectToHome}
         />
         
         <CreateModal
