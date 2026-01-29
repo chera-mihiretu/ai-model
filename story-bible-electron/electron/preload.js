@@ -40,6 +40,7 @@ contextBridge.exposeInMainWorld('api', {
   getAllCharacters: (projectId) => ipcRenderer.invoke('python-call', 'get_all_characters', { project_id: projectId }),
   getCharacterDetails: (name, projectId) => ipcRenderer.invoke('python-call', 'get_character_details', { name, project_id: projectId }),
   saveCharacter: (data) => ipcRenderer.invoke('python-call', 'save_character', { data }),
+  deleteCharacter: (characterId) => ipcRenderer.invoke('python-call', 'delete_character', { character_id: characterId }),
   
   // ==================== STORY BIBLE METHODS ====================
   
