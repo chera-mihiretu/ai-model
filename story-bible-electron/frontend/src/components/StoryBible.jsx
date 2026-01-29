@@ -3,6 +3,7 @@
  * =====================
  * Displays Story Bible tabs (Braindump, Genre, Style, Synopsis, etc.)
  * Includes AI-powered generation from synopsis.
+ * Dark & Gold luxury theme
  */
 
 import { useState, useEffect, useRef } from 'react'
@@ -25,6 +26,14 @@ const Icons = {
   GENERATE: '⚡',
   MAGIC: '🪄',
   CLOSE: '✕',
+  DRAG: '⋮⋮',
+  ARROW_EXPAND: '▶',
+  ARROW_COLLAPSE: '▼',
+  COPY: '📋',
+  DELETE: '🗑️',
+  EDIT: '✏️',
+  MORE: '⋯',
+  PLUS: '+',
 }
 
 // Synopsis generation questions
@@ -58,7 +67,6 @@ function GenerateSynopsisModal({ isOpen, onClose, onGenerate, isGenerating, genr
   }
   
   const handleSubmit = () => {
-    // Check required fields
     const hasProtagonist = answers.protagonist?.trim()
     const hasConflict = answers.conflict?.trim()
     
@@ -69,7 +77,6 @@ function GenerateSynopsisModal({ isOpen, onClose, onGenerate, isGenerating, genr
     onGenerate(answers, selectedGenre, wordCount)
   }
   
-  // Reset form when modal closes
   useEffect(() => {
     if (!isOpen) {
       setAnswers({})
@@ -84,26 +91,23 @@ function GenerateSynopsisModal({ isOpen, onClose, onGenerate, isGenerating, genr
   
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
-      {/* Backdrop */}
       <div 
-        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+        className="absolute inset-0 bg-black/70 backdrop-blur-sm"
         onClick={!isGenerating ? onClose : undefined}
       />
       
-      {/* Modal */}
       <div className="relative z-10 w-full max-w-3xl mx-4 glass-card p-6 animate-slide-up max-h-[90vh] overflow-y-auto">
-        {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">
             <span className="text-3xl">{Icons.MAGIC}</span>
             <div>
-              <h2 className="text-xl font-bold text-text-primary">Generate Synopsis with AI</h2>
-              <p className="text-sm text-text-muted">Answer a few questions and AI will create your synopsis</p>
+              <h2 className="text-xl font-bold text-gray-100">Generate Synopsis with AI</h2>
+              <p className="text-sm text-gray-400">Answer a few questions and AI will create your synopsis</p>
             </div>
           </div>
           {!isGenerating && (
             <button
-              className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-bg-hover text-text-muted hover:text-text-primary transition-colors"
+              className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gold-rich/10 text-gray-500 hover:text-gold-rich transition-colors"
               onClick={onClose}
             >
               {Icons.CLOSE}
@@ -111,10 +115,9 @@ function GenerateSynopsisModal({ isOpen, onClose, onGenerate, isGenerating, genr
           )}
         </div>
         
-        {/* Genre and Length Selection */}
         <div className="grid grid-cols-2 gap-4 mb-6">
           <div>
-            <label className="block text-sm font-medium text-text-secondary mb-2">
+            <label className="block text-sm font-medium text-gold-pale mb-2">
               Story Genre
             </label>
             <select
@@ -129,7 +132,7 @@ function GenerateSynopsisModal({ isOpen, onClose, onGenerate, isGenerating, genr
             </select>
           </div>
           <div>
-            <label className="block text-sm font-medium text-text-secondary mb-2">
+            <label className="block text-sm font-medium text-gold-pale mb-2">
               Synopsis Length
             </label>
             <select
@@ -145,11 +148,10 @@ function GenerateSynopsisModal({ isOpen, onClose, onGenerate, isGenerating, genr
           </div>
         </div>
         
-        {/* Questions */}
         <div className="space-y-4 mb-6">
           {SYNOPSIS_QUESTIONS.map(question => (
             <div key={question.id}>
-              <label className="block text-sm font-medium text-text-secondary mb-1">
+              <label className="block text-sm font-medium text-gold-pale mb-1">
                 {question.label}
                 {question.required && <span className="text-red-400 ml-1">*</span>}
               </label>
@@ -164,15 +166,13 @@ function GenerateSynopsisModal({ isOpen, onClose, onGenerate, isGenerating, genr
           ))}
         </div>
         
-        {/* Info Note */}
-        <div className="mb-6 p-3 rounded-lg bg-accent-primary/10 border border-accent-primary/20">
-          <p className="text-sm text-text-muted">
-            <span className="text-accent-primary font-medium">💡 Tip:</span> The more detail you provide, the better your synopsis will be. 
+        <div className="mb-6 p-3 rounded-lg bg-gold-rich/10 border border-gold-rich/20">
+          <p className="text-sm text-gray-300">
+            <span className="text-gold-rich font-medium">💡 Tip:</span> The more detail you provide, the better your synopsis will be. 
             At minimum, fill in the protagonist and main conflict.
           </p>
         </div>
         
-        {/* Actions */}
         <div className="flex items-center justify-end gap-3">
           <button
             type="button"
@@ -202,14 +202,13 @@ function GenerateSynopsisModal({ isOpen, onClose, onGenerate, isGenerating, genr
           </button>
         </div>
         
-        {/* Generating State */}
         {isGenerating && (
-          <div className="mt-6 p-4 rounded-lg bg-accent-primary/10 border border-accent-primary/30">
+          <div className="mt-6 p-4 rounded-lg bg-gold-rich/10 border border-gold-rich/30">
             <div className="flex items-center gap-3">
               <div className="spinner !w-6 !h-6" />
               <div>
-                <p className="text-accent-primary font-medium">Creating your synopsis...</p>
-                <p className="text-sm text-text-muted">AI is weaving your story elements together. This may take 20-30 seconds.</p>
+                <p className="text-gold-rich font-medium">Creating your synopsis...</p>
+                <p className="text-sm text-gray-400">AI is weaving your story elements together. This may take 20-30 seconds.</p>
               </div>
             </div>
           </div>
@@ -219,97 +218,221 @@ function GenerateSynopsisModal({ isOpen, onClose, onGenerate, isGenerating, genr
   )
 }
 
-// Outline Chapter Card Component
-function OutlineChapterCard({ chapter, index, onUpdate, onDelete }) {
-  const [isEditing, setIsEditing] = useState(false)
+// Outline Chapter Row Component - Similar to Character/World rows
+function OutlineChapterRow({ chapter, index, onUpdate, onDelete, onDuplicate }) {
+  const [isExpanded, setIsExpanded] = useState(false)
   const [editData, setEditData] = useState(chapter)
+  const [isDirty, setIsDirty] = useState(false)
+  const [showMenu, setShowMenu] = useState(false)
+  const menuRef = useRef(null)
+  const menuButtonRef = useRef(null)
+  const [menuPosition, setMenuPosition] = useState({ top: 0, right: 0 })
+  
+  useEffect(() => {
+    setEditData(chapter)
+    setIsDirty(false)
+  }, [chapter])
+  
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (menuRef.current && !menuRef.current.contains(event.target)) {
+        setShowMenu(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
+  
+  const handleChange = (field, value) => {
+    setEditData(prev => ({ ...prev, [field]: value }))
+    setIsDirty(true)
+  }
   
   const handleSave = () => {
-    onUpdate(index, editData)
-    setIsEditing(false)
+    if (isDirty) {
+      onUpdate(index, editData)
+      setIsDirty(false)
+    }
   }
   
-  const handleCancel = () => {
-    setEditData(chapter)
-    setIsEditing(false)
-  }
-  
-  if (isEditing) {
-    return (
-      <div className="glass-card p-4 border-2 border-accent-primary">
-        <div className="flex items-center gap-2 mb-3">
-          <span className="text-lg font-bold text-accent-primary">Ch {chapter.chapter_number}</span>
-          <input
-            type="text"
-            className="input flex-1"
-            value={editData.title}
-            onChange={(e) => setEditData({ ...editData, title: e.target.value })}
-            placeholder="Chapter Title"
-          />
-        </div>
-        <textarea
-          className="input-textarea min-h-[100px] mb-3"
-          value={editData.summary}
-          onChange={(e) => setEditData({ ...editData, summary: e.target.value })}
-          placeholder="Chapter summary..."
-        />
-        <textarea
-          className="input-textarea min-h-[60px] mb-3"
-          value={editData.key_events || ''}
-          onChange={(e) => setEditData({ ...editData, key_events: e.target.value })}
-          placeholder="Key events..."
-        />
-        <div className="flex justify-end gap-2">
-          <button className="btn btn-ghost text-sm" onClick={handleCancel}>Cancel</button>
-          <button className="btn btn-primary text-sm" onClick={handleSave}>Save</button>
-        </div>
-      </div>
-    )
+  const handleTitleBlur = () => {
+    if (isDirty && editData.title?.trim()) {
+      handleSave()
+    }
   }
   
   return (
-    <div 
-      className="glass-card p-4 hover:border-accent-primary/50 transition-all cursor-pointer group"
-      onClick={() => setIsEditing(true)}
-    >
-      <div className="flex items-start justify-between mb-2">
-        <div className="flex items-center gap-2">
-          <span className="w-8 h-8 rounded-lg bg-accent-primary/20 text-accent-primary flex items-center justify-center font-bold text-sm">
-            {chapter.chapter_number}
-          </span>
-          <h3 className="font-semibold text-text-primary">{chapter.title}</h3>
-        </div>
+    <div className="bg-dark-800 rounded-xl border border-gold-rich/10 shadow-sm mb-3 overflow-hidden">
+      {/* Main Row */}
+      <div className="flex items-center gap-3 px-4 py-3 hover:bg-dark-750 transition-colors group">
+        {/* Drag Handle */}
+        <span className="text-gray-600 cursor-grab text-sm">{Icons.DRAG}</span>
+        
+        {/* Expand Arrow */}
+        <button
+          className="w-5 h-5 flex items-center justify-center text-gray-500 hover:text-gold-rich transition-colors"
+          onClick={() => setIsExpanded(!isExpanded)}
+        >
+          {isExpanded ? Icons.ARROW_COLLAPSE : Icons.ARROW_EXPAND}
+        </button>
+        
+        {/* Chapter Number Badge */}
+        <span className="w-8 h-8 rounded-lg bg-gold-rich/20 text-gold-rich flex items-center justify-center font-bold text-sm flex-shrink-0">
+          {chapter.chapter_number}
+        </span>
+        
+        {/* Chapter Title - Editable */}
+        <input
+          type="text"
+          className="flex-1 font-medium text-gold-soft bg-transparent border-none focus:outline-none focus:ring-0 hover:bg-dark-700 focus:bg-dark-700 px-2 py-1 rounded"
+          value={editData.title || ''}
+          onChange={(e) => handleChange('title', e.target.value)}
+          onBlur={handleTitleBlur}
+          placeholder="Chapter title..."
+        />
+        
+        {/* Action Icons */}
         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
           <button
-            className="w-7 h-7 flex items-center justify-center rounded text-text-muted hover:text-text-primary hover:bg-bg-hover"
-            onClick={(e) => { e.stopPropagation(); setIsEditing(true); }}
+            className="w-8 h-8 flex items-center justify-center rounded-lg text-gray-500 hover:text-gold-rich hover:bg-gold-rich/10 transition-colors"
+            onClick={() => setIsExpanded(!isExpanded)}
             title="Edit"
           >
-            ✏️
+            {Icons.EDIT}
           </button>
+          
           <button
-            className="w-7 h-7 flex items-center justify-center rounded text-text-muted hover:text-red-400 hover:bg-red-500/20"
-            onClick={(e) => { e.stopPropagation(); onDelete(index); }}
-            title="Delete"
+            className="w-8 h-8 flex items-center justify-center rounded-lg text-gray-500 hover:text-gold-rich hover:bg-gold-rich/10 transition-colors"
+            onClick={() => onDuplicate(index)}
+            title="Duplicate"
           >
-            🗑️
+            {Icons.COPY}
           </button>
+          
+          <div className="relative" ref={menuRef}>
+            <button
+              ref={menuButtonRef}
+              className="w-8 h-8 flex items-center justify-center rounded-lg text-gray-500 hover:text-gold-rich hover:bg-gold-rich/10 transition-colors"
+              onClick={() => {
+                if (!showMenu && menuButtonRef.current) {
+                  const rect = menuButtonRef.current.getBoundingClientRect()
+                  setMenuPosition({
+                    top: rect.bottom + 4,
+                    right: window.innerWidth - rect.right
+                  })
+                }
+                setShowMenu(!showMenu)
+              }}
+            >
+              {Icons.MORE}
+            </button>
+            
+            {showMenu && (
+              <div 
+                className="fixed bg-dark-800 rounded-xl shadow-lg border border-gold-rich/20 min-w-[140px] py-2 z-[9999]"
+                style={{ top: menuPosition.top, right: menuPosition.right }}
+              >
+                <button
+                  className="w-full px-4 py-2 text-left text-sm text-gray-300 hover:bg-gold-rich/10 hover:text-gold-rich flex items-center gap-2"
+                  onClick={() => {
+                    onDuplicate(index)
+                    setShowMenu(false)
+                  }}
+                >
+                  {Icons.COPY} Duplicate
+                </button>
+                <button
+                  className="w-full px-4 py-2 text-left text-sm text-red-400 hover:bg-red-400/10 flex items-center gap-2"
+                  onClick={() => {
+                    onDelete(index)
+                    setShowMenu(false)
+                  }}
+                >
+                  {Icons.DELETE} Delete
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
-      <p className="text-text-secondary text-sm mb-2">{chapter.summary}</p>
-      {chapter.key_events && (
-        <p className="text-text-muted text-xs italic">📌 {chapter.key_events}</p>
+      
+      {/* Expanded Content */}
+      {isExpanded && (
+        <div className="px-12 pb-6 bg-dark-850/50 animate-fade-in">
+          <div className="space-y-4">
+            {/* Summary */}
+            <div>
+              <label className="block text-sm font-medium text-gold-pale mb-2">Summary</label>
+              <textarea
+                className="w-full px-3 py-3 text-sm bg-dark-750 border border-gold-rich/20 rounded-lg text-gray-200 placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-gold-rich/30 min-h-[100px] resize-none"
+                value={editData.summary || ''}
+                onChange={(e) => handleChange('summary', e.target.value)}
+                onBlur={handleSave}
+                placeholder="What happens in this chapter..."
+              />
+            </div>
+            
+            {/* Key Events */}
+            <div>
+              <label className="block text-sm font-medium text-gold-pale mb-2">Key Events</label>
+              <textarea
+                className="w-full px-3 py-3 text-sm bg-dark-750 border border-gold-rich/20 rounded-lg text-gray-200 placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-gold-rich/30 min-h-[80px] resize-none"
+                value={editData.key_events || ''}
+                onChange={(e) => handleChange('key_events', e.target.value)}
+                onBlur={handleSave}
+                placeholder="Important plot points, reveals, character moments..."
+              />
+            </div>
+            
+            {/* Characters in Chapter */}
+            <div>
+              <label className="block text-sm font-medium text-gold-pale mb-2">Characters</label>
+              <input
+                type="text"
+                className="w-full px-3 py-2.5 text-sm bg-dark-750 border border-gold-rich/20 rounded-lg text-gray-200 placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-gold-rich/30"
+                value={editData.characters || ''}
+                onChange={(e) => handleChange('characters', e.target.value)}
+                onBlur={handleSave}
+                placeholder="Characters appearing in this chapter..."
+              />
+            </div>
+            
+            {/* Notes */}
+            <div>
+              <label className="block text-sm font-medium text-gold-pale mb-2">Notes</label>
+              <textarea
+                className="w-full px-3 py-3 text-sm bg-dark-750 border border-gold-rich/20 rounded-lg text-gray-200 placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-gold-rich/30 min-h-[60px] resize-none"
+                value={editData.notes || ''}
+                onChange={(e) => handleChange('notes', e.target.value)}
+                onBlur={handleSave}
+                placeholder="Additional notes, reminders, ideas..."
+              />
+            </div>
+          </div>
+          
+          {isDirty && (
+            <div className="mt-4 flex items-center justify-end gap-2">
+              <span className="text-xs text-gray-500">Unsaved changes</span>
+              <button
+                className="px-4 py-2 text-sm bg-gradient-to-r from-gold-rich to-gold-deep text-dark-950 rounded-lg hover:from-gold-amber hover:to-gold-rich font-medium"
+                onClick={handleSave}
+              >
+                Save Changes
+              </button>
+            </div>
+          )}
+        </div>
       )}
     </div>
   )
 }
 
-// Outline Editor with Chapter Cards
+// Outline Editor with Expandable Chapter Rows
 function OutlineEditor({ chapters, onSave, onGenerateFromSynopsis, isGenerating, hasSynopsis }) {
   const [outlineChapters, setOutlineChapters] = useState([])
+  const [isSectionExpanded, setIsSectionExpanded] = useState(true)
   
   useEffect(() => {
-    // Parse chapters from string if needed
     if (typeof chapters === 'string') {
       try {
         const parsed = JSON.parse(chapters)
@@ -334,11 +457,22 @@ function OutlineEditor({ chapters, onSave, onGenerateFromSynopsis, isGenerating,
   const handleDeleteChapter = (index) => {
     if (confirm('Delete this chapter from the outline?')) {
       const newChapters = outlineChapters.filter((_, i) => i !== index)
-      // Renumber chapters
       newChapters.forEach((ch, i) => ch.chapter_number = i + 1)
       setOutlineChapters(newChapters)
       onSave(JSON.stringify(newChapters))
     }
+  }
+  
+  const handleDuplicateChapter = (index) => {
+    const chapterToCopy = outlineChapters[index]
+    const newChapter = {
+      ...chapterToCopy,
+      title: `${chapterToCopy.title} (Copy)`,
+      chapter_number: outlineChapters.length + 1
+    }
+    const newChapters = [...outlineChapters, newChapter]
+    setOutlineChapters(newChapters)
+    onSave(JSON.stringify(newChapters))
   }
   
   const handleAddChapter = () => {
@@ -346,7 +480,9 @@ function OutlineEditor({ chapters, onSave, onGenerateFromSynopsis, isGenerating,
       chapter_number: outlineChapters.length + 1,
       title: `Chapter ${outlineChapters.length + 1}`,
       summary: '',
-      key_events: ''
+      key_events: '',
+      characters: '',
+      notes: ''
     }
     const newChapters = [...outlineChapters, newChapter]
     setOutlineChapters(newChapters)
@@ -355,70 +491,91 @@ function OutlineEditor({ chapters, onSave, onGenerateFromSynopsis, isGenerating,
   
   return (
     <div className="h-full flex flex-col">
-      {/* Actions Bar */}
-      <div className="flex items-center justify-between mb-4">
-        <p className="text-text-muted text-sm">
-          {outlineChapters.length} chapter{outlineChapters.length !== 1 ? 's' : ''} in outline
-        </p>
-        <div className="flex items-center gap-2">
-          {hasSynopsis && (
-            <button
-              className="btn btn-secondary text-sm"
-              onClick={onGenerateFromSynopsis}
-              disabled={isGenerating}
-            >
-              {isGenerating ? (
-                <><div className="spinner !w-3 !h-3" /> Generating...</>
-              ) : (
-                <>🤖 Generate from Synopsis</>
-              )}
-            </button>
-          )}
-          <button className="btn btn-primary text-sm" onClick={handleAddChapter}>
-            + Add Chapter
-          </button>
-        </div>
-      </div>
-      
-      {/* Chapter Cards Grid */}
-      <div className="flex-1 overflow-y-auto">
-        {outlineChapters.length === 0 ? (
-          <div className="h-full flex items-center justify-center">
-            <div className="text-center max-w-md">
-              <div className="text-6xl mb-4">📋</div>
-              <h3 className="text-lg font-semibold text-text-primary mb-2">No Outline Yet</h3>
-              <p className="text-text-muted mb-4">
-                {hasSynopsis 
-                  ? 'Generate chapter outline from your synopsis or add chapters manually.'
-                  : 'Write a synopsis first, then generate an outline, or add chapters manually.'}
+      {/* Section Header */}
+      <div className="bg-dark-800 rounded-xl shadow-sm border border-gold-rich/10 mb-4">
+        <div className="flex items-center justify-between px-4 py-4 border-b border-gold-rich/10">
+          <button
+            className="flex items-center gap-3 text-left"
+            onClick={() => setIsSectionExpanded(!isSectionExpanded)}
+          >
+            <span className="text-gray-500 text-sm">
+              {isSectionExpanded ? Icons.ARROW_COLLAPSE : Icons.ARROW_EXPAND}
+            </span>
+            <span className="text-2xl">{Icons.OUTLINE}</span>
+            <div>
+              <h1 className="text-xl font-semibold text-gold-soft">Story Outline</h1>
+              <p className="text-sm text-gray-400">
+                {outlineChapters.length} chapter{outlineChapters.length !== 1 ? 's' : ''} planned
               </p>
-              <div className="flex items-center justify-center gap-2">
-                {hasSynopsis && (
-                  <button
-                    className="btn btn-secondary"
-                    onClick={onGenerateFromSynopsis}
-                    disabled={isGenerating}
-                  >
-                    🤖 Generate from Synopsis
-                  </button>
-                )}
-                <button className="btn btn-primary" onClick={handleAddChapter}>
-                  + Add Manually
-                </button>
-              </div>
             </div>
+          </button>
+          
+          <div className="flex items-center gap-2">
+            {hasSynopsis && (
+              <button
+                className="flex items-center gap-1 text-gray-400 hover:text-gold-rich font-medium text-sm border border-gold-rich/20 rounded-lg px-3 py-1.5 hover:bg-gold-rich/10 transition-colors"
+                onClick={onGenerateFromSynopsis}
+                disabled={isGenerating}
+              >
+                {isGenerating ? (
+                  <><div className="spinner !w-3 !h-3" /> Generating...</>
+                ) : (
+                  <><span>🤖</span> <span>Generate from Synopsis</span></>
+                )}
+              </button>
+            )}
+            <button
+              className="flex items-center gap-1 text-gold-rich hover:text-gold-amber font-medium text-sm"
+              onClick={handleAddChapter}
+            >
+              <span>+</span>
+              <span>Add Chapter</span>
+            </button>
           </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pb-4">
-            {outlineChapters.map((chapter, index) => (
-              <OutlineChapterCard
-                key={index}
-                chapter={chapter}
-                index={index}
-                onUpdate={handleUpdateChapter}
-                onDelete={handleDeleteChapter}
-              />
-            ))}
+        </div>
+        
+        {/* Chapters List */}
+        {isSectionExpanded && (
+          <div className="p-4 max-h-[calc(100vh-350px)] overflow-y-auto">
+            {outlineChapters.length === 0 ? (
+              <div className="text-center py-12">
+                <div className="text-5xl mb-4 opacity-50">{Icons.OUTLINE}</div>
+                <h2 className="text-lg font-semibold text-gray-200 mb-2">No Chapters Yet</h2>
+                <p className="text-gray-400 mb-4 text-sm">
+                  {hasSynopsis 
+                    ? 'Generate chapter outline from your synopsis or add chapters manually.'
+                    : 'Write a synopsis first, then generate an outline, or add chapters manually.'}
+                </p>
+                <div className="flex items-center justify-center gap-3">
+                  {hasSynopsis && (
+                    <button
+                      className="px-4 py-2 rounded-lg bg-dark-700 text-gray-300 hover:bg-dark-600 text-sm font-medium flex items-center gap-2 border border-gold-rich/20"
+                      onClick={onGenerateFromSynopsis}
+                      disabled={isGenerating}
+                    >
+                      🤖 Generate from Synopsis
+                    </button>
+                  )}
+                  <button
+                    className="px-4 py-2 rounded-lg bg-gradient-to-r from-gold-rich to-gold-deep text-dark-950 hover:from-gold-amber hover:to-gold-rich text-sm font-medium flex items-center gap-2"
+                    onClick={handleAddChapter}
+                  >
+                    + Add Manually
+                  </button>
+                </div>
+              </div>
+            ) : (
+              outlineChapters.map((chapter, index) => (
+                <OutlineChapterRow
+                  key={index}
+                  chapter={chapter}
+                  index={index}
+                  onUpdate={handleUpdateChapter}
+                  onDelete={handleDeleteChapter}
+                  onDuplicate={handleDuplicateChapter}
+                />
+              ))
+            )}
           </div>
         )}
       </div>
@@ -492,13 +649,11 @@ function StoryBible() {
   const [showSynopsisModal, setShowSynopsisModal] = useState(false)
   const saveTimeoutRef = useRef(null)
   
-  // Get current tab config
   const currentTab = TABS.find(t => t.id === currentBibleTab) || TABS[0]
   const content = storyBibleData[currentBibleTab] || ''
   const synopsisContent = storyBibleData['synopsis'] || ''
   const genreContent = storyBibleData['genre'] || 'fiction'
   
-  // Load story bible data
   useEffect(() => {
     async function loadBibleData() {
       if (!currentProjectId) return
@@ -512,11 +667,9 @@ function StoryBible() {
     loadBibleData()
   }, [currentProjectId])
   
-  // Handle content change with debounced save
   const handleContentChange = (value) => {
     updateBibleField(currentBibleTab, value)
     
-    // Debounced save
     if (saveTimeoutRef.current) {
       clearTimeout(saveTimeoutRef.current)
     }
@@ -528,7 +681,6 @@ function StoryBible() {
     }, 1000)
   }
   
-  // Handle AI expand
   const handleAiExpand = async () => {
     if (!content.trim()) return
     
@@ -549,7 +701,6 @@ function StoryBible() {
     }
   }
   
-  // Handle Generate Synopsis from questions
   const handleGenerateSynopsis = async (answers, genre, wordCount) => {
     if (!isElectronApi) {
       addNotification({ type: 'warning', message: 'AI generation requires the Python backend' })
@@ -560,7 +711,6 @@ function StoryBible() {
     setGeneratingAction('synopsis')
     
     try {
-      // Build a structured prompt from the answers
       const wordCountMap = { short: '100-200', medium: '300-500', long: '600-800' }
       const targetWords = wordCountMap[wordCount] || '300-500'
       
@@ -577,11 +727,9 @@ function StoryBible() {
       
       const structuredInput = promptParts.join('\n\n')
       
-      // Use the AI to generate a synopsis
       const result = await window.api.generateSynopsis(structuredInput, genre, targetWords)
       
       if (result && !result.error) {
-        // Update the synopsis field
         handleContentChange(result)
         setShowSynopsisModal(false)
         addNotification({ type: 'success', message: 'Synopsis generated successfully!' })
@@ -597,7 +745,6 @@ function StoryBible() {
     }
   }
   
-  // Generate Cast from Synopsis
   const handleGenerateCast = async () => {
     if (!synopsisContent.trim()) {
       addNotification({ type: 'warning', message: 'Please write a synopsis first' })
@@ -616,7 +763,6 @@ function StoryBible() {
       const result = await window.api.generateCharactersFromSynopsis(synopsisContent, genreContent)
       
       if (result && result.length > 0) {
-        // Save characters one by one and track successes
         let savedCount = 0
         let errors = []
         
@@ -630,7 +776,6 @@ function StoryBible() {
           }
         }
         
-        // Refresh characters list
         const chars = await getCharacters(currentProjectId)
         setCharacters(chars)
         
@@ -652,7 +797,6 @@ function StoryBible() {
     }
   }
   
-  // Generate World from Synopsis
   const handleGenerateWorld = async () => {
     if (!synopsisContent.trim()) {
       addNotification({ type: 'warning', message: 'Please write a synopsis first' })
@@ -671,7 +815,6 @@ function StoryBible() {
       const result = await window.api.generateWorldFromSynopsis(synopsisContent, genreContent)
       
       if (result && result.length > 0) {
-        // Save world elements
         for (const elem of result) {
           await createWorldElement(currentProjectId, elem)
         }
@@ -689,7 +832,6 @@ function StoryBible() {
     }
   }
   
-  // Generate Outline from Synopsis
   const handleGenerateOutline = async () => {
     if (!synopsisContent.trim()) {
       addNotification({ type: 'warning', message: 'Please write a synopsis first' })
@@ -708,17 +850,14 @@ function StoryBible() {
       const result = await window.api.generateOutlineFromSynopsis(synopsisContent, 10, genreContent)
       
       if (result && (Array.isArray(result) ? result.length > 0 : result)) {
-        // Convert array to JSON string for storage
         const outlineData = Array.isArray(result) ? JSON.stringify(result) : result
         
-        // Update the outline field
         updateBibleField('outline', outlineData)
         await saveBibleField(currentProjectId, 'outline', outlineData)
         
         const chapterCount = Array.isArray(result) ? result.length : 'unknown'
         addNotification({ type: 'success', message: `Generated ${chapterCount} chapter outline from synopsis` })
         
-        // Switch to outline tab
         setCurrentBibleTab('outline')
       } else {
         addNotification({ type: 'warning', message: 'Could not generate outline' })
@@ -732,7 +871,6 @@ function StoryBible() {
     }
   }
   
-  // Cleanup
   useEffect(() => {
     return () => {
       if (saveTimeoutRef.current) {
@@ -746,11 +884,11 @@ function StoryBible() {
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-semibold text-text-primary flex items-center gap-2">
+          <h1 className="text-2xl font-semibold text-gold-soft flex items-center gap-2">
             <span>{currentTab.icon}</span>
             <span>{currentTab.label}</span>
           </h1>
-          <p className="text-text-muted mt-1">{currentTab.description}</p>
+          <p className="text-gray-400 mt-1">{currentTab.description}</p>
         </div>
         
         <div className="flex items-center gap-2">
@@ -758,7 +896,7 @@ function StoryBible() {
           <div className={clsx(
             'px-3 py-1.5 rounded-lg text-sm',
             isSaving
-              ? 'bg-yellow-500/20 text-yellow-400'
+              ? 'bg-gold-rich/20 text-gold-rich'
               : 'bg-green-500/20 text-green-400'
           )}>
             {isSaving ? 'Saving...' : '✓ Saved'}
@@ -802,8 +940,8 @@ function StoryBible() {
       
       {/* Synopsis Generation Buttons */}
       {currentBibleTab === 'synopsis' && synopsisContent.trim() && (
-        <div className="flex items-center gap-2 mb-4 p-3 rounded-xl bg-accent-primary/10 border border-accent-primary/20">
-          <span className="text-sm text-text-muted mr-2">{Icons.GENERATE} Generate from Synopsis:</span>
+        <div className="flex items-center gap-2 mb-4 p-3 rounded-xl bg-gold-rich/10 border border-gold-rich/20">
+          <span className="text-sm text-gray-400 mr-2">{Icons.GENERATE} Generate from Synopsis:</span>
           
           <button
             className="btn btn-secondary text-sm py-1.5"
@@ -872,8 +1010,8 @@ function StoryBible() {
             className={clsx(
               'px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-all',
               currentBibleTab === tab.id
-                ? 'bg-accent-primary text-white'
-                : 'bg-bg-card/60 text-text-muted hover:bg-bg-hover hover:text-text-primary'
+                ? 'bg-gradient-to-r from-gold-rich to-gold-deep text-dark-950'
+                : 'bg-dark-700 text-gray-400 hover:bg-dark-600 hover:text-gray-200'
             )}
             onClick={() => setCurrentBibleTab(tab.id)}
           >
@@ -895,7 +1033,7 @@ function StoryBible() {
           />
         ) : (
           <textarea
-            className="w-full h-full input-textarea text-editor"
+            className="w-full h-full px-4 py-4 bg-dark-800 border border-gold-rich/10 rounded-xl text-gray-200 placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-gold-rich/30 focus:border-gold-rich/30 resize-none"
             value={content}
             onChange={(e) => handleContentChange(e.target.value)}
             placeholder={currentTab.placeholder}
@@ -905,7 +1043,7 @@ function StoryBible() {
       
       {/* Word Count (only for text tabs) */}
       {currentBibleTab !== 'outline' && (
-        <div className="mt-4 text-sm text-text-muted text-right">
+        <div className="mt-4 text-sm text-gray-500 text-right">
           {content.trim() ? content.trim().split(/\s+/).length : 0} words
         </div>
       )}
@@ -923,4 +1061,3 @@ function StoryBible() {
 }
 
 export default StoryBible
-

@@ -2,6 +2,7 @@
  * Character Manager Component
  * ===========================
  * Manages character profiles with expandable list layout and AI generation.
+ * Dark & Gold luxury theme
  */
 
 import { useState, useEffect, useRef } from 'react'
@@ -118,15 +119,15 @@ function EditableField({ label, value, onChange, onSave, onRewrite, placeholder,
       className={clsx(
         "rounded-xl p-4 border transition-all",
         isFocused || showRewriteInput
-          ? "bg-purple-50/50 border-purple-200"
-          : "bg-gray-50 border-gray-100"
+          ? "bg-dark-700/50 border-gold-rich/40"
+          : "bg-dark-800/50 border-gold-rich/10"
       )}
       onBlur={handleBlur}
     >
       <div className="flex items-center justify-between mb-2">
-        <label className="text-sm font-medium text-gray-600">{label}</label>
+        <label className="text-sm font-medium text-gold-pale">{label}</label>
         <button
-          className="w-6 h-6 flex items-center justify-center rounded text-gray-400 hover:text-gray-600 hover:bg-gray-200 transition-colors"
+          className="w-6 h-6 flex items-center justify-center rounded text-text-muted hover:text-gold-rich hover:bg-gold-rich/10 transition-colors"
           title="More options"
         >
           {Icons.MORE}
@@ -137,7 +138,7 @@ function EditableField({ label, value, onChange, onSave, onRewrite, placeholder,
         <textarea
           ref={textareaRef}
           className={clsx(
-            "w-full px-3 py-3 text-sm bg-white border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent min-h-[80px] resize-none transition-all",
+            "w-full px-3 py-3 text-sm bg-dark-750 border border-gold-rich/20 rounded-lg text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-gold-rich/30 focus:border-gold-rich/40 min-h-[80px] resize-none transition-all",
             isRewriting ? "opacity-50" : ""
           )}
           value={value || ''}
@@ -149,7 +150,7 @@ function EditableField({ label, value, onChange, onSave, onRewrite, placeholder,
         
         {/* Visibility toggle */}
         <button
-          className="absolute top-3 right-3 w-6 h-6 flex items-center justify-center rounded text-gray-400 hover:text-gray-600 transition-colors"
+          className="absolute top-3 right-3 w-6 h-6 flex items-center justify-center rounded text-text-muted hover:text-gold-rich transition-colors"
           title="Toggle visibility"
         >
           {Icons.VISIBLE}
@@ -157,9 +158,9 @@ function EditableField({ label, value, onChange, onSave, onRewrite, placeholder,
         
         {/* Loading overlay */}
         {isRewriting && (
-          <div className="absolute inset-0 flex items-center justify-center bg-white/80 rounded-lg">
-            <div className="flex items-center gap-2 text-primary-600">
-              <div className="w-5 h-5 border-2 border-primary-200 border-t-primary-600 rounded-full animate-spin" />
+          <div className="absolute inset-0 flex items-center justify-center bg-dark-800/80 rounded-lg">
+            <div className="flex items-center gap-2 text-gold-rich">
+              <div className="w-5 h-5 border-2 border-gold-rich/20 border-t-gold-rich rounded-full animate-spin" />
               <span className="text-sm font-medium">Rewriting...</span>
             </div>
           </div>
@@ -169,7 +170,7 @@ function EditableField({ label, value, onChange, onSave, onRewrite, placeholder,
       {/* Rewrite Button - Shows ONLY when input is focused and has content */}
       {isFocused && value?.trim() && !showRewriteInput && !isRewriting && (
         <button
-          className="mt-3 flex items-center gap-1.5 text-sm text-primary-600 hover:text-primary-700 font-medium transition-colors"
+          className="mt-3 flex items-center gap-1.5 text-sm text-gold-rich hover:text-gold-amber font-medium transition-colors"
           onClick={() => setShowRewriteInput(true)}
           onMouseDown={(e) => e.preventDefault()} // Prevent blur
         >
@@ -184,7 +185,7 @@ function EditableField({ label, value, onChange, onSave, onRewrite, placeholder,
           <div className="flex items-center gap-2">
             <input
               type="text"
-              className="flex-1 px-3 py-2.5 text-sm bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+              className="flex-1 px-3 py-2.5 text-sm bg-dark-750 border border-gold-rich/20 rounded-lg text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-gold-rich/30 focus:border-gold-rich/40"
               placeholder={`Tell AI how to rewrite "${label}"...`}
               value={rewriteInstruction}
               onChange={(e) => setRewriteInstruction(e.target.value)}
@@ -195,19 +196,19 @@ function EditableField({ label, value, onChange, onSave, onRewrite, placeholder,
               className={clsx(
                 'px-4 py-2.5 rounded-lg text-sm font-medium flex items-center gap-2 transition-all min-w-[90px] justify-center',
                 rewriteInstruction.trim() && value?.trim()
-                  ? 'bg-primary-600 text-white hover:bg-primary-700 shadow-sm'
-                  : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                  ? 'bg-gradient-to-r from-gold-rich to-gold-deep text-dark-950 hover:from-gold-amber hover:to-gold-rich shadow-gold-sm'
+                  : 'bg-dark-600 text-text-muted cursor-not-allowed'
               )}
               onClick={handleRewrite}
               disabled={!rewriteInstruction.trim() || !value?.trim() || isRewriting}
             >
               <span>Go</span>
-              <span className="text-xs bg-white/20 px-1.5 py-0.5 rounded">ctrl</span>
+              <span className="text-xs bg-dark-950/20 px-1.5 py-0.5 rounded">ctrl</span>
               <span className="text-xs">↵</span>
             </button>
           </div>
           <button
-            className="mt-2 text-xs text-gray-400 hover:text-gray-600 transition-colors"
+            className="mt-2 text-xs text-text-muted hover:text-gold-rich transition-colors"
             onClick={() => {
               setShowRewriteInput(false)
               setRewriteInstruction('')
@@ -303,15 +304,15 @@ function CharacterRow({ character, onToggleVisibility, onDuplicate, onDelete, on
   ]
   
   return (
-    <div className="border-b border-gray-100 last:border-b-0">
+    <div className="border-b border-gold-rich/10 last:border-b-0">
       {/* Main Row */}
-      <div className="flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-colors group">
+      <div className="flex items-center gap-3 px-4 py-3 hover:bg-gold-rich/5 transition-colors group">
         {/* Drag Handle */}
-        <span className="text-gray-300 cursor-grab text-sm">{Icons.DRAG}</span>
+        <span className="text-text-muted cursor-grab text-sm">{Icons.DRAG}</span>
         
         {/* Expand Arrow */}
         <button
-          className="w-5 h-5 flex items-center justify-center text-gray-400 hover:text-gray-600 transition-colors"
+          className="w-5 h-5 flex items-center justify-center text-text-muted hover:text-gold-rich transition-colors"
           onClick={() => setIsExpanded(!isExpanded)}
         >
           {isExpanded ? Icons.COLLAPSE : Icons.EXPAND}
@@ -320,7 +321,7 @@ function CharacterRow({ character, onToggleVisibility, onDuplicate, onDelete, on
         {/* Character Name - Editable */}
         <input
           type="text"
-          className="flex-1 font-medium text-gray-800 bg-transparent border-none focus:outline-none focus:ring-0 hover:bg-gray-100 focus:bg-white px-2 py-1 rounded"
+          className="flex-1 font-medium text-text-primary bg-transparent border-none focus:outline-none focus:ring-0 hover:bg-dark-700/50 focus:bg-dark-700 px-2 py-1 rounded"
           value={editData.name || ''}
           onChange={(e) => handleChange('name', e.target.value)}
           onBlur={handleNameBlur}
@@ -330,7 +331,7 @@ function CharacterRow({ character, onToggleVisibility, onDuplicate, onDelete, on
         {/* Role Dropdown */}
         <div className="relative">
           <select
-            className="appearance-none bg-gray-100 border border-gray-200 rounded-lg px-3 py-1.5 text-sm text-gray-600 cursor-pointer hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-primary-500"
+            className="appearance-none bg-dark-700 border border-gold-rich/20 rounded-lg px-3 py-1.5 text-sm text-text-secondary cursor-pointer hover:bg-dark-600 hover:border-gold-rich/30 focus:outline-none focus:ring-2 focus:ring-gold-rich/30"
             value={editData.role || 'Other'}
             onChange={(e) => {
               handleChange('role', e.target.value)
@@ -342,7 +343,7 @@ function CharacterRow({ character, onToggleVisibility, onDuplicate, onDelete, on
               <option key={role} value={role}>{role}</option>
             ))}
           </select>
-          <span className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400 text-xs">▼</span>
+          <span className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none text-gold-rich/60 text-xs">▼</span>
         </div>
         
         {/* Action Icons */}
@@ -352,8 +353,8 @@ function CharacterRow({ character, onToggleVisibility, onDuplicate, onDelete, on
             className={clsx(
               'w-8 h-8 flex items-center justify-center rounded-lg transition-colors',
               isVisible
-                ? 'text-gray-400 hover:text-green-500 hover:bg-green-50'
-                : 'text-red-400 hover:text-red-500 hover:bg-red-50'
+                ? 'text-text-muted hover:text-green-400 hover:bg-green-400/10'
+                : 'text-red-400 hover:text-red-300 hover:bg-red-400/10'
             )}
             onClick={() => onToggleVisibility(character)}
             title={isVisible ? 'Visible to AI (click to hide)' : 'Hidden from AI (click to show)'}
@@ -363,7 +364,7 @@ function CharacterRow({ character, onToggleVisibility, onDuplicate, onDelete, on
           
           {/* Clock/History (placeholder) */}
           <button
-            className="w-8 h-8 flex items-center justify-center rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
+            className="w-8 h-8 flex items-center justify-center rounded-lg text-text-muted hover:text-gold-rich hover:bg-gold-rich/10 transition-colors"
             title="History"
           >
             {Icons.CLOCK}
@@ -371,7 +372,7 @@ function CharacterRow({ character, onToggleVisibility, onDuplicate, onDelete, on
           
           {/* Duplicate */}
           <button
-            className="w-8 h-8 flex items-center justify-center rounded-lg text-gray-400 hover:text-primary-600 hover:bg-primary-50 transition-colors"
+            className="w-8 h-8 flex items-center justify-center rounded-lg text-text-muted hover:text-gold-rich hover:bg-gold-rich/10 transition-colors"
             onClick={() => onDuplicate(character)}
             title="Duplicate"
           >
@@ -382,7 +383,7 @@ function CharacterRow({ character, onToggleVisibility, onDuplicate, onDelete, on
           <div className="relative" ref={menuRef}>
             <button
               ref={menuButtonRef}
-              className="w-8 h-8 flex items-center justify-center rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
+              className="w-8 h-8 flex items-center justify-center rounded-lg text-text-muted hover:text-gold-rich hover:bg-gold-rich/10 transition-colors"
               onClick={() => {
                 if (!showMenu && menuButtonRef.current) {
                   const rect = menuButtonRef.current.getBoundingClientRect()
@@ -399,11 +400,11 @@ function CharacterRow({ character, onToggleVisibility, onDuplicate, onDelete, on
             
             {showMenu && (
               <div 
-                className="fixed bg-white rounded-xl shadow-lg border border-gray-100 min-w-[140px] py-2 z-[9999]"
+                className="fixed bg-dark-800 rounded-xl shadow-lg shadow-black/50 border border-gold-rich/20 min-w-[140px] py-2 z-[9999]"
                 style={{ top: menuPosition.top, right: menuPosition.right }}
               >
                 <button
-                  className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                  className="w-full px-4 py-2 text-left text-sm text-text-secondary hover:bg-gold-rich/10 hover:text-gold-rich flex items-center gap-2"
                   onClick={() => {
                     onDuplicate(character)
                     setShowMenu(false)
@@ -412,7 +413,7 @@ function CharacterRow({ character, onToggleVisibility, onDuplicate, onDelete, on
                   {Icons.COPY} Duplicate
                 </button>
                 <button
-                  className="w-full px-4 py-2 text-left text-sm text-red-500 hover:bg-red-50 flex items-center gap-2"
+                  className="w-full px-4 py-2 text-left text-sm text-red-400 hover:bg-red-400/10 flex items-center gap-2"
                   onClick={() => {
                     onDelete(character)
                     setShowMenu(false)
@@ -428,7 +429,7 @@ function CharacterRow({ character, onToggleVisibility, onDuplicate, onDelete, on
       
       {/* Expanded Content - All fields vertical */}
       {isExpanded && (
-        <div className="px-12 pb-6 bg-gray-50/30 animate-fade-in">
+        <div className="px-12 pb-6 bg-dark-850/50 animate-fade-in">
           <div className="space-y-4">
             {fields.map(field => (
               <EditableField
@@ -447,9 +448,9 @@ function CharacterRow({ character, onToggleVisibility, onDuplicate, onDelete, on
           {/* Save indicator */}
           {isDirty && (
             <div className="mt-4 flex items-center justify-end gap-2">
-              <span className="text-xs text-gray-500">Unsaved changes</span>
+              <span className="text-xs text-text-muted">Unsaved changes</span>
               <button
-                className="px-4 py-2 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700 font-medium"
+                className="px-4 py-2 text-sm bg-gradient-to-r from-gold-rich to-gold-deep text-dark-950 rounded-lg hover:from-gold-amber hover:to-gold-rich font-medium shadow-gold-sm"
                 onClick={handleSave}
               >
                 Save Changes
@@ -505,7 +506,7 @@ function CharacterEditor({ character, onSave, onClose }) {
       <div className="flex-1 overflow-y-auto pr-2 space-y-4">
         {CHARACTER_FIELDS.map(field => (
           <div key={field.id}>
-            <label className="block text-sm font-medium text-text-secondary mb-1">
+            <label className="block text-sm font-medium text-gold-pale mb-1">
               {field.label}
               {field.required && <span className="text-red-400 ml-1">*</span>}
             </label>
@@ -563,7 +564,7 @@ function GenerateCharacterModal({ isOpen, onClose, onGenerate, isGenerating }) {
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       {/* Backdrop */}
       <div 
-        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+        className="absolute inset-0 bg-black/70 backdrop-blur-sm"
         onClick={!isGenerating ? onClose : undefined}
       />
       
@@ -580,7 +581,7 @@ function GenerateCharacterModal({ isOpen, onClose, onGenerate, isGenerating }) {
           </div>
           {!isGenerating && (
             <button
-              className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-bg-hover text-text-muted hover:text-text-primary transition-colors"
+              className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gold-rich/10 text-text-muted hover:text-gold-rich transition-colors"
               onClick={onClose}
             >
               {Icons.CLOSE}
@@ -592,7 +593,7 @@ function GenerateCharacterModal({ isOpen, onClose, onGenerate, isGenerating }) {
         <form onSubmit={handleSubmit}>
           {/* Prompt Input */}
           <div className="mb-4">
-            <label className="block text-sm font-medium text-text-secondary mb-2">
+            <label className="block text-sm font-medium text-gold-pale mb-2">
               Character Description <span className="text-red-400">*</span>
             </label>
             <textarea
@@ -613,7 +614,7 @@ function GenerateCharacterModal({ isOpen, onClose, onGenerate, isGenerating }) {
           
           {/* Genre Selection */}
           <div className="mb-4">
-            <label className="block text-sm font-medium text-text-secondary mb-2">
+            <label className="block text-sm font-medium text-gold-pale mb-2">
               Story Genre
             </label>
             <select
@@ -636,7 +637,7 @@ function GenerateCharacterModal({ isOpen, onClose, onGenerate, isGenerating }) {
           
           {/* Example Prompts */}
           <div className="mb-6">
-            <label className="block text-sm font-medium text-text-secondary mb-2">
+            <label className="block text-sm font-medium text-gold-pale mb-2">
               Need inspiration? Click one:
             </label>
             <div className="flex flex-wrap gap-2">
@@ -644,7 +645,7 @@ function GenerateCharacterModal({ isOpen, onClose, onGenerate, isGenerating }) {
                 <button
                   key={index}
                   type="button"
-                  className="px-3 py-1.5 text-xs rounded-full bg-bg-hover text-text-muted hover:bg-accent-primary/20 hover:text-accent-primary transition-colors"
+                  className="px-3 py-1.5 text-xs rounded-full bg-dark-700 border border-gold-rich/20 text-text-muted hover:bg-gold-rich/10 hover:border-gold-rich/40 hover:text-gold-rich transition-colors"
                   onClick={() => handleExampleClick(example)}
                   disabled={isGenerating}
                 >
@@ -686,11 +687,11 @@ function GenerateCharacterModal({ isOpen, onClose, onGenerate, isGenerating }) {
         
         {/* Generating State */}
         {isGenerating && (
-          <div className="mt-6 p-4 rounded-lg bg-accent-primary/10 border border-accent-primary/30">
+          <div className="mt-6 p-4 rounded-lg bg-gold-rich/10 border border-gold-rich/30">
             <div className="flex items-center gap-3">
               <div className="spinner !w-6 !h-6" />
               <div>
-                <p className="text-accent-primary font-medium">Creating your character...</p>
+                <p className="text-gold-rich font-medium">Creating your character...</p>
                 <p className="text-sm text-text-muted">AI is filling all character fields. This may take 10-20 seconds.</p>
               </div>
             </div>
@@ -734,7 +735,7 @@ function CSVImportModal({ isOpen, onClose, onImport }) {
   if (!isOpen) return null
   
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50">
       <div className="glass-card p-6 w-full max-w-2xl">
         <h2 className="text-xl font-bold text-text-primary mb-4 flex items-center gap-2">
           <span>{Icons.IMPORT}</span>
@@ -1144,23 +1145,23 @@ Please rewrite the ${fieldLabel} following the user's instruction. Keep it conci
   return (
     <div className="h-full flex flex-col p-6">
       {/* Section Header - Collapsible */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 mb-4">
-        <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
+      <div className="bg-dark-800/80 rounded-xl shadow-lg shadow-black/20 border border-gold-rich/20 mb-4 backdrop-blur-sm">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-gold-rich/10">
           <button
             className="flex items-center gap-3 text-left"
             onClick={() => setIsSectionExpanded(!isSectionExpanded)}
           >
-            <span className="text-gray-400 text-sm">
+            <span className="text-gold-rich/60 text-sm">
               {isSectionExpanded ? Icons.COLLAPSE : Icons.EXPAND}
             </span>
             <span className="text-lg">{Icons.PERSON}</span>
-            <span className="font-semibold text-gray-800">Characters</span>
+            <span className="font-semibold text-gold-rich">Characters</span>
           </button>
           
           <div className="flex items-center gap-2">
             {/* Add Character Button */}
             <button
-              className="flex items-center gap-1 text-primary-600 hover:text-primary-700 font-medium text-sm"
+              className="flex items-center gap-1 text-gold-rich hover:text-gold-amber font-medium text-sm transition-colors"
               onClick={handleCreateBlankCharacter}
             >
               <span>+</span>
@@ -1170,16 +1171,16 @@ Please rewrite the ${fieldLabel} following the user's instruction. Keep it conci
             {/* Section Menu */}
             <div className="relative" ref={sectionMenuRef}>
               <button
-                className="w-8 h-8 flex items-center justify-center rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
+                className="w-8 h-8 flex items-center justify-center rounded-lg text-text-muted hover:text-gold-rich hover:bg-gold-rich/10 transition-colors"
                 onClick={() => setShowSectionMenu(!showSectionMenu)}
               >
                 {Icons.MORE}
               </button>
               
               {showSectionMenu && (
-                <div className="absolute right-0 top-full mt-1 bg-white rounded-xl shadow-lg border border-gray-100 min-w-[180px] py-2 z-50">
+                <div className="absolute right-0 top-full mt-1 bg-dark-800 rounded-xl shadow-lg shadow-black/50 border border-gold-rich/20 min-w-[180px] py-2 z-50">
                   <button
-                    className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                    className="w-full px-4 py-2 text-left text-sm text-text-secondary hover:bg-gold-rich/10 hover:text-gold-rich flex items-center gap-2"
                     onClick={() => {
                       setShowGenerateModal(true)
                       setShowSectionMenu(false)
@@ -1188,7 +1189,7 @@ Please rewrite the ${fieldLabel} following the user's instruction. Keep it conci
                     {Icons.MAGIC} Generate with AI
                   </button>
                   <button
-                    className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                    className="w-full px-4 py-2 text-left text-sm text-text-secondary hover:bg-gold-rich/10 hover:text-gold-rich flex items-center gap-2"
                     onClick={() => {
                       setShowImportModal(true)
                       setShowSectionMenu(false)
@@ -1197,7 +1198,7 @@ Please rewrite the ${fieldLabel} following the user's instruction. Keep it conci
                     {Icons.IMPORT} Import CSV
                   </button>
                   <button
-                    className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                    className="w-full px-4 py-2 text-left text-sm text-text-secondary hover:bg-gold-rich/10 hover:text-gold-rich flex items-center gap-2"
                     onClick={() => {
                       handleExport()
                       setShowSectionMenu(false)
@@ -1217,21 +1218,21 @@ Please rewrite the ${fieldLabel} following the user's instruction. Keep it conci
             {characters.length === 0 ? (
               <div className="text-center py-12">
                 <div className="text-5xl mb-4 opacity-50">👥</div>
-                <h2 className="text-lg font-semibold text-gray-700 mb-2">
+                <h2 className="text-lg font-semibold text-text-primary mb-2">
                   No Characters Yet
                 </h2>
-                <p className="text-gray-500 mb-4 text-sm">
+                <p className="text-text-muted mb-4 text-sm">
                   Create your first character to start building your story's cast.
                 </p>
                 <div className="flex items-center justify-center gap-3">
                   <button
-                    className="px-4 py-2 rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 text-sm font-medium flex items-center gap-2"
+                    className="px-4 py-2 rounded-lg bg-dark-700 border border-gold-rich/20 text-text-secondary hover:bg-gold-rich/10 hover:text-gold-rich hover:border-gold-rich/40 text-sm font-medium flex items-center gap-2 transition-colors"
                     onClick={() => setShowGenerateModal(true)}
                   >
                     {Icons.MAGIC} Generate with AI
                   </button>
                   <button
-                    className="px-4 py-2 rounded-lg bg-primary-600 text-white hover:bg-primary-700 text-sm font-medium flex items-center gap-2"
+                    className="px-4 py-2 rounded-lg bg-gradient-to-r from-gold-rich to-gold-deep text-dark-950 hover:from-gold-amber hover:to-gold-rich text-sm font-medium flex items-center gap-2 shadow-gold-sm transition-all"
                     onClick={handleCreateBlankCharacter}
                   >
                     {Icons.PLUS} Create Manually

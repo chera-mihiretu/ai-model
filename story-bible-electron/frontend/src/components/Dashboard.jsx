@@ -2,7 +2,7 @@
  * Dashboard Component
  * ===================
  * Landing page showing projects organized in folders and series.
- * Beautiful warm gradient background with clean, airy design.
+ * Dark & Gold luxury theme with elegant styling.
  */
 
 import { useState, useEffect, useRef, useMemo } from 'react'
@@ -30,7 +30,7 @@ const Icons = {
   MENU: '⋯',
 }
 
-// Project Card - with folded corner effect for standalone projects
+// Project Card - with gold accent styling
 function ProjectCard({ project, onSelect, onDelete, onRename, onDuplicate }) {
   const [showMenu, setShowMenu] = useState(false)
   const menuRef = useRef(null)
@@ -65,8 +65,9 @@ function ProjectCard({ project, onSelect, onDelete, onRename, onDuplicate }) {
     <div
       className={clsx(
         'relative group cursor-pointer',
-        'bg-white rounded-xl',
-        'shadow-paper hover:shadow-paper-hover',
+        'bg-dark-800 rounded-xl',
+        'shadow-card hover:shadow-card-hover',
+        'border border-gold-rich/20 hover:border-gold-rich/40',
         'transition-all duration-300 hover:-translate-y-1',
         'min-h-[220px] flex flex-col'
       )}
@@ -78,7 +79,7 @@ function ProjectCard({ project, onSelect, onDelete, onRename, onDuplicate }) {
         <button
           className={clsx(
             'w-8 h-8 rounded-lg flex items-center justify-center',
-            'text-gray-300 hover:text-gray-500 hover:bg-gray-100',
+            'text-text-muted hover:text-gold-rich hover:bg-gold-rich/10',
             'opacity-0 group-hover:opacity-100 transition-all'
           )}
           onClick={(e) => {
@@ -90,7 +91,7 @@ function ProjectCard({ project, onSelect, onDelete, onRename, onDuplicate }) {
         </button>
         
         {showMenu && (
-          <div className="absolute right-0 top-10 bg-white rounded-xl shadow-lg border border-gray-100 min-w-[140px] py-2" style={{ zIndex: 99999 }}>
+          <div className="absolute right-0 top-10 bg-dark-800 rounded-xl shadow-lg shadow-black/50 border border-gold-rich/20 min-w-[140px] py-2" style={{ zIndex: 99999 }}>
             <button
               className="dropdown-item flex items-center gap-2 w-full"
               onClick={(e) => {
@@ -112,7 +113,7 @@ function ProjectCard({ project, onSelect, onDelete, onRename, onDuplicate }) {
               ✏️ Rename
             </button>
             <button
-              className="dropdown-item flex items-center gap-2 w-full text-red-500 hover:!bg-red-50"
+              className="dropdown-item flex items-center gap-2 w-full text-red-400 hover:!bg-red-500/10"
               onClick={(e) => {
                 e.stopPropagation()
                 onDelete(project)
@@ -127,17 +128,17 @@ function ProjectCard({ project, onSelect, onDelete, onRename, onDuplicate }) {
       
       {/* Project Content */}
       <div className="flex-1 flex items-center justify-center p-6">
-        <h3 className="text-xl font-serif font-medium text-gray-800 text-center leading-tight">
+        <h3 className="text-xl font-serif font-medium text-gold-soft text-center leading-tight">
           {project.name}
         </h3>
       </div>
       
       {/* Stats at bottom */}
-      <div className="text-center pb-4 px-4 border-t border-gray-50 pt-3">
+      <div className="text-center pb-4 px-4 border-t border-gold-rich/10 pt-3">
         <p className="text-sm text-gray-400">
           {wordCount.toLocaleString()} words
         </p>
-        <p className="text-xs text-gray-300 mt-0.5">
+        <p className="text-xs text-gray-500 mt-0.5">
           {formatTime(project.updated_at)}
         </p>
       </div>
@@ -145,16 +146,16 @@ function ProjectCard({ project, onSelect, onDelete, onRename, onDuplicate }) {
   )
 }
 
-// Folder Card - file folder shape with papers inside
+// Folder Card - elegant dark gold styling
 function FolderCard({ folder, onClick, onDelete, onRename, onDuplicateProject, onDeleteProject }) {
   const [showMenu, setShowMenu] = useState(false)
-  const [showProjectMenu, setShowProjectMenu] = useState(null) // track which project menu is open
+  const [showProjectMenu, setShowProjectMenu] = useState(null)
   const menuRef = useRef(null)
   const projectMenuRef = useRef(null)
   
   const projects = folder.projects || []
   const projectCount = projects.length
-  const papersToShow = Math.min(projectCount, 3) // Max 3 papers shown
+  const papersToShow = Math.min(projectCount, 3)
   
   const formatTime = (timestamp) => {
     if (!timestamp) return 'Just now'
@@ -196,15 +197,15 @@ function FolderCard({ folder, onClick, onDelete, onRename, onDuplicateProject, o
         {/* Folder tab */}
         <div 
           className="absolute -top-2 left-3 w-16 h-4 rounded-t-lg"
-          style={{ backgroundColor: '#f5f0eb' }}
+          style={{ backgroundColor: '#1E1E28' }}
         />
         
         {/* Folder body */}
         <div
-          className="relative rounded-xl overflow-hidden"
+          className="relative rounded-xl overflow-hidden border border-gold-rich/20 hover:border-gold-rich/40 transition-all"
           style={{ 
-            backgroundColor: '#f5f0eb',
-            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.06), 0 4px 20px rgba(0, 0, 0, 0.04)'
+            background: 'linear-gradient(145deg, #1E1E28, #16161D)',
+            boxShadow: '0 4px 20px rgba(0, 0, 0, 0.3), 0 0 1px rgba(212, 175, 55, 0.2)'
           }}
         >
           {/* Menu Button */}
@@ -212,7 +213,7 @@ function FolderCard({ folder, onClick, onDelete, onRename, onDuplicateProject, o
             <button
               className={clsx(
                 'w-8 h-8 rounded-lg flex items-center justify-center',
-                'text-gray-400 hover:text-gray-600 hover:bg-white/50',
+                'text-text-muted hover:text-gold-rich hover:bg-gold-rich/10',
                 'opacity-0 group-hover:opacity-100 transition-all'
               )}
               onClick={(e) => {
@@ -225,7 +226,7 @@ function FolderCard({ folder, onClick, onDelete, onRename, onDuplicateProject, o
             
             {showMenu && (
               <div 
-                className="absolute right-0 top-10 bg-white rounded-xl shadow-lg border border-gray-100 min-w-[140px] py-2"
+                className="absolute right-0 top-10 bg-dark-800 rounded-xl shadow-lg shadow-black/50 border border-gold-rich/20 min-w-[140px] py-2"
                 style={{ zIndex: 99999 }}
               >
                 <button
@@ -239,7 +240,7 @@ function FolderCard({ folder, onClick, onDelete, onRename, onDuplicateProject, o
                   {Icons.EDIT} Rename
                 </button>
                 <button
-                  className="dropdown-item flex items-center gap-2 w-full text-red-500 hover:!bg-red-50"
+                  className="dropdown-item flex items-center gap-2 w-full text-red-400 hover:!bg-red-500/10"
                   onClick={(e) => {
                     e.stopPropagation()
                     onDelete(folder)
@@ -254,7 +255,7 @@ function FolderCard({ folder, onClick, onDelete, onRename, onDuplicateProject, o
           
           {/* Folder Content */}
           <div className="p-4 pt-5 pb-3">
-            <h3 className="text-xl font-serif font-medium text-gray-800 leading-tight">
+            <h3 className="text-xl font-serif font-medium text-gold-soft leading-tight">
               {folder.name}
             </h3>
           </div>
@@ -265,7 +266,7 @@ function FolderCard({ folder, onClick, onDelete, onRename, onDuplicateProject, o
               {projects.slice(0, 3).map((project, index) => (
                 <div
                   key={project.id || index}
-                  className="absolute bg-white rounded-lg shadow-sm border border-gray-100 p-3 group/paper"
+                  className="absolute bg-dark-700 rounded-lg shadow-sm border border-gold-rich/10 p-3 group/paper"
                   style={{
                     width: 'calc(100% - 24px)',
                     height: '70px',
@@ -276,7 +277,7 @@ function FolderCard({ folder, onClick, onDelete, onRename, onDuplicateProject, o
                   }}
                   onClick={(e) => e.stopPropagation()}
                 >
-                  <p className="text-sm font-medium text-gray-700 truncate pr-6">
+                  <p className="text-sm font-medium text-text-secondary truncate pr-6">
                     {project.name || 'Untitled'}
                   </p>
                   
@@ -284,7 +285,7 @@ function FolderCard({ folder, onClick, onDelete, onRename, onDuplicateProject, o
                   <button
                     className={clsx(
                       'absolute top-2 right-2 w-6 h-6 rounded flex items-center justify-center',
-                      'text-gray-300 hover:text-gray-500 hover:bg-gray-100',
+                      'text-text-muted hover:text-gold-rich hover:bg-gold-rich/10',
                       'opacity-0 group-hover/paper:opacity-100 transition-all text-xs'
                     )}
                     onClick={(e) => {
@@ -298,7 +299,7 @@ function FolderCard({ folder, onClick, onDelete, onRename, onDuplicateProject, o
                   {/* Project dropdown menu */}
                   {showProjectMenu === project.id && (
                     <div 
-                      className="absolute right-0 top-8 bg-white rounded-xl shadow-lg border border-gray-100 min-w-[120px] py-2"
+                      className="absolute right-0 top-8 bg-dark-800 rounded-xl shadow-lg shadow-black/50 border border-gold-rich/20 min-w-[120px] py-2"
                       style={{ zIndex: 99999 }}
                     >
                       <button
@@ -312,7 +313,7 @@ function FolderCard({ folder, onClick, onDelete, onRename, onDuplicateProject, o
                         📋 Duplicate
                       </button>
                       <button
-                        className="dropdown-item flex items-center gap-2 w-full text-sm text-red-500 hover:!bg-red-50"
+                        className="dropdown-item flex items-center gap-2 w-full text-sm text-red-400 hover:!bg-red-500/10"
                         onClick={(e) => {
                           e.stopPropagation()
                           onDeleteProject?.(project)
@@ -331,18 +332,18 @@ function FolderCard({ folder, onClick, onDelete, onRename, onDuplicateProject, o
           {/* Empty state inside folder */}
           {papersToShow === 0 && (
             <div className="px-4 pb-4 pt-2">
-              <div className="h-16 rounded-lg border-2 border-dashed border-gray-300/50 flex items-center justify-center">
-                <span className="text-xs text-gray-400">No projects</span>
+              <div className="h-16 rounded-lg border-2 border-dashed border-gold-rich/20 flex items-center justify-center">
+                <span className="text-xs text-gray-500">No projects</span>
               </div>
             </div>
           )}
           
           {/* Stats at bottom */}
           <div className="px-4 pb-4 pt-2">
-            <p className="text-sm text-gray-500">
+            <p className="text-sm text-gray-400">
               {projectCount} project{projectCount !== 1 ? 's' : ''}
             </p>
-            <p className="text-xs text-gray-400 mt-0.5">
+            <p className="text-xs text-gray-500 mt-0.5">
               {formatTime(folder.updated_at)}
             </p>
           </div>
@@ -352,7 +353,7 @@ function FolderCard({ folder, onClick, onDelete, onRename, onDuplicateProject, o
   )
 }
 
-// Series Card - file folder shape with SERIES badge and papers inside
+// Series Card - elegant dark gold styling with SERIES badge
 function SeriesCard({ series, onClick, onDelete, onRename, onDuplicateProject, onDeleteProject }) {
   const [showMenu, setShowMenu] = useState(false)
   const [showProjectMenu, setShowProjectMenu] = useState(null)
@@ -403,15 +404,15 @@ function SeriesCard({ series, onClick, onDelete, onRename, onDuplicateProject, o
         {/* Folder tab */}
         <div 
           className="absolute -top-2 left-3 w-16 h-4 rounded-t-lg"
-          style={{ backgroundColor: '#f5f0eb' }}
+          style={{ backgroundColor: '#1E1E28' }}
         />
         
         {/* Folder body */}
         <div
-          className="relative rounded-xl overflow-hidden"
+          className="relative rounded-xl overflow-hidden border border-gold-rich/20 hover:border-gold-rich/40 transition-all"
           style={{ 
-            backgroundColor: '#f5f0eb',
-            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.06), 0 4px 20px rgba(0, 0, 0, 0.04)'
+            background: 'linear-gradient(145deg, #1E1E28, #16161D)',
+            boxShadow: '0 4px 20px rgba(0, 0, 0, 0.3), 0 0 1px rgba(212, 175, 55, 0.2)'
           }}
         >
           {/* Menu Button */}
@@ -419,7 +420,7 @@ function SeriesCard({ series, onClick, onDelete, onRename, onDuplicateProject, o
             <button
               className={clsx(
                 'w-8 h-8 rounded-lg flex items-center justify-center',
-                'text-gray-400 hover:text-gray-600 hover:bg-white/50',
+                'text-text-muted hover:text-gold-rich hover:bg-gold-rich/10',
                 'opacity-0 group-hover:opacity-100 transition-all'
               )}
               onClick={(e) => {
@@ -432,7 +433,7 @@ function SeriesCard({ series, onClick, onDelete, onRename, onDuplicateProject, o
             
             {showMenu && (
               <div 
-                className="absolute right-0 top-10 bg-white rounded-xl shadow-lg border border-gray-100 min-w-[140px] py-2"
+                className="absolute right-0 top-10 bg-dark-800 rounded-xl shadow-lg shadow-black/50 border border-gold-rich/20 min-w-[140px] py-2"
                 style={{ zIndex: 99999 }}
               >
                 <button
@@ -446,7 +447,7 @@ function SeriesCard({ series, onClick, onDelete, onRename, onDuplicateProject, o
                   {Icons.EDIT} Rename
                 </button>
                 <button
-                  className="dropdown-item flex items-center gap-2 w-full text-red-500 hover:!bg-red-50"
+                  className="dropdown-item flex items-center gap-2 w-full text-red-400 hover:!bg-red-500/10"
                   onClick={(e) => {
                     e.stopPropagation()
                     onDelete(series)
@@ -461,14 +462,14 @@ function SeriesCard({ series, onClick, onDelete, onRename, onDuplicateProject, o
           
           {/* Series Badge */}
           <div className="px-4 pt-4">
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-white/60 text-gray-600">
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-gold-rich/20 text-gold-rich border border-gold-rich/30">
               {Icons.SERIES} SERIES
             </span>
           </div>
           
           {/* Folder Content */}
           <div className="p-4 pt-2 pb-3">
-            <h3 className="text-xl font-serif font-medium text-gray-800 leading-tight">
+            <h3 className="text-xl font-serif font-medium text-gold-soft leading-tight">
               {series.name}
             </h3>
           </div>
@@ -479,7 +480,7 @@ function SeriesCard({ series, onClick, onDelete, onRename, onDuplicateProject, o
               {projects.slice(0, 3).map((project, index) => (
                 <div
                   key={project.id || index}
-                  className="absolute bg-white rounded-lg shadow-sm border border-gray-100 p-3 group/paper"
+                  className="absolute bg-dark-700 rounded-lg shadow-sm border border-gold-rich/10 p-3 group/paper"
                   style={{
                     width: 'calc(100% - 24px)',
                     height: '70px',
@@ -490,7 +491,7 @@ function SeriesCard({ series, onClick, onDelete, onRename, onDuplicateProject, o
                   }}
                   onClick={(e) => e.stopPropagation()}
                 >
-                  <p className="text-sm font-medium text-gray-700 truncate pr-6">
+                  <p className="text-sm font-medium text-text-secondary truncate pr-6">
                     {project.name || 'Untitled'}
                   </p>
                   
@@ -498,7 +499,7 @@ function SeriesCard({ series, onClick, onDelete, onRename, onDuplicateProject, o
                   <button
                     className={clsx(
                       'absolute top-2 right-2 w-6 h-6 rounded flex items-center justify-center',
-                      'text-gray-300 hover:text-gray-500 hover:bg-gray-100',
+                      'text-text-muted hover:text-gold-rich hover:bg-gold-rich/10',
                       'opacity-0 group-hover/paper:opacity-100 transition-all text-xs'
                     )}
                     onClick={(e) => {
@@ -512,7 +513,7 @@ function SeriesCard({ series, onClick, onDelete, onRename, onDuplicateProject, o
                   {/* Project dropdown menu */}
                   {showProjectMenu === project.id && (
                     <div 
-                      className="absolute right-0 top-8 bg-white rounded-xl shadow-lg border border-gray-100 min-w-[120px] py-2"
+                      className="absolute right-0 top-8 bg-dark-800 rounded-xl shadow-lg shadow-black/50 border border-gold-rich/20 min-w-[120px] py-2"
                       style={{ zIndex: 99999 }}
                     >
                       <button
@@ -526,7 +527,7 @@ function SeriesCard({ series, onClick, onDelete, onRename, onDuplicateProject, o
                         📋 Duplicate
                       </button>
                       <button
-                        className="dropdown-item flex items-center gap-2 w-full text-sm text-red-500 hover:!bg-red-50"
+                        className="dropdown-item flex items-center gap-2 w-full text-sm text-red-400 hover:!bg-red-500/10"
                         onClick={(e) => {
                           e.stopPropagation()
                           onDeleteProject?.(project)
@@ -545,18 +546,18 @@ function SeriesCard({ series, onClick, onDelete, onRename, onDuplicateProject, o
           {/* Empty state inside folder */}
           {papersToShow === 0 && (
             <div className="px-4 pb-4 pt-2">
-              <div className="h-16 rounded-lg border-2 border-dashed border-gray-300/50 flex items-center justify-center">
-                <span className="text-xs text-gray-400">No projects</span>
+              <div className="h-16 rounded-lg border-2 border-dashed border-gold-rich/20 flex items-center justify-center">
+                <span className="text-xs text-gray-500">No projects</span>
               </div>
             </div>
           )}
           
           {/* Stats at bottom */}
           <div className="px-4 pb-4 pt-2">
-            <p className="text-sm text-gray-500">
+            <p className="text-sm text-gray-400">
               {projectCount} project{projectCount !== 1 ? 's' : ''}
             </p>
-            <p className="text-xs text-gray-400 mt-0.5">
+            <p className="text-xs text-gray-500 mt-0.5">
               {formatTime(series.updated_at)}
             </p>
           </div>
@@ -566,37 +567,37 @@ function SeriesCard({ series, onClick, onDelete, onRename, onDuplicateProject, o
   )
 }
 
-// Feature Card with stacked effect
+// Feature Card with gold accent
 function FeatureCard() {
   return (
     <div className="relative">
       {/* Stacked cards behind */}
-      <div className="absolute top-2 left-2 right-2 bottom-0 bg-gray-50 rounded-xl transform rotate-2" />
-      <div className="absolute top-1 left-1 right-1 bottom-0 bg-gray-100 rounded-xl transform rotate-1" />
+      <div className="absolute top-2 left-2 right-2 bottom-0 bg-dark-700 rounded-xl transform rotate-2 border border-gold-rich/10" />
+      <div className="absolute top-1 left-1 right-1 bottom-0 bg-dark-750 rounded-xl transform rotate-1 border border-gold-rich/10" />
       
       {/* Main card */}
-      <div className="relative bg-white rounded-xl shadow-paper p-6 min-h-[200px]">
+      <div className="relative bg-dark-800 rounded-xl shadow-card border border-gold-rich/20 p-6 min-h-[200px]">
         {/* Close button */}
-        <button className="absolute top-3 right-3 text-gray-300 hover:text-gray-500 text-lg">
+        <button className="absolute top-3 right-3 text-text-muted hover:text-gold-rich text-lg">
           ×
         </button>
         
         {/* Content */}
         <div className="text-center pt-4">
-          <span className="text-xs font-semibold text-primary-500 uppercase tracking-wider">
+          <span className="text-xs font-semibold text-gold-rich uppercase tracking-wider">
             NEW
           </span>
-          <h3 className="text-lg font-serif font-semibold text-gray-800 mt-2 leading-tight">
+          <h3 className="text-lg font-serif font-semibold text-text-primary mt-2 leading-tight">
             AI-Powered
             <br />
             Writing Assistant
           </h3>
-          <p className="text-sm text-gray-500 mt-3">
+          <p className="text-sm text-text-muted mt-3">
             Let Exelsias help you write
             <br />
             your next chapter.
           </p>
-          <button className="mt-4 px-6 py-2 border border-gray-200 rounded-full text-sm text-gray-600 hover:bg-gray-50 transition-colors">
+          <button className="mt-4 px-6 py-2 border border-gold-rich/30 rounded-full text-sm text-gold-rich hover:bg-gold-rich/10 transition-colors">
             Learn More
           </button>
         </div>
@@ -624,7 +625,7 @@ function NewButtonDropdown({ onCreateProject, onCreateFolder, onCreateSeries }) 
   return (
     <div className="relative" ref={menuRef} style={{ zIndex: 9999 }}>
       <button
-        className="flex items-center gap-2 text-gray-600 hover:text-gray-900 transition-colors font-medium"
+        className="flex items-center gap-2 text-gold-rich hover:text-gold-amber transition-colors font-medium"
         onClick={() => setIsOpen(!isOpen)}
       >
         <span className="text-lg">+</span> New
@@ -632,7 +633,7 @@ function NewButtonDropdown({ onCreateProject, onCreateFolder, onCreateSeries }) 
       
       {isOpen && (
         <div 
-          className="absolute left-0 top-full mt-2 bg-white rounded-xl shadow-lg border border-gray-100 min-w-[160px] py-2"
+          className="absolute left-0 top-full mt-2 bg-dark-800 rounded-xl shadow-lg shadow-black/50 border border-gold-rich/20 min-w-[160px] py-2"
           style={{ zIndex: 99999 }}
         >
           <button
@@ -716,20 +717,20 @@ function CreateModal({ isOpen, onClose, onCreate, type = 'project' }) {
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       {/* Backdrop */}
       <div 
-        className="absolute inset-0 modal-backdrop"
+        className="absolute inset-0 bg-black/70 backdrop-blur-sm"
         onClick={onClose}
       />
       
       {/* Modal */}
-      <div className="relative z-10 w-full max-w-md mx-4 modal-content p-6 animate-slide-up">
-        <h2 className="text-xl font-semibold text-gray-800 mb-6">
+      <div className="relative z-10 w-full max-w-md mx-4 glass-card p-6 animate-slide-up">
+        <h2 className="text-xl font-semibold text-text-primary mb-6">
           {titles[type]}
         </h2>
         
         <form onSubmit={handleSubmit}>
           {/* Name */}
           <div className="mb-4">
-            <label className="block text-sm font-medium text-gray-600 mb-2">
+            <label className="block text-sm font-medium text-gold-pale mb-2">
               Name *
             </label>
             <input
@@ -745,7 +746,7 @@ function CreateModal({ isOpen, onClose, onCreate, type = 'project' }) {
           {/* Genre - only for projects */}
           {type === 'project' && (
             <div className="mb-6">
-              <label className="block text-sm font-medium text-gray-600 mb-2">
+              <label className="block text-sm font-medium text-gold-pale mb-2">
                 Genre
               </label>
               <select
@@ -806,34 +807,34 @@ function FolderView({ folder, onBack, onSelectProject, onCreateProject, onDelete
       <div className="px-8 py-6">
         <div className="max-w-5xl mx-auto">
           {/* Breadcrumb */}
-          <div className="flex items-center gap-2 text-gray-500 mb-2">
+          <div className="flex items-center gap-2 text-text-muted mb-2">
             <button 
-              className="hover:text-gray-700 transition-colors"
+              className="hover:text-gold-rich transition-colors"
               onClick={onBack}
             >
               Home
             </button>
-            <span className="text-gray-300">›</span>
-            <span className="text-gray-700">{folder.name}</span>
+            <span className="text-text-light">›</span>
+            <span className="text-gold-rich">{folder.name}</span>
           </div>
           
           {/* Folder Title */}
           <div className="flex items-start justify-between">
             <div>
-              <h1 className="text-4xl font-serif font-medium text-gray-800">
+              <h1 className="text-4xl font-serif font-medium text-gold-rich">
                 {folder.name}
               </h1>
-              <p className="text-gray-500 mt-1">
+              <p className="text-text-muted mt-1">
                 {projects.length} project{projects.length !== 1 ? 's' : ''} • Last edited {formatTime(folder.updated_at)}
               </p>
             </div>
             
             <div className="flex items-center gap-2">
-              <button className="w-8 h-8 rounded-lg flex items-center justify-center text-gray-400 hover:text-gray-600 hover:bg-gray-100">
+              <button className="w-8 h-8 rounded-lg flex items-center justify-center text-text-muted hover:text-gold-rich hover:bg-gold-rich/10">
                 {Icons.MENU}
               </button>
               <button 
-                className="w-8 h-8 rounded-lg flex items-center justify-center text-gray-400 hover:text-gray-600 hover:bg-gray-100"
+                className="w-8 h-8 rounded-lg flex items-center justify-center text-text-muted hover:text-gold-rich hover:bg-gold-rich/10"
                 onClick={onBack}
               >
                 {Icons.CLOSE}
@@ -862,9 +863,9 @@ function FolderView({ folder, onBack, onSelectProject, onCreateProject, onDelete
             <button
               className={clsx(
                 'min-h-[180px] rounded-xl',
-                'border-2 border-dashed border-gray-200',
+                'border-2 border-dashed border-gold-rich/30',
                 'flex flex-col items-center justify-center',
-                'text-gray-400 hover:text-gray-600 hover:border-gray-300',
+                'text-text-muted hover:text-gold-rich hover:border-gold-rich/50',
                 'transition-all duration-200'
               )}
               onClick={onCreateProject}
@@ -878,8 +879,8 @@ function FolderView({ folder, onBack, onSelectProject, onCreateProject, onDelete
           {projects.length === 0 && (
             <div className="text-center py-12">
               <div className="text-5xl mb-4 opacity-50">📁</div>
-              <p className="text-gray-500">This folder is empty</p>
-              <p className="text-gray-400 text-sm mt-1">Create a project to get started</p>
+              <p className="text-text-muted">This folder is empty</p>
+              <p className="text-text-light text-sm mt-1">Create a project to get started</p>
             </div>
           )}
         </div>
@@ -894,10 +895,10 @@ function StorageModeIndicator({ mode }) {
   return (
     <div
       className={clsx(
-        'flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium',
+        'flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium border',
         isLocal 
-          ? 'bg-amber-50 text-amber-600 border border-amber-200'
-          : 'bg-green-50 text-green-600 border border-green-200'
+          ? 'bg-amber-500/10 text-amber-400 border-amber-500/30'
+          : 'bg-green-500/10 text-green-400 border-green-500/30'
       )}
       title={isLocal 
         ? 'Running in offline mode. Data is saved locally in your browser.' 
@@ -1313,7 +1314,7 @@ function Dashboard() {
             />
             
             <div className="flex items-center gap-2">
-              <span className="text-2xl font-serif tracking-tight text-gray-800">
+              <span className="text-2xl font-serif tracking-tight gold-gradient-text">
                 exel<span className="relative top-[1px]">s</span>ias
               </span>
             </div>
@@ -1368,7 +1369,7 @@ function Dashboard() {
             />
             
             <div className="flex items-center gap-2">
-              <span className="text-2xl font-serif tracking-tight text-gray-800">
+              <span className="text-2xl font-serif tracking-tight gold-gradient-text">
                 exel<span className="relative top-[1px]">s</span>ias
               </span>
             </div>
@@ -1403,7 +1404,7 @@ function Dashboard() {
   // Main Dashboard View
   return (
     <div className="h-full flex flex-col">
-      {/* Header - Minimal like Sudowrite */}
+      {/* Header - Elegant dark gold */}
       <header className="px-8 py-4 glass relative" style={{ zIndex: 100000 }}>
         <div className="max-w-6xl mx-auto flex items-center justify-between">
           {/* Left side - New & Import */}
@@ -1424,7 +1425,7 @@ function Dashboard() {
             />
             
             <button
-              className="flex items-center gap-2 text-gray-600 hover:text-gray-900 transition-colors font-medium"
+              className="flex items-center gap-2 text-text-secondary hover:text-gold-rich transition-colors font-medium"
               onClick={() => setShowImportModal(true)}
             >
               <span className="text-sm">↓</span> Import Novel
@@ -1433,7 +1434,7 @@ function Dashboard() {
           
           {/* Center - Logo */}
           <div className="flex items-center gap-2">
-            <span className="text-2xl font-serif tracking-tight text-gray-800">
+            <span className="text-2xl font-serif tracking-tight gold-gradient-text">
               exel<span className="relative top-[1px]">s</span>ias
             </span>
           </div>
@@ -1453,13 +1454,13 @@ function Dashboard() {
             <div className="flex items-center justify-center h-64">
               <div className="text-center">
                 <div className="spinner mx-auto mb-4" />
-                <p className="text-gray-500">Loading projects...</p>
+                <p className="text-gray-400">Loading projects...</p>
               </div>
             </div>
           ) : (
             /* Project Grid */
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-              {/* Standalone Projects (with folded corner) */}
+              {/* Standalone Projects */}
               {standaloneProjects.map(project => (
                 <ProjectCard
                   key={project.id}
@@ -1507,13 +1508,13 @@ function Dashboard() {
           {/* Empty State */}
           {!isLoading && standaloneProjects.length === 0 && folders.length === 0 && series.length === 0 && (
             <div className="text-center py-16">
-              <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-white shadow-paper mb-6">
+              <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-dark-700 shadow-gold border border-gold-rich/30 mb-6">
                 <span className="text-4xl">📚</span>
               </div>
-              <h3 className="text-xl font-serif font-semibold text-gray-800 mb-2">
+              <h3 className="text-xl font-serif font-semibold text-gold-rich mb-2">
                 No projects yet
               </h3>
-              <p className="text-gray-500 mb-6 max-w-md mx-auto">
+              <p className="text-text-muted mb-6 max-w-md mx-auto">
                 Create your first project to start writing your story with AI assistance.
               </p>
               <div className="flex items-center justify-center gap-4">

@@ -2,7 +2,7 @@
  * Toolbar Component
  * =================
  * Main application toolbar with AI writing tools and status indicators.
- * Paper-light theme styling.
+ * Dark & Gold luxury theme styling.
  */
 
 import { useState, useRef, useEffect } from 'react'
@@ -48,11 +48,11 @@ function ToolbarButton({ icon, label, tooltip, hasMenu, onClick, children, close
       <button
         className={clsx(
           'px-4 py-2 rounded-lg flex items-center gap-2',
-          'bg-white border border-gray-200',
-          'text-gray-600 text-sm font-medium',
-          'hover:bg-primary-50 hover:border-primary-300 hover:text-primary-600',
-          'transition-all duration-200 shadow-sm',
-          isOpen && 'bg-primary-50 border-primary-300 text-primary-600'
+          'bg-dark-700 border border-gold-rich/20',
+          'text-text-secondary text-sm font-medium',
+          'hover:bg-gold-rich/10 hover:border-gold-rich/40 hover:text-gold-rich',
+          'transition-all duration-200',
+          isOpen && 'bg-gold-rich/10 border-gold-rich/40 text-gold-rich'
         )}
         onClick={() => hasMenu ? setIsOpen(!isOpen) : onClick?.()}
         title={tooltip}
@@ -97,10 +97,10 @@ function DescribeSplitButton({ icon, label, tooltip, onDescribe, children, activ
         <button
           className={clsx(
             'px-4 py-2 rounded-l-lg flex items-center gap-2',
-            'bg-white border border-gray-200 border-r-0',
-            'text-gray-600 text-sm font-medium',
-            'hover:bg-primary-50 hover:border-primary-300 hover:text-primary-600',
-            'transition-all duration-200 shadow-sm'
+            'bg-dark-700 border border-gold-rich/20 border-r-0',
+            'text-text-secondary text-sm font-medium',
+            'hover:bg-gold-rich/10 hover:border-gold-rich/40 hover:text-gold-rich',
+            'transition-all duration-200'
           )}
           onClick={onDescribe}
           title={tooltip}
@@ -108,7 +108,7 @@ function DescribeSplitButton({ icon, label, tooltip, onDescribe, children, activ
           <span>{icon}</span>
           <span>{label}</span>
           {activeCount > 0 && (
-            <span className="ml-1 px-1.5 py-0.5 text-xs bg-primary-500 text-white rounded-full">
+            <span className="ml-1 px-1.5 py-0.5 text-xs bg-gold-rich text-dark-950 rounded-full font-semibold">
               {activeCount}
             </span>
           )}
@@ -118,11 +118,11 @@ function DescribeSplitButton({ icon, label, tooltip, onDescribe, children, activ
         <button
           className={clsx(
             'px-2 py-2 rounded-r-lg flex items-center',
-            'bg-white border border-gray-200',
-            'text-gray-600 text-sm',
-            'hover:bg-primary-50 hover:border-primary-300 hover:text-primary-600',
-            'transition-all duration-200 shadow-sm',
-            isOpen && 'bg-primary-50 border-primary-300 text-primary-600'
+            'bg-dark-700 border border-gold-rich/20',
+            'text-text-secondary text-sm',
+            'hover:bg-gold-rich/10 hover:border-gold-rich/40 hover:text-gold-rich',
+            'transition-all duration-200',
+            isOpen && 'bg-gold-rich/10 border-gold-rich/40 text-gold-rich'
           )}
           onClick={() => setIsOpen(!isOpen)}
           title="Select senses to describe"
@@ -148,7 +148,7 @@ function MenuItem({ icon, label, onClick, checkbox, checked, onCheck }) {
           type="checkbox"
           checked={checked}
           onChange={(e) => onCheck?.(e.target.checked)}
-          className="w-4 h-4 rounded border-gray-300 accent-primary-500"
+          className="w-4 h-4 rounded border-gold-rich/30 accent-gold-rich bg-dark-700"
         />
         {icon && <span>{icon}</span>}
         <span>{label}</span>
@@ -489,7 +489,7 @@ ${selectedText}
       <div className="flex items-center gap-3 no-drag">
         {/* Back to Dashboard */}
         <button
-          className="flex items-center gap-2 px-3 py-2 rounded-lg text-gray-500 hover:bg-gray-100 hover:text-gray-700 transition-colors"
+          className="flex items-center gap-2 px-3 py-2 rounded-lg text-text-muted hover:bg-gold-rich/10 hover:text-gold-rich transition-colors"
           onClick={handleBackToDashboard}
           title="Back to Projects"
         >
@@ -498,13 +498,13 @@ ${selectedText}
         </button>
         
         {/* Separator */}
-        <div className="w-px h-6 bg-gray-200" />
+        <div className="w-px h-6 bg-gold-rich/20" />
         
         {/* Current Project Name */}
         {currentProject && (
           <div className="flex items-center gap-2">
             <span className="text-lg">📖</span>
-            <span className="text-sm font-medium text-gray-700 max-w-[150px] truncate">
+            <span className="text-sm font-medium text-gold-pale max-w-[150px] truncate">
               {currentProject.name}
             </span>
           </div>
@@ -512,7 +512,7 @@ ${selectedText}
         
         {/* Toggle Sidebar */}
         <button
-          className="w-8 h-8 flex items-center justify-center rounded-lg text-gray-500 hover:bg-gray-100 hover:text-gray-700 transition-colors"
+          className="w-8 h-8 flex items-center justify-center rounded-lg text-text-muted hover:bg-gold-rich/10 hover:text-gold-rich transition-colors"
           onClick={toggleSidebar}
           title="Toggle Sidebar"
         >
@@ -556,7 +556,7 @@ ${selectedText}
           onDescribe={handleDescribe}
           activeSenses={activeSenses}
         >
-          <div className="px-3 py-2 text-xs text-gray-500 font-medium border-b border-gray-100">
+          <div className="px-3 py-2 text-xs text-text-muted font-medium border-b border-gold-rich/10">
             Select senses to describe:
           </div>
           <MenuItem
@@ -613,7 +613,7 @@ ${selectedText}
           <MenuItem icon="🎬" label="Visualize" onClick={() => {}} />
           <MenuItem icon="🔀" label="Twist" onClick={() => {}} />
           <MenuItem icon="📜" label="Poem" onClick={() => {}} />
-          <hr className="my-2 border-gray-200" />
+          <hr className="my-2 border-gold-rich/10" />
           <MenuItem icon={Icons.EXPORT} label="Export" onClick={() => {}} />
           <MenuItem icon={Icons.SETTINGS} label="Settings" onClick={() => {}} />
         </ToolbarButton>
@@ -626,7 +626,7 @@ ${selectedText}
           {/* Voice Selector */}
           {ttsVoices.length > 0 && (
             <select
-              className="px-2 py-1.5 rounded-l-lg bg-white text-gray-600 text-sm border border-gray-200 focus:outline-none focus:ring-1 focus:ring-primary-500 cursor-pointer max-w-[100px]"
+              className="px-2 py-1.5 rounded-l-lg bg-dark-700 text-text-secondary text-sm border border-gold-rich/20 focus:outline-none focus:ring-1 focus:ring-gold-rich cursor-pointer max-w-[100px]"
               value={selectedVoice}
               onChange={(e) => setSelectedVoice(e.target.value)}
               title="Select Voice"
@@ -644,8 +644,8 @@ ${selectedText}
               'transition-all duration-200',
               ttsVoices.length > 0 ? 'rounded-r-lg' : 'rounded-lg',
               isTtsPlaying
-                ? 'bg-primary-500 text-white'
-                : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
+                ? 'bg-gold-rich text-dark-950'
+                : 'bg-dark-700 text-text-secondary border border-gold-rich/20 hover:bg-gold-rich/10 hover:text-gold-rich'
             )}
             onClick={handleTts}
             title={isTtsPlaying ? 'Stop Reading' : 'Read Aloud'}
@@ -656,7 +656,7 @@ ${selectedText}
         </div>
         
         {/* Word Count */}
-        <div className="px-3 py-1.5 rounded-lg bg-white/80 text-gray-500 text-sm border border-gray-200">
+        <div className="px-3 py-1.5 rounded-lg bg-dark-700/80 text-text-muted text-sm border border-gold-rich/20">
           {wordCount.toLocaleString()} words
         </div>
         
@@ -664,8 +664,8 @@ ${selectedText}
         <div className={clsx(
           'px-3 py-1.5 rounded-lg text-sm border',
           isEditorDirty
-            ? 'bg-amber-50 text-amber-600 border-amber-200'
-            : 'bg-green-50 text-green-600 border-green-200'
+            ? 'bg-amber-500/10 text-amber-400 border-amber-500/30'
+            : 'bg-green-500/10 text-green-400 border-green-500/30'
         )}>
           {isEditorDirty ? 'Unsaved' : '✓ Saved'}
         </div>
@@ -683,7 +683,7 @@ ${selectedText}
           <span className={clsx(
             'w-2 h-2 rounded-full',
             aiStatus === 'ready' && 'bg-green-400',
-            aiStatus === 'loading' && 'bg-amber-400 animate-pulse',
+            aiStatus === 'loading' && 'bg-gold-rich animate-pulse',
             aiStatus === 'error' && 'bg-red-400'
           )} />
           <span>
@@ -699,7 +699,7 @@ ${selectedText}
         
         {/* Toggle Assistant */}
         <button
-          className="w-10 h-10 flex items-center justify-center rounded-lg text-gray-500 hover:bg-gray-100 hover:text-gray-700 transition-colors"
+          className="w-10 h-10 flex items-center justify-center rounded-lg text-text-muted hover:bg-gold-rich/10 hover:text-gold-rich transition-colors"
           onClick={toggleAssistant}
           title="Toggle Assistant Panel"
         >

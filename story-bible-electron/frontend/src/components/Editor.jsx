@@ -2,7 +2,7 @@
  * Editor Component
  * ================
  * Rich text editor with TipTap and formatting toolbar.
- * Paper-light theme styling.
+ * Dark & Gold luxury theme styling.
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react'
@@ -83,7 +83,7 @@ function FormattingToolbar({ editor }) {
         disabled={!editor.can().redo()}
       />
       
-      <div className="w-px h-6 bg-gray-200 mx-2" />
+      <div className="w-px h-6 bg-gold-rich/20 mx-2" />
       
       <FormatButton
         icon={Icons.BOLD}
@@ -110,7 +110,7 @@ function FormattingToolbar({ editor }) {
         onClick={() => editor.chain().focus().toggleStrike().run()}
       />
       
-      <div className="w-px h-6 bg-gray-200 mx-2" />
+      <div className="w-px h-6 bg-gold-rich/20 mx-2" />
       
       <FormatButton
         icon={Icons.BULLET}
@@ -125,7 +125,7 @@ function FormattingToolbar({ editor }) {
         onClick={() => editor.chain().focus().toggleOrderedList().run()}
       />
       
-      <div className="w-px h-6 bg-gray-200 mx-2" />
+      <div className="w-px h-6 bg-gold-rich/20 mx-2" />
       
       <FormatButton
         icon={Icons.H1}
@@ -197,19 +197,19 @@ function GenerateOpeningsModal({ isOpen, onClose, onGenerate, isGenerating }) {
   
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
-      <div className="absolute inset-0 modal-backdrop" onClick={!isGenerating ? onClose : undefined} />
+      <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={!isGenerating ? onClose : undefined} />
       
-      <div className="relative z-10 w-full max-w-2xl mx-4 modal-content p-6 animate-slide-up max-h-[90vh] overflow-y-auto">
+      <div className="relative z-10 w-full max-w-2xl mx-4 glass-card p-6 animate-slide-up max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">
             <span className="text-3xl">{Icons.SPARKLE}</span>
             <div>
-              <h2 className="text-xl font-bold text-gray-800">Generate 3 Openings</h2>
-              <p className="text-sm text-gray-500">Describe what you want and AI will create 3 different opening options</p>
+              <h2 className="text-xl font-bold text-gray-100">Generate 3 Openings</h2>
+              <p className="text-sm text-gray-400">Describe what you want and AI will create 3 different opening options</p>
             </div>
           </div>
           {!isGenerating && (
-            <button className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors" onClick={onClose}>
+            <button className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gold-rich/10 text-gray-400 hover:text-gold-rich transition-colors" onClick={onClose}>
               {Icons.CLOSE}
             </button>
           )}
@@ -217,7 +217,7 @@ function GenerateOpeningsModal({ isOpen, onClose, onGenerate, isGenerating }) {
         
         <div className="space-y-4 mb-6">
           <div>
-            <label className="block text-sm font-medium text-gray-600 mb-1">Opening Style</label>
+            <label className="block text-sm font-medium text-gold-pale mb-1">Opening Style</label>
             <select
               className="input"
               value={formData.style}
@@ -229,7 +229,7 @@ function GenerateOpeningsModal({ isOpen, onClose, onGenerate, isGenerating }) {
           </div>
           
           <div>
-            <label className="block text-sm font-medium text-gray-600 mb-1">Mood / Atmosphere</label>
+            <label className="block text-sm font-medium text-gold-pale mb-1">Mood / Atmosphere</label>
             <input
               type="text"
               className="input"
@@ -241,7 +241,7 @@ function GenerateOpeningsModal({ isOpen, onClose, onGenerate, isGenerating }) {
           </div>
           
           <div>
-            <label className="block text-sm font-medium text-gray-600 mb-1">Setting / Location</label>
+            <label className="block text-sm font-medium text-gold-pale mb-1">Setting / Location</label>
             <input
               type="text"
               className="input"
@@ -253,7 +253,7 @@ function GenerateOpeningsModal({ isOpen, onClose, onGenerate, isGenerating }) {
           </div>
           
           <div>
-            <label className="block text-sm font-medium text-gray-600 mb-1">Character(s)</label>
+            <label className="block text-sm font-medium text-gold-pale mb-1">Character(s)</label>
             <input
               type="text"
               className="input"
@@ -265,7 +265,7 @@ function GenerateOpeningsModal({ isOpen, onClose, onGenerate, isGenerating }) {
           </div>
           
           <div>
-            <label className="block text-sm font-medium text-gray-600 mb-1">Hook / What's Happening</label>
+            <label className="block text-sm font-medium text-gold-pale mb-1">Hook / What's Happening</label>
             <textarea
               className="input-textarea min-h-[80px]"
               placeholder="e.g., they discover a hidden letter, a stranger arrives with bad news, something goes wrong..."
@@ -277,12 +277,12 @@ function GenerateOpeningsModal({ isOpen, onClose, onGenerate, isGenerating }) {
         </div>
         
         <div className="mb-6">
-          <p className="text-sm font-medium text-gray-600 mb-2">Quick Examples:</p>
+          <p className="text-sm font-medium text-gold-pale mb-2">Quick Examples:</p>
           <div className="flex flex-wrap gap-2">
             {examplePrompts.map((ex, i) => (
               <button
                 key={i}
-                className="px-3 py-1.5 text-xs rounded-lg bg-gray-100 text-gray-500 hover:bg-primary-50 hover:text-primary-600 transition-colors"
+                className="px-3 py-1.5 text-xs rounded-lg bg-dark-700 text-gray-400 hover:bg-gold-rich/10 hover:text-gold-rich border border-gold-rich/20 transition-colors"
                 onClick={() => applyExample(ex)}
                 disabled={isGenerating}
               >
@@ -308,12 +308,12 @@ function GenerateOpeningsModal({ isOpen, onClose, onGenerate, isGenerating }) {
         </div>
         
         {isGenerating && (
-          <div className="mt-6 p-4 rounded-lg bg-primary-50 border border-primary-200">
+          <div className="mt-6 p-4 rounded-lg bg-gold-rich/10 border border-gold-rich/30">
             <div className="flex items-center gap-3">
               <div className="spinner !w-6 !h-6" />
               <div>
-                <p className="text-primary-600 font-medium">Creating your openings...</p>
-                <p className="text-sm text-gray-500">AI is crafting 3 different ways to start your story.</p>
+                <p className="text-gold-rich font-medium">Creating your openings...</p>
+                <p className="text-sm text-gray-400">AI is crafting 3 different ways to start your story.</p>
               </div>
             </div>
           </div>
@@ -357,15 +357,15 @@ function GenerateDraftModal({ isOpen, onClose, onGenerate, isGenerating, hasExis
   
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
-      <div className="absolute inset-0 modal-backdrop" onClick={!isGenerating ? onClose : undefined} />
+      <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={!isGenerating ? onClose : undefined} />
       
-      <div className="relative z-10 w-full max-w-2xl mx-4 modal-content p-6 animate-slide-up max-h-[90vh] overflow-y-auto">
+      <div className="relative z-10 w-full max-w-2xl mx-4 glass-card p-6 animate-slide-up max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">
             <span className="text-3xl">{Icons.MAGIC}</span>
             <div>
-              <h2 className="text-xl font-bold text-gray-800">Generate Draft</h2>
-              <p className="text-sm text-gray-500">
+              <h2 className="text-xl font-bold text-gray-100">Generate Draft</h2>
+              <p className="text-sm text-gray-400">
                 {hasExistingContent 
                   ? 'Tell AI what to write next in your story' 
                   : 'Describe what you want AI to write for you'}
@@ -373,7 +373,7 @@ function GenerateDraftModal({ isOpen, onClose, onGenerate, isGenerating, hasExis
             </div>
           </div>
           {!isGenerating && (
-            <button className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors" onClick={onClose}>
+            <button className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gold-rich/10 text-gray-400 hover:text-gold-rich transition-colors" onClick={onClose}>
               {Icons.CLOSE}
             </button>
           )}
@@ -381,8 +381,8 @@ function GenerateDraftModal({ isOpen, onClose, onGenerate, isGenerating, hasExis
         
         <div className="space-y-4 mb-6">
           <div>
-            <label className="block text-sm font-medium text-gray-600 mb-1">
-              What should happen in this section? <span className="text-red-500">*</span>
+            <label className="block text-sm font-medium text-gold-pale mb-1">
+              What should happen in this section? <span className="text-red-400">*</span>
             </label>
             <textarea
               className="input-textarea min-h-[100px]"
@@ -396,7 +396,7 @@ function GenerateDraftModal({ isOpen, onClose, onGenerate, isGenerating, hasExis
           </div>
           
           <div>
-            <label className="block text-sm font-medium text-gray-600 mb-1">
+            <label className="block text-sm font-medium text-gold-pale mb-1">
               Characters in this scene
             </label>
             <input
@@ -410,7 +410,7 @@ function GenerateDraftModal({ isOpen, onClose, onGenerate, isGenerating, hasExis
           </div>
           
           <div>
-            <label className="block text-sm font-medium text-gray-600 mb-1">
+            <label className="block text-sm font-medium text-gold-pale mb-1">
               Key events or plot points to include
             </label>
             <textarea
@@ -424,7 +424,7 @@ function GenerateDraftModal({ isOpen, onClose, onGenerate, isGenerating, hasExis
           
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-600 mb-1">
+              <label className="block text-sm font-medium text-gold-pale mb-1">
                 Emotional tone
               </label>
               <input
@@ -438,7 +438,7 @@ function GenerateDraftModal({ isOpen, onClose, onGenerate, isGenerating, hasExis
             </div>
             
             <div>
-              <label className="block text-sm font-medium text-gray-600 mb-1">
+              <label className="block text-sm font-medium text-gold-pale mb-1">
                 Length
               </label>
               <select
@@ -453,9 +453,9 @@ function GenerateDraftModal({ isOpen, onClose, onGenerate, isGenerating, hasExis
           </div>
         </div>
         
-        <div className="mb-6 p-3 rounded-lg bg-primary-50 border border-primary-200">
-          <p className="text-sm text-gray-600">
-            <span className="text-primary-600 font-medium">💡 Tip:</span> The more specific you are, the better the result. 
+        <div className="mb-6 p-3 rounded-lg bg-gold-rich/10 border border-gold-rich/30">
+          <p className="text-sm text-gray-300">
+            <span className="text-gold-rich font-medium">💡 Tip:</span> The more specific you are, the better the result. 
             {hasExistingContent && " AI will read your existing content and continue naturally from where you left off."}
           </p>
         </div>
@@ -476,12 +476,12 @@ function GenerateDraftModal({ isOpen, onClose, onGenerate, isGenerating, hasExis
         </div>
         
         {isGenerating && (
-          <div className="mt-6 p-4 rounded-lg bg-primary-50 border border-primary-200">
+          <div className="mt-6 p-4 rounded-lg bg-gold-rich/10 border border-gold-rich/30">
             <div className="flex items-center gap-3">
               <div className="spinner !w-6 !h-6" />
               <div>
-                <p className="text-primary-600 font-medium">Writing your draft...</p>
-                <p className="text-sm text-gray-500">AI is crafting your story. This may take 20-40 seconds.</p>
+                <p className="text-gold-rich font-medium">Writing your draft...</p>
+                <p className="text-sm text-gray-400">AI is crafting your story. This may take 20-40 seconds.</p>
               </div>
             </div>
           </div>
@@ -859,11 +859,11 @@ function Editor() {
       {/* Document Header */}
       <div className="flex items-center justify-between mb-4">
         <div>
-          <h1 className="text-2xl font-serif font-semibold text-gray-800">
+          <h1 className="text-2xl font-serif font-semibold text-gold-pale">
             {currentChapterId ? 'Chapter Editor' : 'Welcome to Exelsias'}
           </h1>
           {!currentChapterId && (
-            <p className="text-gray-500 mt-1">
+            <p className="text-gray-400 mt-1">
               Select a chapter from the sidebar to start writing
             </p>
           )}
@@ -871,7 +871,7 @@ function Editor() {
         
         {currentChapterId && (
           <button
-            className="px-3 py-1.5 rounded-lg bg-white text-gray-400 hover:bg-gray-100 text-sm border border-gray-200"
+            className="px-3 py-1.5 rounded-lg bg-dark-700 text-gray-400 hover:bg-gold-rich/10 hover:text-gold-rich text-sm border border-gold-rich/20"
             title="Document Options"
           >
             ⋯
@@ -892,10 +892,10 @@ function Editor() {
           <div className="h-full flex items-center justify-center paper-card">
             <div className="text-center max-w-md">
               <div className="text-6xl mb-6">📖</div>
-              <h2 className="text-xl font-serif font-semibold text-gray-800 mb-2">
+              <h2 className="text-xl font-serif font-semibold text-gray-100 mb-2">
                 No Chapter Selected
               </h2>
-              <p className="text-gray-500 mb-6">
+              <p className="text-gray-400 mb-6">
                 Create a new project or select an existing chapter from the sidebar to begin writing your story.
               </p>
               <button className="btn btn-primary">
@@ -918,9 +918,9 @@ function Editor() {
       
       {/* AI Generating Indicator */}
       {isAiGenerating && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 px-4 py-2 rounded-full bg-primary-500 text-white shadow-lg flex items-center gap-2 animate-pulse">
-          <div className="spinner !w-4 !h-4 !border-white/30 !border-t-white" />
-          <span>AI is writing...</span>
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 px-4 py-2 rounded-full bg-gold-rich text-dark-950 shadow-lg flex items-center gap-2 animate-pulse">
+          <div className="spinner !w-4 !h-4 !border-dark-950/30 !border-t-dark-950" />
+          <span className="font-medium">AI is writing...</span>
         </div>
       )}
       

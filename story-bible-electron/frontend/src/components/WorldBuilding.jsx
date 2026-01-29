@@ -2,6 +2,7 @@
  * World Building Component
  * ========================
  * Manages world building elements with Sudowrite-style expandable list.
+ * Dark & Gold luxury theme
  */
 
 import { useState, useEffect, useRef } from 'react'
@@ -100,14 +101,14 @@ function EditableField({ label, value, onChange, onSave, onRewrite, placeholder,
       className={clsx(
         "rounded-xl p-4 border transition-all",
         isFocused || showRewriteInput
-          ? "bg-purple-50/50 border-purple-200"
-          : "bg-gray-50 border-gray-100"
+          ? "bg-dark-700/50 border-gold-rich/40"
+          : "bg-dark-800/50 border-gold-rich/10"
       )}
     >
       <div className="flex items-center justify-between mb-2">
-        <label className="text-sm font-medium text-gray-600">{label}</label>
+        <label className="text-sm font-medium text-gold-pale">{label}</label>
         <button
-          className="w-6 h-6 flex items-center justify-center rounded text-gray-400 hover:text-gray-600 hover:bg-gray-200 transition-colors"
+          className="w-6 h-6 flex items-center justify-center rounded text-gray-500 hover:text-gold-rich hover:bg-gold-rich/10 transition-colors"
           title="More options"
         >
           {Icons.MORE}
@@ -118,7 +119,7 @@ function EditableField({ label, value, onChange, onSave, onRewrite, placeholder,
         <textarea
           ref={textareaRef}
           className={clsx(
-            "w-full px-3 py-3 text-sm bg-white border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent min-h-[80px] resize-none transition-all overflow-hidden",
+            "w-full px-3 py-3 text-sm bg-dark-750 border border-gold-rich/20 rounded-lg text-gray-200 placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-gold-rich/30 focus:border-gold-rich/40 min-h-[80px] resize-none transition-all overflow-hidden",
             isRewriting ? "opacity-50" : ""
           )}
           value={value || ''}
@@ -132,16 +133,16 @@ function EditableField({ label, value, onChange, onSave, onRewrite, placeholder,
         />
         
         <button
-          className="absolute top-3 right-3 w-6 h-6 flex items-center justify-center rounded text-gray-400 hover:text-gray-600 transition-colors"
+          className="absolute top-3 right-3 w-6 h-6 flex items-center justify-center rounded text-gray-500 hover:text-gold-rich transition-colors"
           title="Toggle visibility"
         >
           {Icons.VISIBLE}
         </button>
         
         {isRewriting && (
-          <div className="absolute inset-0 flex items-center justify-center bg-white/80 rounded-lg">
-            <div className="flex items-center gap-2 text-primary-600">
-              <div className="w-5 h-5 border-2 border-primary-200 border-t-primary-600 rounded-full animate-spin" />
+          <div className="absolute inset-0 flex items-center justify-center bg-dark-800/80 rounded-lg">
+            <div className="flex items-center gap-2 text-gold-rich">
+              <div className="w-5 h-5 border-2 border-gold-rich/20 border-t-gold-rich rounded-full animate-spin" />
               <span className="text-sm font-medium">Rewriting...</span>
             </div>
           </div>
@@ -151,7 +152,7 @@ function EditableField({ label, value, onChange, onSave, onRewrite, placeholder,
       {/* Rewrite Button - Shows when focused */}
       {isFocused && !showRewriteInput && !isRewriting && (
         <button
-          className="mt-3 flex items-center gap-1.5 text-sm text-primary-600 hover:text-primary-700 font-medium transition-colors"
+          className="mt-3 flex items-center gap-1.5 text-sm text-gold-rich hover:text-gold-amber font-medium transition-colors"
           onClick={() => setShowRewriteInput(true)}
         >
           <span className="text-base">✨</span>
@@ -163,12 +164,12 @@ function EditableField({ label, value, onChange, onSave, onRewrite, placeholder,
       {showRewriteInput && !isRewriting && (
         <div className="mt-3">
           {!value?.trim() && (
-            <p className="text-xs text-amber-600 mb-2">Please add some content first before rewriting</p>
+            <p className="text-xs text-amber-400 mb-2">Please add some content first before rewriting</p>
           )}
           <div className="flex items-center gap-2">
             <input
               type="text"
-              className="flex-1 px-3 py-2.5 text-sm bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+              className="flex-1 px-3 py-2.5 text-sm bg-dark-750 border border-gold-rich/20 rounded-lg text-gray-200 placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-gold-rich/30 focus:border-gold-rich/40"
               placeholder={`Tell AI how to rewrite "${label}"...`}
               value={rewriteInstruction}
               onChange={(e) => setRewriteInstruction(e.target.value)}
@@ -179,8 +180,8 @@ function EditableField({ label, value, onChange, onSave, onRewrite, placeholder,
               className={clsx(
                 'px-4 py-2.5 rounded-lg text-sm font-medium flex items-center gap-2 transition-all min-w-[90px] justify-center',
                 rewriteInstruction.trim() && value?.trim()
-                  ? 'bg-primary-600 text-white hover:bg-primary-700 shadow-sm'
-                  : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                  ? 'bg-gradient-to-r from-gold-rich to-gold-deep text-dark-950 hover:from-gold-amber hover:to-gold-rich'
+                  : 'bg-dark-600 text-gray-500 cursor-not-allowed'
               )}
               onClick={handleRewrite}
               disabled={!rewriteInstruction.trim() || !value?.trim() || isRewriting}
@@ -191,7 +192,7 @@ function EditableField({ label, value, onChange, onSave, onRewrite, placeholder,
             </button>
           </div>
           <button
-            className="mt-2 text-xs text-gray-400 hover:text-gray-600 transition-colors"
+            className="mt-2 text-xs text-gray-500 hover:text-gray-300 transition-colors"
             onClick={() => {
               setShowRewriteInput(false)
               setRewriteInstruction('')
@@ -267,15 +268,15 @@ function WorldElementRow({ element, onToggleVisibility, onDuplicate, onDelete, o
   }
   
   return (
-    <div className="bg-white rounded-xl border border-gray-100 shadow-sm mb-3 overflow-hidden">
+    <div className="bg-dark-800 rounded-xl border border-gold-rich/10 shadow-sm mb-3 overflow-hidden">
       {/* Main Row */}
-      <div className="flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-colors group">
+      <div className="flex items-center gap-3 px-4 py-3 hover:bg-dark-750 transition-colors group">
         {/* Drag Handle */}
-        <span className="text-gray-300 cursor-grab text-sm">{Icons.DRAG}</span>
+        <span className="text-gray-600 cursor-grab text-sm">{Icons.DRAG}</span>
         
         {/* Expand Arrow */}
         <button
-          className="w-5 h-5 flex items-center justify-center text-gray-400 hover:text-gray-600 transition-colors"
+          className="w-5 h-5 flex items-center justify-center text-gray-500 hover:text-gold-rich transition-colors"
           onClick={() => setIsExpanded(!isExpanded)}
         >
           {isExpanded ? Icons.COLLAPSE : Icons.EXPAND}
@@ -284,7 +285,7 @@ function WorldElementRow({ element, onToggleVisibility, onDuplicate, onDelete, o
         {/* Element Name - Editable */}
         <input
           type="text"
-          className="flex-1 font-medium text-gray-800 bg-transparent border-none focus:outline-none focus:ring-0 hover:bg-gray-100 focus:bg-white px-2 py-1 rounded"
+          className="flex-1 font-medium text-gold-soft bg-transparent border-none focus:outline-none focus:ring-0 hover:bg-dark-700 focus:bg-dark-700 px-2 py-1 rounded"
           value={editData.name || ''}
           onChange={(e) => handleChange('name', e.target.value)}
           onBlur={handleNameBlur}
@@ -294,7 +295,7 @@ function WorldElementRow({ element, onToggleVisibility, onDuplicate, onDelete, o
         {/* Type Dropdown */}
         <div className="relative">
           <select
-            className="appearance-none bg-gray-100 border border-gray-200 rounded-lg px-3 py-1.5 text-sm text-gray-600 cursor-pointer hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-primary-500 pr-8"
+            className="appearance-none bg-dark-700 border border-gold-rich/20 rounded-lg px-3 py-1.5 text-sm text-gray-300 cursor-pointer hover:bg-dark-600 focus:outline-none focus:ring-2 focus:ring-gold-rich/30 pr-8"
             value={editData.element_type || 'other'}
             onChange={(e) => {
               handleChange('element_type', e.target.value)
@@ -305,7 +306,7 @@ function WorldElementRow({ element, onToggleVisibility, onDuplicate, onDelete, o
               <option key={type.id} value={type.id}>{type.label}</option>
             ))}
           </select>
-          <span className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400 text-xs">▼</span>
+          <span className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none text-gray-500 text-xs">▼</span>
         </div>
         
         {/* Action Icons */}
@@ -314,8 +315,8 @@ function WorldElementRow({ element, onToggleVisibility, onDuplicate, onDelete, o
             className={clsx(
               'w-8 h-8 flex items-center justify-center rounded-lg transition-colors',
               isVisible
-                ? 'text-gray-400 hover:text-green-500 hover:bg-green-50'
-                : 'text-red-400 hover:text-red-500 hover:bg-red-50'
+                ? 'text-gray-500 hover:text-green-400 hover:bg-green-400/10'
+                : 'text-red-400 hover:text-red-300 hover:bg-red-400/10'
             )}
             onClick={() => onToggleVisibility(element)}
             title={isVisible ? 'Visible to AI' : 'Hidden from AI'}
@@ -324,14 +325,14 @@ function WorldElementRow({ element, onToggleVisibility, onDuplicate, onDelete, o
           </button>
           
           <button
-            className="w-8 h-8 flex items-center justify-center rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
+            className="w-8 h-8 flex items-center justify-center rounded-lg text-gray-500 hover:text-gold-rich hover:bg-gold-rich/10 transition-colors"
             title="History"
           >
             {Icons.CLOCK}
           </button>
           
           <button
-            className="w-8 h-8 flex items-center justify-center rounded-lg text-gray-400 hover:text-primary-600 hover:bg-primary-50 transition-colors"
+            className="w-8 h-8 flex items-center justify-center rounded-lg text-gray-500 hover:text-gold-rich hover:bg-gold-rich/10 transition-colors"
             onClick={() => onDuplicate(element)}
             title="Duplicate"
           >
@@ -341,7 +342,7 @@ function WorldElementRow({ element, onToggleVisibility, onDuplicate, onDelete, o
           <div className="relative" ref={menuRef}>
             <button
               ref={menuButtonRef}
-              className="w-8 h-8 flex items-center justify-center rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
+              className="w-8 h-8 flex items-center justify-center rounded-lg text-gray-500 hover:text-gold-rich hover:bg-gold-rich/10 transition-colors"
               onClick={() => {
                 if (!showMenu && menuButtonRef.current) {
                   const rect = menuButtonRef.current.getBoundingClientRect()
@@ -358,11 +359,11 @@ function WorldElementRow({ element, onToggleVisibility, onDuplicate, onDelete, o
             
             {showMenu && (
               <div 
-                className="fixed bg-white rounded-xl shadow-lg border border-gray-100 min-w-[140px] py-2 z-[9999]"
+                className="fixed bg-dark-800 rounded-xl shadow-lg border border-gold-rich/20 min-w-[140px] py-2 z-[9999]"
                 style={{ top: menuPosition.top, right: menuPosition.right }}
               >
                 <button
-                  className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                  className="w-full px-4 py-2 text-left text-sm text-gray-300 hover:bg-gold-rich/10 hover:text-gold-rich flex items-center gap-2"
                   onClick={() => {
                     onDuplicate(element)
                     setShowMenu(false)
@@ -371,7 +372,7 @@ function WorldElementRow({ element, onToggleVisibility, onDuplicate, onDelete, o
                   {Icons.COPY} Duplicate
                 </button>
                 <button
-                  className="w-full px-4 py-2 text-left text-sm text-red-500 hover:bg-red-50 flex items-center gap-2"
+                  className="w-full px-4 py-2 text-left text-sm text-red-400 hover:bg-red-400/10 flex items-center gap-2"
                   onClick={() => {
                     onDelete(element)
                     setShowMenu(false)
@@ -387,14 +388,14 @@ function WorldElementRow({ element, onToggleVisibility, onDuplicate, onDelete, o
       
       {/* Expanded Content */}
       {isExpanded && (
-        <div className="px-12 pb-6 bg-gray-50/30 animate-fade-in">
+        <div className="px-12 pb-6 bg-dark-850/50 animate-fade-in">
           <div className="space-y-4">
             {/* Other Names */}
             <div>
-              <label className="block text-sm font-medium text-gray-500 mb-2">Other Names</label>
+              <label className="block text-sm font-medium text-gold-pale mb-2">Other Names</label>
               <input
                 type="text"
-                className="w-full px-3 py-2.5 text-sm bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                className="w-full px-3 py-2.5 text-sm bg-dark-750 border border-gold-rich/20 rounded-lg text-gray-200 placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-gold-rich/30"
                 value={editData.other_names || ''}
                 onChange={(e) => handleChange('other_names', e.target.value)}
                 onBlur={handleSave}
@@ -418,7 +419,7 @@ function WorldElementRow({ element, onToggleVisibility, onDuplicate, onDelete, o
             <div className="mt-4 flex items-center justify-end gap-2">
               <span className="text-xs text-gray-500">Unsaved changes</span>
               <button
-                className="px-4 py-2 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700 font-medium"
+                className="px-4 py-2 text-sm bg-gradient-to-r from-gold-rich to-gold-deep text-dark-950 rounded-lg hover:from-gold-amber hover:to-gold-rich font-medium"
                 onClick={handleSave}
               >
                 Save Changes
@@ -453,14 +454,14 @@ function GenerateElementModal({ isOpen, onClose, onGenerate, isGenerating }) {
   
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
-      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative z-10 w-full max-w-lg mx-4 bg-white rounded-2xl shadow-xl p-6">
+      <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative z-10 w-full max-w-lg mx-4 glass-card p-6">
         <div className="flex items-center justify-between mb-6">
-          <h2 className="text-xl font-semibold text-gray-800 flex items-center gap-2">
+          <h2 className="text-xl font-semibold text-gray-100 flex items-center gap-2">
             {Icons.MAGIC} Generate Element with AI
           </h2>
           <button
-            className="w-8 h-8 flex items-center justify-center rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100"
+            className="w-8 h-8 flex items-center justify-center rounded-lg text-gray-500 hover:text-gold-rich hover:bg-gold-rich/10"
             onClick={onClose}
           >
             {Icons.CLOSE}
@@ -469,9 +470,9 @@ function GenerateElementModal({ isOpen, onClose, onGenerate, isGenerating }) {
         
         <div className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-600 mb-2">Element Type</label>
+            <label className="block text-sm font-medium text-gold-pale mb-2">Element Type</label>
             <select
-              className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+              className="w-full px-3 py-2.5 bg-dark-750 border border-gold-rich/20 rounded-lg text-gray-200 focus:outline-none focus:ring-2 focus:ring-gold-rich/30"
               value={elementType}
               onChange={(e) => setElementType(e.target.value)}
               disabled={isGenerating}
@@ -483,21 +484,21 @@ function GenerateElementModal({ isOpen, onClose, onGenerate, isGenerating }) {
           </div>
           
           <div>
-            <label className="block text-sm font-medium text-gray-600 mb-2">Description</label>
+            <label className="block text-sm font-medium text-gold-pale mb-2">Description</label>
             <textarea
-              className="w-full px-3 py-3 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 min-h-[120px] resize-none"
+              className="w-full px-3 py-3 bg-dark-750 border border-gold-rich/20 rounded-lg text-gray-200 placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-gold-rich/30 min-h-[120px] resize-none"
               placeholder="Describe the element you want to create (min 10 characters)..."
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               disabled={isGenerating}
             />
-            <p className="text-xs text-gray-400 mt-1">{description.length}/10 characters minimum</p>
+            <p className="text-xs text-gray-500 mt-1">{description.length}/10 characters minimum</p>
           </div>
         </div>
         
         <div className="flex items-center justify-end gap-3 mt-6">
           <button
-            className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800"
+            className="px-4 py-2 text-sm text-gray-400 hover:text-gray-200"
             onClick={onClose}
             disabled={isGenerating}
           >
@@ -507,15 +508,15 @@ function GenerateElementModal({ isOpen, onClose, onGenerate, isGenerating }) {
             className={clsx(
               'px-6 py-2.5 rounded-lg text-sm font-medium flex items-center gap-2 transition-all',
               description.trim().length >= 10
-                ? 'bg-primary-600 text-white hover:bg-primary-700'
-                : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                ? 'bg-gradient-to-r from-gold-rich to-gold-deep text-dark-950 hover:from-gold-amber hover:to-gold-rich'
+                : 'bg-dark-600 text-gray-500 cursor-not-allowed'
             )}
             onClick={handleSubmit}
             disabled={description.trim().length < 10 || isGenerating}
           >
             {isGenerating ? (
               <>
-                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                <div className="w-4 h-4 border-2 border-dark-950/30 border-t-dark-950 rounded-full animate-spin" />
                 <span>Generating...</span>
               </>
             ) : (
@@ -563,17 +564,17 @@ function CreateElementModal({ isOpen, onClose, onCreate }) {
   
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
-      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative z-10 w-full max-w-md mx-4 bg-white rounded-2xl shadow-xl p-6">
-        <h2 className="text-xl font-semibold text-gray-800 mb-6">Create New Element</h2>
+      <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative z-10 w-full max-w-md mx-4 glass-card p-6">
+        <h2 className="text-xl font-semibold text-gray-100 mb-6">Create New Element</h2>
         
         <form onSubmit={handleSubmit}>
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-600 mb-2">Element Name *</label>
+              <label className="block text-sm font-medium text-gold-pale mb-2">Element Name *</label>
               <input
                 type="text"
-                className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                className="w-full px-3 py-2.5 bg-dark-750 border border-gold-rich/20 rounded-lg text-gray-200 placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-gold-rich/30"
                 placeholder="Enter element name..."
                 value={name}
                 onChange={(e) => setName(e.target.value)}
@@ -583,9 +584,9 @@ function CreateElementModal({ isOpen, onClose, onCreate }) {
             </div>
             
             <div>
-              <label className="block text-sm font-medium text-gray-600 mb-2">Type</label>
+              <label className="block text-sm font-medium text-gold-pale mb-2">Type</label>
               <select
-                className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                className="w-full px-3 py-2.5 bg-dark-750 border border-gold-rich/20 rounded-lg text-gray-200 focus:outline-none focus:ring-2 focus:ring-gold-rich/30"
                 value={elementType}
                 onChange={(e) => setElementType(e.target.value)}
                 disabled={isCreating}
@@ -600,7 +601,7 @@ function CreateElementModal({ isOpen, onClose, onCreate }) {
           <div className="flex items-center justify-end gap-3 mt-6">
             <button
               type="button"
-              className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800"
+              className="px-4 py-2 text-sm text-gray-400 hover:text-gray-200"
               onClick={onClose}
               disabled={isCreating}
             >
@@ -611,14 +612,14 @@ function CreateElementModal({ isOpen, onClose, onCreate }) {
               className={clsx(
                 'px-6 py-2.5 rounded-lg text-sm font-medium transition-all',
                 name.trim()
-                  ? 'bg-primary-600 text-white hover:bg-primary-700'
-                  : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                  ? 'bg-gradient-to-r from-gold-rich to-gold-deep text-dark-950 hover:from-gold-amber hover:to-gold-rich'
+                  : 'bg-dark-600 text-gray-500 cursor-not-allowed'
               )}
               disabled={!name.trim() || isCreating}
             >
               {isCreating ? (
                 <span className="flex items-center gap-2">
-                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  <div className="w-4 h-4 border-2 border-dark-950/30 border-t-dark-950 rounded-full animate-spin" />
                   Creating...
                 </span>
               ) : (
@@ -838,25 +839,25 @@ Please rewrite following the instruction. Only output the rewritten content.`
   return (
     <div className="h-full flex flex-col p-6">
       {/* Section Header */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 mb-4">
-        <div className="flex items-center justify-between px-4 py-4 border-b border-gray-100">
+      <div className="bg-dark-800 rounded-xl shadow-sm border border-gold-rich/10 mb-4">
+        <div className="flex items-center justify-between px-4 py-4 border-b border-gold-rich/10">
           <button
             className="flex items-center gap-3 text-left"
             onClick={() => setIsSectionExpanded(!isSectionExpanded)}
           >
-            <span className="text-gray-400 text-sm">
+            <span className="text-gray-500 text-sm">
               {isSectionExpanded ? Icons.COLLAPSE : Icons.EXPAND}
             </span>
             <span className="text-2xl">{Icons.WORLD}</span>
             <div>
-              <h1 className="text-xl font-semibold text-gray-800">Worldbuilding</h1>
-              <p className="text-sm text-gray-500">Bring your world to life with Locations, Lore, Magic, and more</p>
+              <h1 className="text-xl font-semibold text-gold-soft">Worldbuilding</h1>
+              <p className="text-sm text-gray-400">Bring your world to life with Locations, Lore, Magic, and more</p>
             </div>
           </button>
           
           <div className="flex items-center gap-2">
             <button
-              className="flex items-center gap-1 text-primary-600 hover:text-primary-700 font-medium text-sm"
+              className="flex items-center gap-1 text-gold-rich hover:text-gold-amber font-medium text-sm"
               onClick={() => setShowCreateModal(true)}
             >
               <span>+</span>
@@ -865,16 +866,16 @@ Please rewrite following the instruction. Only output the rewritten content.`
             
             <div className="relative" ref={sectionMenuRef}>
               <button
-                className="w-8 h-8 flex items-center justify-center rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
+                className="w-8 h-8 flex items-center justify-center rounded-lg text-gray-500 hover:text-gold-rich hover:bg-gold-rich/10 transition-colors"
                 onClick={() => setShowSectionMenu(!showSectionMenu)}
               >
                 {Icons.MORE}
               </button>
               
               {showSectionMenu && (
-                <div className="absolute right-0 top-full mt-1 bg-white rounded-xl shadow-lg border border-gray-100 min-w-[180px] py-2 z-50">
+                <div className="absolute right-0 top-full mt-1 bg-dark-800 rounded-xl shadow-lg border border-gold-rich/20 min-w-[180px] py-2 z-50">
                   <button
-                    className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                    className="w-full px-4 py-2 text-left text-sm text-gray-300 hover:bg-gold-rich/10 hover:text-gold-rich flex items-center gap-2"
                     onClick={() => {
                       setShowGenerateModal(true)
                       setShowSectionMenu(false)
@@ -893,25 +894,25 @@ Please rewrite following the instruction. Only output the rewritten content.`
           <div className="p-4 max-h-[calc(100vh-250px)] overflow-y-auto">
             {isLoading ? (
               <div className="text-center py-8">
-                <div className="w-8 h-8 border-2 border-gray-200 border-t-primary-600 rounded-full animate-spin mx-auto mb-3" />
-                <p className="text-gray-500">Loading elements...</p>
+                <div className="w-8 h-8 border-2 border-gold-rich/20 border-t-gold-rich rounded-full animate-spin mx-auto mb-3" />
+                <p className="text-gray-400">Loading elements...</p>
               </div>
             ) : elements.length === 0 ? (
               <div className="text-center py-12">
                 <div className="text-5xl mb-4 opacity-50">{Icons.WORLD}</div>
-                <h2 className="text-lg font-semibold text-gray-700 mb-2">No Elements Yet</h2>
-                <p className="text-gray-500 mb-4 text-sm">
+                <h2 className="text-lg font-semibold text-gray-200 mb-2">No Elements Yet</h2>
+                <p className="text-gray-400 mb-4 text-sm">
                   Start building your world by adding locations, lore, and more.
                 </p>
                 <div className="flex items-center justify-center gap-3">
                   <button
-                    className="px-4 py-2 rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 text-sm font-medium flex items-center gap-2"
+                    className="px-4 py-2 rounded-lg bg-dark-700 text-gray-300 hover:bg-dark-600 text-sm font-medium flex items-center gap-2 border border-gold-rich/20"
                     onClick={() => setShowGenerateModal(true)}
                   >
                     {Icons.MAGIC} Generate with AI
                   </button>
                   <button
-                    className="px-4 py-2 rounded-lg bg-primary-600 text-white hover:bg-primary-700 text-sm font-medium flex items-center gap-2"
+                    className="px-4 py-2 rounded-lg bg-gradient-to-r from-gold-rich to-gold-deep text-dark-950 hover:from-gold-amber hover:to-gold-rich text-sm font-medium flex items-center gap-2"
                     onClick={() => setShowCreateModal(true)}
                   >
                     {Icons.PLUS} Create Manually

@@ -2,7 +2,7 @@
  * Project Sidebar Component
  * =========================
  * Left sidebar showing only the current project's chapters.
- * Paper-light theme styling.
+ * Dark & Gold luxury theme styling.
  */
 
 import { useState, useEffect } from 'react'
@@ -71,25 +71,25 @@ function ChapterItem({ chapter, index, isActive, onClick, onDelete, onRename, on
         'group flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer transition-all duration-200',
         'border border-transparent',
         isActive
-          ? 'bg-primary-100 border-primary-300 text-primary-700'
-          : 'hover:bg-gray-100 text-gray-600 hover:text-gray-800'
+          ? 'bg-gold-rich/15 border-gold-rich/30 text-gold-pale'
+          : 'hover:bg-gold-rich/5 text-gray-300 hover:text-gray-100'
       )}
       onClick={() => !isEditing && onClick(chapter.id)}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
       {/* Drag Handle */}
-      <span className="text-gray-300 text-xs">{Icons.DRAG}</span>
+      <span className="text-gray-500 text-xs">{Icons.DRAG}</span>
       
       {/* Chapter Icon & Number */}
       <span className="text-lg">{Icons.CHAPTER}</span>
-      <span className="text-xs font-mono text-gray-400 w-6">{index + 1}.</span>
+      <span className="text-xs font-mono text-gray-500 w-6">{index + 1}.</span>
       
       {/* Title */}
       {isEditing ? (
         <input
           type="text"
-          className="flex-1 bg-white px-2 py-1 rounded text-sm text-gray-800 focus:outline-none focus:ring-1 focus:ring-primary-500 border border-gray-200"
+          className="flex-1 bg-dark-700 px-2 py-1 rounded text-sm text-gray-100 focus:outline-none focus:ring-1 focus:ring-gold-rich border border-gold-rich/20"
           value={editTitle}
           onChange={(e) => setEditTitle(e.target.value)}
           onBlur={handleRename}
@@ -108,7 +108,7 @@ function ChapterItem({ chapter, index, isActive, onClick, onDelete, onRename, on
         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
           {!isFirst && (
             <button
-              className="w-5 h-5 flex items-center justify-center rounded text-gray-400 hover:text-primary-600 hover:bg-primary-50 text-xs"
+              className="w-5 h-5 flex items-center justify-center rounded text-gray-500 hover:text-gold-rich hover:bg-gold-rich/10 text-xs"
               onClick={(e) => {
                 e.stopPropagation()
                 onMoveUp(chapter.id)
@@ -120,7 +120,7 @@ function ChapterItem({ chapter, index, isActive, onClick, onDelete, onRename, on
           )}
           {!isLast && (
             <button
-              className="w-5 h-5 flex items-center justify-center rounded text-gray-400 hover:text-primary-600 hover:bg-primary-50 text-xs"
+              className="w-5 h-5 flex items-center justify-center rounded text-gray-500 hover:text-gold-rich hover:bg-gold-rich/10 text-xs"
               onClick={(e) => {
                 e.stopPropagation()
                 onMoveDown(chapter.id)
@@ -131,7 +131,7 @@ function ChapterItem({ chapter, index, isActive, onClick, onDelete, onRename, on
             </button>
           )}
           <button
-            className="w-5 h-5 flex items-center justify-center rounded text-gray-400 hover:text-primary-600 hover:bg-primary-50 text-xs"
+            className="w-5 h-5 flex items-center justify-center rounded text-gray-500 hover:text-gold-rich hover:bg-gold-rich/10 text-xs"
             onClick={(e) => {
               e.stopPropagation()
               setIsEditing(true)
@@ -141,7 +141,7 @@ function ChapterItem({ chapter, index, isActive, onClick, onDelete, onRename, on
             {Icons.EDIT}
           </button>
           <button
-            className="w-5 h-5 flex items-center justify-center rounded text-gray-400 hover:text-red-500 hover:bg-red-50 text-xs"
+            className="w-5 h-5 flex items-center justify-center rounded text-gray-500 hover:text-red-400 hover:bg-red-400/10 text-xs"
             onClick={(e) => {
               e.stopPropagation()
               onDelete(chapter.id)
@@ -177,12 +177,12 @@ function NewChapterModal({ isOpen, onClose, onSubmit, isCreating }) {
   
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
-      <div className="absolute inset-0 modal-backdrop" onClick={onClose} />
-      <div className="relative z-10 w-full max-w-md mx-4 modal-content p-6 animate-slide-up">
-        <h2 className="text-xl font-bold text-gray-800 mb-4">Create New Chapter</h2>
+      <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative z-10 w-full max-w-md mx-4 glass-card p-6 animate-slide-up">
+        <h2 className="text-xl font-bold text-gray-100 mb-4">Create New Chapter</h2>
         <form onSubmit={handleSubmit}>
           <div className="mb-4">
-            <label className="block text-sm font-medium text-gray-600 mb-2">
+            <label className="block text-sm font-medium text-gold-pale mb-2">
               Chapter Title
             </label>
             <input
@@ -369,7 +369,7 @@ function ProjectSidebar() {
   if (!currentProjectId || !currentProject) {
     return (
       <div className="h-full flex flex-col items-center justify-center p-6 text-center">
-        <p className="text-gray-500">No project selected</p>
+        <p className="text-gray-400">No project selected</p>
       </div>
     )
   }
@@ -378,17 +378,17 @@ function ProjectSidebar() {
     <div className="h-full flex flex-col p-4 overflow-hidden">
       {/* Project Header */}
       <div className="mb-4">
-        <h2 className="text-lg font-serif font-semibold text-gray-800 truncate" title={currentProject.name}>
+        <h2 className="text-lg font-serif font-semibold text-gold-pale truncate" title={currentProject.name}>
           {currentProject.name}
         </h2>
-        <p className="text-xs text-gray-500 mt-1">
+        <p className="text-xs text-gray-400 mt-1">
           {chapters.length} chapter{chapters.length !== 1 ? 's' : ''}
         </p>
       </div>
       
       {/* Add Chapter Button */}
       <button
-        className="w-full mb-4 px-4 py-2 rounded-lg bg-primary-50 text-primary-600 hover:bg-primary-100 transition-colors flex items-center justify-center gap-2 font-medium border border-primary-200"
+        className="w-full mb-4 px-4 py-2 rounded-lg bg-gold-rich/10 text-gold-rich hover:bg-gold-rich/20 transition-colors flex items-center justify-center gap-2 font-medium border border-gold-rich/30"
         onClick={() => setShowNewChapterModal(true)}
       >
         <span className="text-lg font-bold">{Icons.PLUS}</span>
@@ -400,8 +400,8 @@ function ProjectSidebar() {
         {chapters.length === 0 ? (
           <div className="text-center py-8">
             <div className="text-4xl mb-3 opacity-50">{Icons.CHAPTER}</div>
-            <p className="text-gray-500 text-sm">No chapters yet</p>
-            <p className="text-gray-400 text-xs mt-1">Click "New Chapter" to get started</p>
+            <p className="text-gray-400 text-sm">No chapters yet</p>
+            <p className="text-gray-500 text-xs mt-1">Click "New Chapter" to get started</p>
           </div>
         ) : (
           chapters.map((chapter, index) => (
@@ -423,7 +423,7 @@ function ProjectSidebar() {
       </div>
       
       {/* Divider */}
-      <div className="border-t border-gray-200 my-4" />
+      <div className="border-t border-gold-rich/20 my-4" />
       
       {/* Story Bible Section */}
       <div>
@@ -432,8 +432,8 @@ function ProjectSidebar() {
             'w-full px-4 py-3 rounded-lg text-left flex items-center gap-3',
             'transition-all duration-200',
             isBibleExpanded 
-              ? 'bg-primary-50 text-primary-700 border border-primary-200'
-              : 'bg-gray-50 text-gray-600 hover:bg-gray-100 border border-transparent'
+              ? 'bg-gold-rich/15 text-gold-pale border border-gold-rich/30'
+              : 'bg-dark-700/50 text-gray-300 hover:bg-dark-700 border border-transparent'
           )}
           onClick={toggleBibleExpanded}
         >
