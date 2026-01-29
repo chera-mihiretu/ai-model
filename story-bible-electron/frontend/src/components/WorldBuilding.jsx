@@ -1,8 +1,7 @@
 /**
  * World Building Component
  * ========================
- * Manages world building elements (settings, locations, events, etc.)
- * Similar to character management but for non-character story elements.
+ * Manages world building elements with Sudowrite-style expandable list.
  */
 
 import { useState, useEffect, useRef } from 'react'
@@ -13,360 +12,517 @@ import { clsx } from 'clsx'
 // Icons
 const Icons = {
   WORLD: '🌍',
-  LOCATION: '📍',
-  EVENT: '📅',
-  SYSTEM: '⚙️',
-  ITEM: '🏺',
-  OTHER: '📦',
   PLUS: '+',
   DELETE: '🗑️',
-  EDIT: '✏️',
-  SAVE: '💾',
   VISIBLE: '👁️',
   HIDDEN: '👁️‍🗨️',
-  IMPORT: '📥',
-  EXPORT: '📤',
   AI: '🤖',
-  FILTER: '🔍',
+  MORE: '⋯',
+  DRAG: '⋮⋮',
+  EXPAND: '▶',
+  COLLAPSE: '▼',
+  COPY: '📋',
+  CLOCK: '🕐',
+  CLOSE: '✕',
+  MAGIC: '🪄',
 }
 
-// Element types with their icons and labels
+// Element types
 const ELEMENT_TYPES = [
-  { id: 'all', label: 'All Elements', icon: Icons.WORLD },
-  { id: 'setting', label: 'Settings', icon: '🏙️' },
-  { id: 'location', label: 'Locations', icon: Icons.LOCATION },
-  { id: 'event', label: 'Events', icon: Icons.EVENT },
-  { id: 'system', label: 'Systems', icon: Icons.SYSTEM },
-  { id: 'item', label: 'Items', icon: Icons.ITEM },
-  { id: 'other', label: 'Other', icon: Icons.OTHER },
+  { id: 'location', label: 'Location' },
+  { id: 'setting', label: 'Setting' },
+  { id: 'event', label: 'Event' },
+  { id: 'system', label: 'System' },
+  { id: 'item', label: 'Item' },
+  { id: 'lore', label: 'Lore' },
+  { id: 'magic', label: 'Magic' },
+  { id: 'other', label: 'Other' },
 ]
 
-// Element fields for the editor
-const ELEMENT_FIELDS = [
-  { id: 'name', label: 'Name', type: 'text', required: true, placeholder: 'Enter element name...' },
-  { id: 'element_type', label: 'Type', type: 'select', options: ELEMENT_TYPES.filter(t => t.id !== 'all') },
-  { id: 'description', label: 'Description', type: 'textarea', placeholder: 'Describe this element...' },
-  { id: 'sensory_details', label: 'Sensory Details', type: 'textarea', placeholder: 'Sights, sounds, smells, textures...' },
-  { id: 'significance', label: 'Story Significance', type: 'textarea', placeholder: 'Why is this important to the story?' },
-  { id: 'custom_traits', label: 'Custom Traits', type: 'textarea', placeholder: 'JSON or key-value pairs for custom properties...' },
-]
-
-function WorldElementCard({ element, isSelected, onClick, onToggleVisibility, onDelete }) {
-  const isVisible = element.is_visible !== 0
-  const typeInfo = ELEMENT_TYPES.find(t => t.id === element.element_type) || ELEMENT_TYPES[6]
+// Editable field with AI rewrite capability
+function EditableField({ label, value, onChange, onSave, onRewrite, placeholder, isRewriting }) {
+  const [isFocused, setIsFocused] = useState(false)
+  const [showRewriteInput, setShowRewriteInput] = useState(false)
+  const [rewriteInstruction, setRewriteInstruction] = useState('')
+  const containerRef = useRef(null)
+  const textareaRef = useRef(null)
+  
+  // Auto-resize textarea based on content
+  const autoResize = () => {
+    const textarea = textareaRef.current
+    if (textarea) {
+      textarea.style.height = 'auto'
+      textarea.style.height = `${Math.max(80, textarea.scrollHeight)}px`
+    }
+  }
+  
+  useEffect(() => {
+    autoResize()
+  }, [value])
+  
+  const handleRewrite = async () => {
+    if (rewriteInstruction.trim() && value?.trim()) {
+      await onRewrite(rewriteInstruction.trim())
+      setRewriteInstruction('')
+      setShowRewriteInput(false)
+      setIsFocused(false)
+    }
+  }
+  
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+      e.preventDefault()
+      handleRewrite()
+    }
+    if (e.key === 'Escape') {
+      setShowRewriteInput(false)
+      setRewriteInstruction('')
+    }
+  }
+  
+  // Handle clicks outside to close
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (containerRef.current && !containerRef.current.contains(event.target)) {
+        if (!showRewriteInput) {
+          setIsFocused(false)
+          onSave()
+        }
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [showRewriteInput, onSave])
   
   return (
-    <div
+    <div 
+      ref={containerRef}
       className={clsx(
-        'p-4 rounded-xl cursor-pointer transition-all duration-200',
-        'bg-gradient-to-br from-bg-card/90 to-bg-sidebar/90',
-        'border border-glass-border',
-        'hover:border-accent-primary hover:shadow-lg hover:shadow-accent-primary/20',
-        'hover:-translate-y-1',
-        isSelected && 'border-accent-primary ring-2 ring-accent-primary/30'
+        "rounded-xl p-4 border transition-all",
+        isFocused || showRewriteInput
+          ? "bg-purple-50/50 border-purple-200"
+          : "bg-gray-50 border-gray-100"
       )}
-      onClick={() => onClick(element)}
     >
-      {/* Header */}
-      <div className="flex items-start justify-between mb-3">
-        <div className="flex items-center gap-2">
-          <span className="text-2xl">{typeInfo.icon}</span>
-          <div>
-            <h3 className="font-semibold text-text-primary">{element.name}</h3>
-            <p className="text-xs text-text-muted">{typeInfo.label}</p>
-          </div>
-        </div>
-        <div className="flex items-center gap-1">
-          <button
-            className={clsx(
-              'w-7 h-7 flex items-center justify-center rounded-lg transition-colors text-sm',
-              isVisible
-                ? 'bg-green-500/20 text-green-400'
-                : 'bg-red-500/20 text-red-400'
-            )}
-            onClick={(e) => {
-              e.stopPropagation()
-              onToggleVisibility(element)
-            }}
-            title={isVisible ? 'Visible to AI' : 'Hidden from AI'}
-          >
-            {isVisible ? Icons.VISIBLE : Icons.HIDDEN}
-          </button>
-          <button
-            className="w-7 h-7 flex items-center justify-center rounded-lg bg-red-500/20 text-red-400 hover:bg-red-500/30 transition-colors text-sm"
-            onClick={(e) => {
-              e.stopPropagation()
-              onDelete(element)
-            }}
-            title="Delete"
-          >
-            {Icons.DELETE}
-          </button>
-        </div>
+      <div className="flex items-center justify-between mb-2">
+        <label className="text-sm font-medium text-gray-600">{label}</label>
+        <button
+          className="w-6 h-6 flex items-center justify-center rounded text-gray-400 hover:text-gray-600 hover:bg-gray-200 transition-colors"
+          title="More options"
+        >
+          {Icons.MORE}
+        </button>
       </div>
       
-      {/* Preview */}
-      {element.description && (
-        <p className="text-sm text-text-secondary line-clamp-2 mb-2">
-          {element.description}
-        </p>
+      <div className="relative">
+        <textarea
+          ref={textareaRef}
+          className={clsx(
+            "w-full px-3 py-3 text-sm bg-white border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent min-h-[80px] resize-none transition-all overflow-hidden",
+            isRewriting ? "opacity-50" : ""
+          )}
+          value={value || ''}
+          onChange={(e) => {
+            onChange(e.target.value)
+            autoResize()
+          }}
+          onFocus={() => setIsFocused(true)}
+          placeholder={placeholder}
+          disabled={isRewriting}
+        />
+        
+        <button
+          className="absolute top-3 right-3 w-6 h-6 flex items-center justify-center rounded text-gray-400 hover:text-gray-600 transition-colors"
+          title="Toggle visibility"
+        >
+          {Icons.VISIBLE}
+        </button>
+        
+        {isRewriting && (
+          <div className="absolute inset-0 flex items-center justify-center bg-white/80 rounded-lg">
+            <div className="flex items-center gap-2 text-primary-600">
+              <div className="w-5 h-5 border-2 border-primary-200 border-t-primary-600 rounded-full animate-spin" />
+              <span className="text-sm font-medium">Rewriting...</span>
+            </div>
+          </div>
+        )}
+      </div>
+      
+      {/* Rewrite Button - Shows when focused */}
+      {isFocused && !showRewriteInput && !isRewriting && (
+        <button
+          className="mt-3 flex items-center gap-1.5 text-sm text-primary-600 hover:text-primary-700 font-medium transition-colors"
+          onClick={() => setShowRewriteInput(true)}
+        >
+          <span className="text-base">✨</span>
+          <span>Rewrite...</span>
+        </button>
       )}
       
-      {/* Tags */}
-      {element.significance && (
-        <div className="mt-2 pt-2 border-t border-border/30">
-          <p className="text-xs text-accent-secondary line-clamp-1">
-            📌 {element.significance}
-          </p>
+      {/* Rewrite Input */}
+      {showRewriteInput && !isRewriting && (
+        <div className="mt-3">
+          {!value?.trim() && (
+            <p className="text-xs text-amber-600 mb-2">Please add some content first before rewriting</p>
+          )}
+          <div className="flex items-center gap-2">
+            <input
+              type="text"
+              className="flex-1 px-3 py-2.5 text-sm bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+              placeholder={`Tell AI how to rewrite "${label}"...`}
+              value={rewriteInstruction}
+              onChange={(e) => setRewriteInstruction(e.target.value)}
+              onKeyDown={handleKeyDown}
+              autoFocus
+            />
+            <button
+              className={clsx(
+                'px-4 py-2.5 rounded-lg text-sm font-medium flex items-center gap-2 transition-all min-w-[90px] justify-center',
+                rewriteInstruction.trim() && value?.trim()
+                  ? 'bg-primary-600 text-white hover:bg-primary-700 shadow-sm'
+                  : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+              )}
+              onClick={handleRewrite}
+              disabled={!rewriteInstruction.trim() || !value?.trim() || isRewriting}
+            >
+              <span>Go</span>
+              <span className="text-xs bg-white/20 px-1.5 py-0.5 rounded">ctrl</span>
+              <span className="text-xs">↵</span>
+            </button>
+          </div>
+          <button
+            className="mt-2 text-xs text-gray-400 hover:text-gray-600 transition-colors"
+            onClick={() => {
+              setShowRewriteInput(false)
+              setRewriteInstruction('')
+            }}
+          >
+            Cancel (Esc)
+          </button>
         </div>
       )}
     </div>
   )
 }
 
-function WorldElementEditor({ element, onSave, onClose }) {
-  const [formData, setFormData] = useState(element || { element_type: 'other' })
+// World Element Row Component
+function WorldElementRow({ element, onToggleVisibility, onDuplicate, onDelete, onSave, onRewriteField }) {
+  const [isExpanded, setIsExpanded] = useState(false)
+  const [showMenu, setShowMenu] = useState(false)
+  const [menuPosition, setMenuPosition] = useState({ top: 0, right: 0 })
+  const [editData, setEditData] = useState(element)
   const [isDirty, setIsDirty] = useState(false)
+  const [rewritingField, setRewritingField] = useState(null)
+  const menuRef = useRef(null)
+  const menuButtonRef = useRef(null)
+  const isVisible = element.is_visible !== 0
+  
+  useEffect(() => {
+    setEditData(element)
+    setIsDirty(false)
+  }, [element])
+  
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (menuRef.current && !menuRef.current.contains(event.target)) {
+        setShowMenu(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
   
   const handleChange = (field, value) => {
-    setFormData(prev => ({ ...prev, [field]: value }))
+    setEditData(prev => ({ ...prev, [field]: value }))
     setIsDirty(true)
   }
   
   const handleSave = () => {
-    onSave(formData)
-    setIsDirty(false)
+    if (isDirty) {
+      onSave(editData)
+      setIsDirty(false)
+    }
+  }
+  
+  const handleNameBlur = () => {
+    if (isDirty && editData.name?.trim()) {
+      handleSave()
+    }
+  }
+  
+  const handleRewrite = async (field, instruction) => {
+    if (!onRewriteField) return
+    
+    setRewritingField(field)
+    try {
+      const rewritten = await onRewriteField(field, editData[field], instruction, editData.name)
+      if (rewritten) {
+        handleChange(field, rewritten)
+        const newData = { ...editData, [field]: rewritten }
+        onSave(newData)
+      }
+    } finally {
+      setRewritingField(null)
+    }
   }
   
   return (
-    <div className="h-full flex flex-col">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <h2 className="text-xl font-semibold text-text-primary">
-          {element?.id ? 'Edit Element' : 'New World Element'}
-        </h2>
-        <div className="flex items-center gap-2">
-          <button className="btn btn-ghost" onClick={onClose}>
-            Cancel
-          </button>
-          <button
-            className={clsx('btn btn-primary', !isDirty && 'opacity-50')}
-            onClick={handleSave}
-            disabled={!isDirty || !formData.name?.trim()}
+    <div className="bg-white rounded-xl border border-gray-100 shadow-sm mb-3 overflow-hidden">
+      {/* Main Row */}
+      <div className="flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-colors group">
+        {/* Drag Handle */}
+        <span className="text-gray-300 cursor-grab text-sm">{Icons.DRAG}</span>
+        
+        {/* Expand Arrow */}
+        <button
+          className="w-5 h-5 flex items-center justify-center text-gray-400 hover:text-gray-600 transition-colors"
+          onClick={() => setIsExpanded(!isExpanded)}
+        >
+          {isExpanded ? Icons.COLLAPSE : Icons.EXPAND}
+        </button>
+        
+        {/* Element Name - Editable */}
+        <input
+          type="text"
+          className="flex-1 font-medium text-gray-800 bg-transparent border-none focus:outline-none focus:ring-0 hover:bg-gray-100 focus:bg-white px-2 py-1 rounded"
+          value={editData.name || ''}
+          onChange={(e) => handleChange('name', e.target.value)}
+          onBlur={handleNameBlur}
+          placeholder="Element name..."
+        />
+        
+        {/* Type Dropdown */}
+        <div className="relative">
+          <select
+            className="appearance-none bg-gray-100 border border-gray-200 rounded-lg px-3 py-1.5 text-sm text-gray-600 cursor-pointer hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-primary-500 pr-8"
+            value={editData.element_type || 'other'}
+            onChange={(e) => {
+              handleChange('element_type', e.target.value)
+              onSave({ ...editData, element_type: e.target.value })
+            }}
           >
-            <span>{Icons.SAVE}</span>
-            <span>Save</span>
+            {ELEMENT_TYPES.map(type => (
+              <option key={type.id} value={type.id}>{type.label}</option>
+            ))}
+          </select>
+          <span className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400 text-xs">▼</span>
+        </div>
+        
+        {/* Action Icons */}
+        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+          <button
+            className={clsx(
+              'w-8 h-8 flex items-center justify-center rounded-lg transition-colors',
+              isVisible
+                ? 'text-gray-400 hover:text-green-500 hover:bg-green-50'
+                : 'text-red-400 hover:text-red-500 hover:bg-red-50'
+            )}
+            onClick={() => onToggleVisibility(element)}
+            title={isVisible ? 'Visible to AI' : 'Hidden from AI'}
+          >
+            {isVisible ? Icons.VISIBLE : Icons.HIDDEN}
           </button>
+          
+          <button
+            className="w-8 h-8 flex items-center justify-center rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
+            title="History"
+          >
+            {Icons.CLOCK}
+          </button>
+          
+          <button
+            className="w-8 h-8 flex items-center justify-center rounded-lg text-gray-400 hover:text-primary-600 hover:bg-primary-50 transition-colors"
+            onClick={() => onDuplicate(element)}
+            title="Duplicate"
+          >
+            {Icons.COPY}
+          </button>
+          
+          <div className="relative" ref={menuRef}>
+            <button
+              ref={menuButtonRef}
+              className="w-8 h-8 flex items-center justify-center rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
+              onClick={() => {
+                if (!showMenu && menuButtonRef.current) {
+                  const rect = menuButtonRef.current.getBoundingClientRect()
+                  setMenuPosition({
+                    top: rect.bottom + 4,
+                    right: window.innerWidth - rect.right
+                  })
+                }
+                setShowMenu(!showMenu)
+              }}
+            >
+              {Icons.MORE}
+            </button>
+            
+            {showMenu && (
+              <div 
+                className="fixed bg-white rounded-xl shadow-lg border border-gray-100 min-w-[140px] py-2 z-[9999]"
+                style={{ top: menuPosition.top, right: menuPosition.right }}
+              >
+                <button
+                  className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                  onClick={() => {
+                    onDuplicate(element)
+                    setShowMenu(false)
+                  }}
+                >
+                  {Icons.COPY} Duplicate
+                </button>
+                <button
+                  className="w-full px-4 py-2 text-left text-sm text-red-500 hover:bg-red-50 flex items-center gap-2"
+                  onClick={() => {
+                    onDelete(element)
+                    setShowMenu(false)
+                  }}
+                >
+                  {Icons.DELETE} Delete
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
       
-      {/* Form */}
-      <div className="flex-1 overflow-y-auto pr-2 space-y-4">
-        {ELEMENT_FIELDS.map(field => (
-          <div key={field.id}>
-            <label className="block text-sm font-medium text-text-secondary mb-1">
-              {field.label}
-              {field.required && <span className="text-red-400 ml-1">*</span>}
-            </label>
-            
-            {field.type === 'textarea' ? (
-              <textarea
-                className="input-textarea min-h-[100px]"
-                value={formData[field.id] || ''}
-                onChange={(e) => handleChange(field.id, e.target.value)}
-                placeholder={field.placeholder}
-              />
-            ) : field.type === 'select' ? (
-              <select
-                className="input"
-                value={formData[field.id] || 'other'}
-                onChange={(e) => handleChange(field.id, e.target.value)}
-              >
-                {field.options.map(opt => (
-                  <option key={opt.id} value={opt.id}>
-                    {opt.icon} {opt.label}
-                  </option>
-                ))}
-              </select>
-            ) : (
+      {/* Expanded Content */}
+      {isExpanded && (
+        <div className="px-12 pb-6 bg-gray-50/30 animate-fade-in">
+          <div className="space-y-4">
+            {/* Other Names */}
+            <div>
+              <label className="block text-sm font-medium text-gray-500 mb-2">Other Names</label>
               <input
                 type="text"
-                className="input"
-                value={formData[field.id] || ''}
-                onChange={(e) => handleChange(field.id, e.target.value)}
-                placeholder={field.placeholder}
+                className="w-full px-3 py-2.5 text-sm bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                value={editData.other_names || ''}
+                onChange={(e) => handleChange('other_names', e.target.value)}
+                onBlur={handleSave}
+                placeholder="Alternative names, aliases..."
               />
-            )}
+            </div>
+            
+            {/* Description */}
+            <EditableField
+              label="Description"
+              value={editData.description}
+              onChange={(value) => handleChange('description', value)}
+              onSave={handleSave}
+              onRewrite={(instruction) => handleRewrite('description', instruction)}
+              placeholder="Describe this element in detail..."
+              isRewriting={rewritingField === 'description'}
+            />
           </div>
-        ))}
-      </div>
+          
+          {isDirty && (
+            <div className="mt-4 flex items-center justify-end gap-2">
+              <span className="text-xs text-gray-500">Unsaved changes</span>
+              <button
+                className="px-4 py-2 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700 font-medium"
+                onClick={handleSave}
+              >
+                Save Changes
+              </button>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   )
 }
 
-// AI Generation Modal for World Elements
-function GenerateElementModal({ isOpen, onClose, onGenerate, isGenerating, error, clearError }) {
+// AI Generation Modal
+function GenerateElementModal({ isOpen, onClose, onGenerate, isGenerating }) {
   const [description, setDescription] = useState('')
   const [elementType, setElementType] = useState('location')
-  const [genre, setGenre] = useState('Fantasy')
-  
-  const genres = ['Fantasy', 'Sci-Fi', 'Romance', 'Thriller', 'Mystery', 'Horror', 'Historical', 'Literary', 'Urban Fantasy', 'Post-Apocalyptic']
-  
-  const inspirationPrompts = {
-    location: [
-      "A hidden underground city lit by bioluminescent fungi",
-      "An abandoned space station orbiting a dying star",
-      "A floating market on a river delta at sunset",
-      "A cursed forest where time moves backwards",
-    ],
-    setting: [
-      "A world where magic is powered by emotions",
-      "A steampunk Victorian society on the brink of revolution",
-      "A medieval kingdom ruled by a council of dragons",
-      "A cyberpunk megacity built on the ruins of the old world",
-    ],
-    event: [
-      "The day the sun turned black and never recovered",
-      "A royal wedding interrupted by an ancient prophecy",
-      "The discovery of a portal to another dimension",
-      "A plague that grants supernatural abilities",
-    ],
-    system: [
-      "A magic system based on musical notes and harmony",
-      "A political structure with five competing noble houses",
-      "An economic system where memories are currency",
-      "A religious hierarchy centered around elemental spirits",
-    ],
-    item: [
-      "A sword that whispers the secrets of those it kills",
-      "An ancient map that reveals hidden pathways",
-      "A crown that corrupts anyone who wears it",
-      "A mechanical heart that grants immortality",
-    ],
-    other: [
-      "A mysterious organization pulling strings from the shadows",
-      "An ancient language that can reshape reality when spoken",
-      "A phenomenon where dreams become physically real",
-      "A creature that exists between worlds",
-    ],
-  }
-  
-  const currentPrompts = inspirationPrompts[elementType] || inspirationPrompts.other
   
   const handleSubmit = () => {
-    if (description.trim().length < 10) return
-    onGenerate(description, elementType, genre)
+    if (description.trim().length >= 10) {
+      onGenerate(description, elementType)
+    }
   }
   
   useEffect(() => {
-    if (isOpen) {
+    if (!isOpen) {
       setDescription('')
       setElementType('location')
-      setGenre('Fantasy')
-      clearError()
     }
   }, [isOpen])
   
   if (!isOpen) return null
   
-  const elementTypeOptions = ELEMENT_TYPES.filter(t => t.id !== 'all')
-  
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative z-10 w-full max-w-2xl mx-4 glass-card p-6 animate-slide-up overflow-y-auto max-h-[90vh]">
-        <h2 className="text-xl font-semibold text-text-primary mb-6 flex items-center gap-2">
-          {Icons.AI} Generate World Element with AI
-        </h2>
-
-        {error && (
-          <div className="bg-red-500/20 text-red-400 p-3 rounded-lg mb-4 flex items-center gap-2">
-            <span>⚠️</span>
-            <span>Error: {error}</span>
-          </div>
-        )}
-
-        <div className="mb-4">
-          <label className="block text-sm font-medium text-text-secondary mb-2">
-            Element Description <span className="text-red-400">*</span>
-          </label>
-          <textarea
-            className="input-textarea min-h-[120px]"
-            placeholder="Describe the world element you want to create (e.g., 'A haunted castle on a cliff')."
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            rows="4"
-            disabled={isGenerating}
-          />
-          <p className="text-xs text-text-muted mt-1">
-            {description.length} characters (min 10)
-          </p>
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative z-10 w-full max-w-lg mx-4 bg-white rounded-2xl shadow-xl p-6">
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-xl font-semibold text-gray-800 flex items-center gap-2">
+            {Icons.MAGIC} Generate Element with AI
+          </h2>
+          <button
+            className="w-8 h-8 flex items-center justify-center rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100"
+            onClick={onClose}
+          >
+            {Icons.CLOSE}
+          </button>
         </div>
-
-        <div className="grid grid-cols-2 gap-4 mb-4">
+        
+        <div className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-text-secondary mb-2">
-              Element Type
-            </label>
+            <label className="block text-sm font-medium text-gray-600 mb-2">Element Type</label>
             <select
-              className="input"
+              className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
               value={elementType}
               onChange={(e) => setElementType(e.target.value)}
               disabled={isGenerating}
             >
-              {elementTypeOptions.map(t => (
-                <option key={t.id} value={t.id}>{t.icon} {t.label}</option>
+              {ELEMENT_TYPES.map(type => (
+                <option key={type.id} value={type.id}>{type.label}</option>
               ))}
             </select>
           </div>
           
           <div>
-            <label className="block text-sm font-medium text-text-secondary mb-2">
-              Story Genre
-            </label>
-            <select
-              className="input"
-              value={genre}
-              onChange={(e) => setGenre(e.target.value)}
+            <label className="block text-sm font-medium text-gray-600 mb-2">Description</label>
+            <textarea
+              className="w-full px-3 py-3 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 min-h-[120px] resize-none"
+              placeholder="Describe the element you want to create (min 10 characters)..."
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
               disabled={isGenerating}
-            >
-              {genres.map(g => (
-                <option key={g} value={g}>{g}</option>
-              ))}
-            </select>
+            />
+            <p className="text-xs text-gray-400 mt-1">{description.length}/10 characters minimum</p>
           </div>
         </div>
-
-        <div className="mb-6">
-          <p className="text-sm font-medium text-text-secondary mb-2">Inspiration Prompts:</p>
-          <div className="flex flex-wrap gap-2">
-            {currentPrompts.map((prompt, index) => (
-              <button
-                key={index}
-                className="px-3 py-1 text-xs rounded-full bg-bg-card/60 text-text-muted hover:bg-bg-hover hover:text-text-primary transition-colors text-left"
-                onClick={() => setDescription(prompt)}
-                disabled={isGenerating}
-              >
-                {prompt}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div className="flex items-center justify-end gap-3">
-          <button type="button" className="btn btn-ghost" onClick={onClose} disabled={isGenerating}>
+        
+        <div className="flex items-center justify-end gap-3 mt-6">
+          <button
+            className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800"
+            onClick={onClose}
+            disabled={isGenerating}
+          >
             Cancel
           </button>
           <button
-            type="button"
-            className="btn btn-primary"
+            className={clsx(
+              'px-6 py-2.5 rounded-lg text-sm font-medium flex items-center gap-2 transition-all',
+              description.trim().length >= 10
+                ? 'bg-primary-600 text-white hover:bg-primary-700'
+                : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+            )}
             onClick={handleSubmit}
-            disabled={isGenerating || description.trim().length < 10}
+            disabled={description.trim().length < 10 || isGenerating}
           >
             {isGenerating ? (
-              <><div className="spinner !w-4 !h-4 mr-2" /> Generating...</>
+              <>
+                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                <span>Generating...</span>
+              </>
             ) : (
-              <><span>{Icons.AI}</span> Generate Element</>
+              <>
+                <span>{Icons.MAGIC}</span>
+                <span>Generate</span>
+              </>
             )}
           </button>
         </div>
@@ -375,72 +531,102 @@ function GenerateElementModal({ isOpen, onClose, onGenerate, isGenerating, error
   )
 }
 
-function CSVImportModal({ isOpen, onClose, onImport }) {
-  const [csvContent, setCsvContent] = useState('')
-  const fileInputRef = useRef(null)
+// Create Element Modal
+function CreateElementModal({ isOpen, onClose, onCreate }) {
+  const [name, setName] = useState('')
+  const [elementType, setElementType] = useState('location')
+  const [isCreating, setIsCreating] = useState(false)
   
-  const handleFileUpload = (e) => {
-    const file = e.target.files?.[0]
-    if (!file) return
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+    if (!name.trim()) return
     
-    const reader = new FileReader()
-    reader.onload = (event) => {
-      setCsvContent(event.target.result)
+    setIsCreating(true)
+    try {
+      await onCreate(name.trim(), elementType)
+      setName('')
+      setElementType('location')
+      onClose()
+    } finally {
+      setIsCreating(false)
     }
-    reader.readAsText(file)
   }
   
-  const handleImport = () => {
-    if (csvContent.trim()) {
-      onImport(csvContent)
-      setCsvContent('')
-      onClose()
+  useEffect(() => {
+    if (!isOpen) {
+      setName('')
+      setElementType('location')
     }
-  }
+  }, [isOpen])
   
   if (!isOpen) return null
   
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="glass-card p-6 w-full max-w-2xl">
-        <h2 className="text-xl font-bold text-text-primary mb-4">Import World Elements from CSV</h2>
+    <div className="fixed inset-0 z-50 flex items-center justify-center">
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative z-10 w-full max-w-md mx-4 bg-white rounded-2xl shadow-xl p-6">
+        <h2 className="text-xl font-semibold text-gray-800 mb-6">Create New Element</h2>
         
-        <div className="mb-4">
-          <p className="text-text-muted text-sm mb-2">
-            CSV format: name,element_type,description,sensory_details,significance,custom_traits
-          </p>
-          <input
-            type="file"
-            ref={fileInputRef}
-            accept=".csv"
-            className="hidden"
-            onChange={handleFileUpload}
-          />
-          <button
-            className="btn btn-secondary"
-            onClick={() => fileInputRef.current?.click()}
-          >
-            {Icons.IMPORT} Choose CSV File
-          </button>
-        </div>
-        
-        <textarea
-          className="input-textarea h-48 font-mono text-sm mb-4"
-          placeholder="Or paste CSV content here..."
-          value={csvContent}
-          onChange={(e) => setCsvContent(e.target.value)}
-        />
-        
-        <div className="flex justify-end gap-3">
-          <button className="btn btn-ghost" onClick={onClose}>Cancel</button>
-          <button 
-            className="btn btn-primary" 
-            onClick={handleImport}
-            disabled={!csvContent.trim()}
-          >
-            Import Elements
-          </button>
-        </div>
+        <form onSubmit={handleSubmit}>
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-600 mb-2">Element Name *</label>
+              <input
+                type="text"
+                className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                placeholder="Enter element name..."
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                autoFocus
+                disabled={isCreating}
+              />
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-600 mb-2">Type</label>
+              <select
+                className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                value={elementType}
+                onChange={(e) => setElementType(e.target.value)}
+                disabled={isCreating}
+              >
+                {ELEMENT_TYPES.map(type => (
+                  <option key={type.id} value={type.id}>{type.label}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+          
+          <div className="flex items-center justify-end gap-3 mt-6">
+            <button
+              type="button"
+              className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800"
+              onClick={onClose}
+              disabled={isCreating}
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className={clsx(
+                'px-6 py-2.5 rounded-lg text-sm font-medium transition-all',
+                name.trim()
+                  ? 'bg-primary-600 text-white hover:bg-primary-700'
+                  : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+              )}
+              disabled={!name.trim() || isCreating}
+            >
+              {isCreating ? (
+                <span className="flex items-center gap-2">
+                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  Creating...
+                </span>
+              ) : (
+                'Create Element'
+              )}
+            </button>
+          </div>
+        </form>
       </div>
     </div>
   )
@@ -453,84 +639,97 @@ function WorldBuilding() {
     createWorldElement, 
     updateWorldElement, 
     deleteWorldElement,
-    exportWorldElementsCsv,
-    importWorldElementsCsv,
-    generateSingleWorldElement,
     isElectronApi,
-    isApiAvailable
   } = usePythonBridge()
   
   const [elements, setElements] = useState([])
-  const [selectedType, setSelectedType] = useState('all')
-  const [view, setView] = useState('list') // 'list' | 'edit'
-  const [editingElement, setEditingElement] = useState(null)
   const [isLoading, setIsLoading] = useState(true)
-  const [showImportModal, setShowImportModal] = useState(false)
+  const [isSectionExpanded, setIsSectionExpanded] = useState(true)
+  const [showSectionMenu, setShowSectionMenu] = useState(false)
   const [showGenerateModal, setShowGenerateModal] = useState(false)
+  const [showCreateModal, setShowCreateModal] = useState(false)
   const [isGenerating, setIsGenerating] = useState(false)
-  const [generateError, setGenerateError] = useState('')
+  const sectionMenuRef = useRef(null)
   
-  // Load world elements
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (sectionMenuRef.current && !sectionMenuRef.current.contains(event.target)) {
+        setShowSectionMenu(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
+  
+  // Load elements
   useEffect(() => {
     async function loadElements() {
       if (!currentProjectId) return
       setIsLoading(true)
-      
       try {
         const data = await getWorldElements(currentProjectId, null, null)
         setElements(data || [])
       } catch (error) {
         console.error('Failed to load world elements:', error)
-        addNotification({ type: 'error', message: 'Failed to load world elements' })
       } finally {
         setIsLoading(false)
       }
     }
     loadElements()
-  }, [currentProjectId, getWorldElements, addNotification])
+  }, [currentProjectId])
   
-  // Filter elements by type
-  const filteredElements = selectedType === 'all' 
-    ? elements 
-    : elements.filter(e => e.element_type === selectedType)
-  
-  // Handle create new element
-  const handleCreateElement = () => {
-    setEditingElement({ element_type: 'other' })
-    setView('edit')
-  }
-  
-  // Handle save element
-  const handleSaveElement = async (data) => {
+  // Create new element
+  const handleCreateElement = async (name, elementType) => {
+    if (!name?.trim()) {
+      addNotification({ type: 'warning', message: 'Please enter a name' })
+      return
+    }
+    
+    if (!currentProjectId) {
+      addNotification({ type: 'error', message: 'No project selected' })
+      return
+    }
+    
     try {
-      if (data.id) {
-        // Update existing
-        await updateWorldElement(data.id, data)
-        addNotification({ type: 'success', message: 'Element updated' })
-      } else {
-        // Create new
-        await createWorldElement(currentProjectId, data)
-        addNotification({ type: 'success', message: 'Element created' })
-      }
+      console.log('Creating world element:', { name, elementType, projectId: currentProjectId })
+      const result = await createWorldElement(currentProjectId, { 
+        name: name.trim(), 
+        element_type: elementType || 'other',
+        description: '',
+        is_visible: 1 
+      })
+      console.log('Create result:', result)
       
-      // Refresh list
-      const updated = await getWorldElements(currentProjectId, null, null)
-      setElements(updated || [])
-      setView('list')
-      setEditingElement(null)
+      if (result) {
+        const updated = await getWorldElements(currentProjectId, null, null)
+        setElements(updated || [])
+        addNotification({ type: 'success', message: `Element "${name}" created!` })
+      } else {
+        addNotification({ type: 'error', message: 'Failed to create element' })
+      }
     } catch (error) {
-      console.error('Failed to save element:', error)
-      addNotification({ type: 'error', message: 'Failed to save element' })
+      console.error('Create element error:', error)
+      addNotification({ type: 'error', message: `Failed to create element: ${error.message}` })
     }
   }
   
-  // Handle toggle visibility
+  // Save element
+  const handleSaveElement = async (data) => {
+    try {
+      await updateWorldElement(data.id, data)
+      const updated = await getWorldElements(currentProjectId, null, null)
+      setElements(updated || [])
+    } catch (error) {
+      console.error('Failed to save element:', error)
+    }
+  }
+  
+  // Toggle visibility
   const handleToggleVisibility = async (element) => {
     try {
       await updateWorldElement(element.id, { 
         is_visible: element.is_visible === 0 ? 1 : 0 
       })
-      
       const updated = await getWorldElements(currentProjectId, null, null)
       setElements(updated || [])
     } catch (error) {
@@ -538,277 +737,220 @@ function WorldBuilding() {
     }
   }
   
-  // Handle delete element
+  // Duplicate element
+  const handleDuplicateElement = async (element) => {
+    try {
+      await createWorldElement(currentProjectId, {
+        ...element,
+        id: undefined,
+        name: `${element.name} (Copy)`,
+      })
+      const updated = await getWorldElements(currentProjectId, null, null)
+      setElements(updated || [])
+      addNotification({ type: 'success', message: 'Element duplicated' })
+    } catch (error) {
+      addNotification({ type: 'error', message: 'Failed to duplicate element' })
+    }
+  }
+  
+  // Delete element
   const handleDeleteElement = async (element) => {
     if (!confirm(`Delete "${element.name}"? This cannot be undone.`)) return
     
     try {
       await deleteWorldElement(element.id)
-      addNotification({ type: 'success', message: 'Element deleted' })
-      
       const updated = await getWorldElements(currentProjectId, null, null)
       setElements(updated || [])
+      addNotification({ type: 'success', message: 'Element deleted' })
     } catch (error) {
-      console.error('Failed to delete element:', error)
       addNotification({ type: 'error', message: 'Failed to delete element' })
     }
   }
   
-  // Handle edit element
-  const handleEditElement = (element) => {
-    setEditingElement(element)
-    setView('edit')
-  }
-  
-  // Handle CSV export
-  const handleExport = async () => {
-    try {
-      const csvData = await exportWorldElementsCsv(currentProjectId)
-      if (!csvData) {
-        addNotification({ type: 'warning', message: 'No elements to export' })
-        return
-      }
-      
-      // Download CSV
-      const blob = new Blob([csvData], { type: 'text/csv' })
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = 'world_elements.csv'
-      a.click()
-      URL.revokeObjectURL(url)
-      
-      addNotification({ type: 'success', message: 'Elements exported' })
-    } catch (error) {
-      console.error('Failed to export:', error)
-      addNotification({ type: 'error', message: 'Failed to export elements' })
-    }
-  }
-  
-  // Handle CSV import
-  const handleImport = async (csvData) => {
-    try {
-      const result = await importWorldElementsCsv(currentProjectId, csvData)
-      
-      if (result.imported > 0) {
-        addNotification({ type: 'success', message: `Imported ${result.imported} elements` })
-      }
-      if (result.errors?.length > 0) {
-        addNotification({ type: 'warning', message: `${result.errors.length} errors during import` })
-      }
-      
-      // Refresh list
-      const updated = await getWorldElements(currentProjectId, null, null)
-      setElements(updated || [])
-    } catch (error) {
-      console.error('Failed to import:', error)
-      addNotification({ type: 'error', message: 'Failed to import elements' })
-    }
-  }
-  
-  // Handle AI generate element
-  const handleGenerateElement = async (description, elementType, genre) => {
+  // AI rewrite field
+  const handleRewriteField = async (fieldId, currentValue, instruction, elementName) => {
     if (!isElectronApi) {
-      setGenerateError('AI generation requires the full Electron app with Python backend.')
-      return
+      addNotification({ type: 'warning', message: 'AI rewrite requires the Python backend' })
+      return null
     }
-    if (!currentProjectId) {
-      setGenerateError('Please select a project first.')
-      return
+    
+    if (!currentValue?.trim()) {
+      addNotification({ type: 'warning', message: 'Please add content first' })
+      return null
     }
-
-    setIsGenerating(true)
-    setGenerateError('')
+    
     try {
-      console.log('Generating world element:', { description, elementType, genre })
-      const result = await generateSingleWorldElement(description, elementType, genre)
-      console.log('AI Generation Result:', result)
+      const prompt = `You are helping rewrite a world building element's ${fieldId} for "${elementName}".
 
+Current content:
+${currentValue}
+
+User's instruction:
+${instruction}
+
+Please rewrite following the instruction. Only output the rewritten content.`
+
+      const result = await window.api.generatePluginResponse(prompt, 'rewrite', { genre: 'fiction' })
+      
       if (result && !result.error) {
-        const elementToSave = {
+        return result
+      }
+      return null
+    } catch (error) {
+      console.error('Rewrite error:', error)
+      return null
+    }
+  }
+  
+  // Generate element with AI
+  const handleGenerateElement = async (description, elementType) => {
+    if (!isElectronApi) {
+      addNotification({ type: 'warning', message: 'AI generation requires the Python backend' })
+      return
+    }
+    
+    setIsGenerating(true)
+    try {
+      const result = await window.api.generateSingleWorldElement(description, elementType, 'fiction')
+      
+      if (result && !result.error) {
+        await createWorldElement(currentProjectId, {
           name: result.name || 'Unnamed Element',
           element_type: result.element_type || elementType,
           description: result.description || '',
-          sensory_details: result.sensory_details || '',
-          significance: result.significance || '',
-          custom_traits: result.custom_traits || '',
           is_visible: 1,
-        }
+        })
         
-        const newId = await createWorldElement(currentProjectId, elementToSave)
-        
-        if (newId) {
-          addNotification({ type: 'success', message: `World element "${elementToSave.name}" generated and saved!` })
-          const updated = await getWorldElements(currentProjectId, null, null)
-          setElements(updated || [])
-          setShowGenerateModal(false)
-        } else {
-          setGenerateError('Failed to save the generated element to the database.')
-        }
+        const updated = await getWorldElements(currentProjectId, null, null)
+        setElements(updated || [])
+        setShowGenerateModal(false)
+        addNotification({ type: 'success', message: `Element "${result.name}" created!` })
       } else {
-        setGenerateError(result.error || 'AI failed to generate an element. Please try a different description.')
+        addNotification({ type: 'error', message: result?.error || 'Failed to generate' })
       }
     } catch (error) {
-      console.error('Generate element error:', error)
-      setGenerateError(`An unexpected error occurred during generation: ${error.message}`)
+      addNotification({ type: 'error', message: 'Failed to generate element' })
     } finally {
       setIsGenerating(false)
     }
   }
   
-  // Render editor view
-  if (view === 'edit') {
-    return (
-      <div className="h-full p-6">
-        <WorldElementEditor
-          element={editingElement}
-          onSave={handleSaveElement}
-          onClose={() => {
-            setView('list')
-            setEditingElement(null)
-          }}
-        />
-      </div>
-    )
-  }
-  
   return (
     <div className="h-full flex flex-col p-6">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-semibold text-text-primary flex items-center gap-2">
-            <span>{Icons.WORLD}</span>
-            <span>World Building</span>
-          </h1>
-          <p className="text-text-muted mt-1">
-            {elements.length} element{elements.length !== 1 ? 's' : ''} in project
-          </p>
+      {/* Section Header */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 mb-4">
+        <div className="flex items-center justify-between px-4 py-4 border-b border-gray-100">
+          <button
+            className="flex items-center gap-3 text-left"
+            onClick={() => setIsSectionExpanded(!isSectionExpanded)}
+          >
+            <span className="text-gray-400 text-sm">
+              {isSectionExpanded ? Icons.COLLAPSE : Icons.EXPAND}
+            </span>
+            <span className="text-2xl">{Icons.WORLD}</span>
+            <div>
+              <h1 className="text-xl font-semibold text-gray-800">Worldbuilding</h1>
+              <p className="text-sm text-gray-500">Bring your world to life with Locations, Lore, Magic, and more</p>
+            </div>
+          </button>
+          
+          <div className="flex items-center gap-2">
+            <button
+              className="flex items-center gap-1 text-primary-600 hover:text-primary-700 font-medium text-sm"
+              onClick={() => setShowCreateModal(true)}
+            >
+              <span>+</span>
+              <span>Add Element</span>
+            </button>
+            
+            <div className="relative" ref={sectionMenuRef}>
+              <button
+                className="w-8 h-8 flex items-center justify-center rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
+                onClick={() => setShowSectionMenu(!showSectionMenu)}
+              >
+                {Icons.MORE}
+              </button>
+              
+              {showSectionMenu && (
+                <div className="absolute right-0 top-full mt-1 bg-white rounded-xl shadow-lg border border-gray-100 min-w-[180px] py-2 z-50">
+                  <button
+                    className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                    onClick={() => {
+                      setShowGenerateModal(true)
+                      setShowSectionMenu(false)
+                    }}
+                  >
+                    {Icons.MAGIC} Generate with AI
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
         </div>
         
-        {/* Action Buttons */}
-        <div className="flex items-center gap-2">
-          <button
-            className="btn btn-ghost"
-            onClick={() => setShowImportModal(true)}
-            title="Import CSV"
-          >
-            <span>{Icons.IMPORT}</span>
-            <span>Import</span>
-          </button>
-          <button
-            className="btn btn-ghost"
-            onClick={handleExport}
-            title="Export CSV"
-          >
-            <span>{Icons.EXPORT}</span>
-            <span>Export</span>
-          </button>
-          <button
-            className="btn btn-secondary"
-            onClick={() => setShowGenerateModal(true)}
-            title="Generate with AI"
-          >
-            <span>{Icons.AI}</span>
-            <span>Generate with AI</span>
-          </button>
-          <button
-            className="btn btn-primary"
-            onClick={handleCreateElement}
-          >
-            <span>{Icons.PLUS}</span>
-            <span>New Element</span>
-          </button>
-        </div>
-      </div>
-      
-      {/* Type Filter Tabs */}
-      <div className="flex items-center gap-2 mb-4 overflow-x-auto pb-2">
-        {ELEMENT_TYPES.map(type => (
-          <button
-            key={type.id}
-            className={clsx(
-              'px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-all',
-              selectedType === type.id
-                ? 'bg-accent-primary text-white'
-                : 'bg-bg-card/60 text-text-muted hover:bg-bg-hover hover:text-text-primary'
+        {/* Elements List */}
+        {isSectionExpanded && (
+          <div className="p-4 max-h-[calc(100vh-250px)] overflow-y-auto">
+            {isLoading ? (
+              <div className="text-center py-8">
+                <div className="w-8 h-8 border-2 border-gray-200 border-t-primary-600 rounded-full animate-spin mx-auto mb-3" />
+                <p className="text-gray-500">Loading elements...</p>
+              </div>
+            ) : elements.length === 0 ? (
+              <div className="text-center py-12">
+                <div className="text-5xl mb-4 opacity-50">{Icons.WORLD}</div>
+                <h2 className="text-lg font-semibold text-gray-700 mb-2">No Elements Yet</h2>
+                <p className="text-gray-500 mb-4 text-sm">
+                  Start building your world by adding locations, lore, and more.
+                </p>
+                <div className="flex items-center justify-center gap-3">
+                  <button
+                    className="px-4 py-2 rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 text-sm font-medium flex items-center gap-2"
+                    onClick={() => setShowGenerateModal(true)}
+                  >
+                    {Icons.MAGIC} Generate with AI
+                  </button>
+                  <button
+                    className="px-4 py-2 rounded-lg bg-primary-600 text-white hover:bg-primary-700 text-sm font-medium flex items-center gap-2"
+                    onClick={() => setShowCreateModal(true)}
+                  >
+                    {Icons.PLUS} Create Manually
+                  </button>
+                </div>
+              </div>
+            ) : (
+              elements.map(element => (
+                <WorldElementRow
+                  key={element.id}
+                  element={element}
+                  onToggleVisibility={handleToggleVisibility}
+                  onDuplicate={handleDuplicateElement}
+                  onDelete={handleDeleteElement}
+                  onSave={handleSaveElement}
+                  onRewriteField={handleRewriteField}
+                />
+              ))
             )}
-            onClick={() => setSelectedType(type.id)}
-          >
-            <span className="mr-2">{type.icon}</span>
-            <span>{type.label}</span>
-            {type.id !== 'all' && (
-              <span className="ml-2 text-xs opacity-70">
-                ({elements.filter(e => e.element_type === type.id).length})
-              </span>
-            )}
-          </button>
-        ))}
-      </div>
-      
-      {/* Elements Grid */}
-      <div className="flex-1 overflow-y-auto">
-        {isLoading ? (
-          <div className="h-full flex items-center justify-center">
-            <div className="text-center">
-              <div className="spinner mx-auto mb-4" />
-              <p className="text-text-muted">Loading world elements...</p>
-            </div>
-          </div>
-        ) : filteredElements.length === 0 ? (
-          <div className="h-full flex items-center justify-center">
-            <div className="text-center max-w-md">
-              <div className="text-6xl mb-6">{Icons.WORLD}</div>
-              <h2 className="text-xl font-semibold text-text-primary mb-2">
-                {selectedType === 'all' ? 'No World Elements Yet' : `No ${ELEMENT_TYPES.find(t => t.id === selectedType)?.label}`}
-              </h2>
-              <p className="text-text-muted mb-6">
-                Build your world by adding settings, locations, events, and more.
-              </p>
-              <button
-                className="btn btn-primary"
-                onClick={handleCreateElement}
-              >
-                <span>{Icons.PLUS}</span>
-                <span>Create Element</span>
-              </button>
-            </div>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {filteredElements.map(element => (
-              <WorldElementCard
-                key={element.id}
-                element={element}
-                isSelected={editingElement?.id === element.id}
-                onClick={handleEditElement}
-                onToggleVisibility={handleToggleVisibility}
-                onDelete={handleDeleteElement}
-              />
-            ))}
           </div>
         )}
       </div>
       
-      {/* Import Modal */}
-      <CSVImportModal
-        isOpen={showImportModal}
-        onClose={() => setShowImportModal(false)}
-        onImport={handleImport}
+      {/* Create Modal */}
+      <CreateElementModal
+        isOpen={showCreateModal}
+        onClose={() => setShowCreateModal(false)}
+        onCreate={handleCreateElement}
       />
       
-      {/* Generate Element Modal */}
+      {/* Generate Modal */}
       <GenerateElementModal
         isOpen={showGenerateModal}
         onClose={() => setShowGenerateModal(false)}
         onGenerate={handleGenerateElement}
         isGenerating={isGenerating}
-        error={generateError}
-        clearError={() => setGenerateError('')}
       />
     </div>
   )
 }
 
 export default WorldBuilding
-

@@ -193,6 +193,10 @@ class APIBridge:
             data = params.get('data')
             return self.db.save_character(data)
         
+        elif method == 'delete_character':
+            character_id = params.get('character_id')
+            return self.db.delete_character(character_id)
+        
         # ==================== STORY BIBLE METHODS ====================
         elif method == 'get_story_bible':
             project_id = params.get('project_id')

@@ -104,11 +104,11 @@ function App() {
   // Render loading screen
   if (isLoading) {
     return (
-      <div className="h-screen w-screen flex items-center justify-center bg-[#0A0A0C] relative overflow-hidden">
+      <div className="h-screen w-screen flex items-center justify-center relative overflow-hidden">
         <AnimatedBackground />
         <div className="text-center relative z-10">
-          <div className="spinner mx-auto mb-4" style={{ borderTopColor: '#705C38' }} />
-          <p className="text-golden-400">Loading Exelsias...</p>
+          <div className="spinner mx-auto mb-4" />
+          <p className="text-gray-600">Loading Exelsias...</p>
         </div>
       </div>
     )
@@ -151,11 +151,13 @@ function App() {
       
       {/* Content Layer */}
       <div className="relative z-10 h-full flex flex-col">
-        {/* Toolbar */}
-        <Toolbar />
+        {/* Toolbar - higher z-index so dropdowns appear above content */}
+        <div className="relative z-50">
+          <Toolbar />
+        </div>
         
         {/* Main Content Area */}
-        <div className="flex-1 flex overflow-hidden">
+        <div className="flex-1 flex overflow-hidden relative z-0">
           {/* Project Sidebar */}
           <div 
             className={`

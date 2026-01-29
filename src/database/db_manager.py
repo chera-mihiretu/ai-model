@@ -1071,10 +1071,7 @@ class DatabaseManager:
         try:
             with self.get_connection() as conn:
                 cursor = conn.cursor()
-                pid = data.get('project_id', 0)
-                
-                # Dynamic update/insert based on provided keys would be better, but fixed schema is safer for now
-                # We must ensure all keys are present or handled
+                character_id = data.get('id')
                 
                 keys = [
                     'project_id', 'name', 'role', 'personality_traits', 'speech_pattern', 
@@ -1091,18 +1088,52 @@ class DatabaseManager:
                     else:
                         values.append(data.get(k, ''))
 
-                placeholders = ", ".join(["?"] * len(keys))
-                columns = ", ".join(keys)
-
-                cursor.execute(f"""
-                    INSERT OR REPLACE INTO characters 
-                    ({columns})
-                    VALUES ({placeholders})
-                """, values)
+                if character_id:
+                    # Update existing character
+                    set_clause = ", ".join([f"{k} = ?" for k in keys])
+                    values.append(character_id)
+                    cursor.execute(f"""
+                        UPDATE characters 
+                        SET {set_clause}
+                        WHERE id = ?
+                    """, values)
+                else:
+                    # Insert new character
+                    placeholders = ", ".join(["?"] * len(keys))
+                    columns = ", ".join(keys)
+                    cursor.execute(f"""
+                        INSERT INTO characters 
+                        ({columns})
+                        VALUES ({placeholders})
+                    """, values)
+                
                 conn.commit()
                 return True
         except sqlite3.Error as e:
             logging.error(f"Save character error: {e}")
+            return False
+
+    def delete_character(self, character_id: int):
+        """Delete a character by ID."""
+        try:
+            if not character_id:
+                logging.error("Delete character error: No character_id provided")
+                return False
+            
+            logging.info(f"Attempting to delete character with id={character_id}")
+            
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("DELETE FROM characters WHERE id = ?", (character_id,))
+                conn.commit()
+                
+                deleted = cursor.rowcount > 0
+                logging.info(f"Delete character result: rowcount={cursor.rowcount}, deleted={deleted}")
+                return True  # Return True even if no rows affected (character might already be deleted)
+        except Exception as e:
+            logging.error(f"Delete character error: {e}")
+            import traceback
+            logging.error(traceback.format_exc())
             return False
 
     def get_all_characters(self, project_id: int):

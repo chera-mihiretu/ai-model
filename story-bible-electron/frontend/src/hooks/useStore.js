@@ -83,6 +83,21 @@ export const useStore = create((set, get) => ({
   // Editor insertion callback
   editorInsertCallback: null,
   
+  // Editor cursor context callback - returns { precedingText, cursorPosition, fullText }
+  editorCursorContextCallback: null,
+  
+  // Editor selection callback - returns { selectedText, selectionStart, selectionEnd }
+  editorSelectionCallback: null,
+  
+  // Current editor selection state (stored when selection changes)
+  currentEditorSelection: { selectedText: '', selectionStart: 0, selectionEnd: 0, hasSelection: false },
+  
+  // Editor replace selection callback - replaces selected text with new text
+  editorReplaceSelectionCallback: null,
+  
+  // Editor reference for direct access
+  editorInstance: null,
+  
   setAiStatus: (status, message) => set({ 
     aiStatus: status, 
     aiStatusMessage: message 
@@ -107,6 +122,21 @@ export const useStore = create((set, get) => ({
   
   // Set editor insert callback
   setEditorInsertCallback: (callback) => set({ editorInsertCallback: callback }),
+  
+  // Set editor cursor context callback
+  setEditorCursorContextCallback: (callback) => set({ editorCursorContextCallback: callback }),
+  
+  // Set editor selection callback
+  setEditorSelectionCallback: (callback) => set({ editorSelectionCallback: callback }),
+  
+  // Set current editor selection state
+  setCurrentEditorSelection: (selection) => set({ currentEditorSelection: selection }),
+  
+  // Set editor replace selection callback
+  setEditorReplaceSelectionCallback: (callback) => set({ editorReplaceSelectionCallback: callback }),
+  
+  // Set editor instance
+  setEditorInstance: (editor) => set({ editorInstance: editor }),
   
   // ==================== TTS STATE ====================
   ttsVoices: [],

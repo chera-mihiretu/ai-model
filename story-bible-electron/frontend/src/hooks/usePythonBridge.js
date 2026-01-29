@@ -7,7 +7,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import useStore from './useStore'
-import localStorageAdapter from '../utils/localStorageAdapter'
+import localStorageAdapter, { deleteCharacter as deleteCharacterLocal } from '../utils/localStorageAdapter'
 
 export function usePythonBridge() {
   const { 
@@ -244,6 +244,27 @@ export function usePythonBridge() {
     } catch (error) {
       console.error('Failed to save character:', error)
       addNotification({ type: 'error', message: 'Failed to save character' })
+      return false
+    }
+  }, [isElectronApi, api, addNotification])
+  
+  const deleteCharacter = useCallback(async (characterId) => {
+    try {
+      console.log('deleteCharacter called with id:', characterId, 'isElectronApi:', isElectronApi)
+      
+      let result
+      if (isElectronApi) {
+        result = await api.deleteCharacter(characterId)
+      } else {
+        // Use directly imported function for localStorage mode
+        result = deleteCharacterLocal(characterId)
+      }
+      
+      console.log('deleteCharacter result:', result)
+      return result
+    } catch (error) {
+      console.error('Failed to delete character:', error)
+      addNotification({ type: 'error', message: `Failed to delete character: ${error.message || error}` })
       return false
     }
   }, [isElectronApi, api, addNotification])
@@ -800,6 +821,7 @@ export function usePythonBridge() {
     // Characters
     getCharacters,
     saveCharacter,
+    deleteCharacter,
     
     // Story Bible
     getStoryBible,

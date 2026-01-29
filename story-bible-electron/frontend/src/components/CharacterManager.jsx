@@ -1,7 +1,7 @@
 /**
  * Character Manager Component
  * ===========================
- * Manages character profiles with card layout and AI generation.
+ * Manages character profiles with expandable list layout and AI generation.
  */
 
 import { useState, useEffect, useRef } from 'react'
@@ -26,6 +26,11 @@ const Icons = {
   MAGIC: '🪄',
   IMPORT: '📥',
   EXPORT: '📤',
+  DRAG: '⋮⋮',
+  EXPAND: '▶',
+  COLLAPSE: '▼',
+  COPY: '📋',
+  CLOCK: '🕐',
 }
 
 // Character field configuration
@@ -56,48 +61,402 @@ const EXAMPLE_PROMPTS = [
   "A time-traveling scientist stuck in the wrong era",
 ]
 
-function CharacterCard({ character, isSelected, onClick, onToggleVisibility }) {
-  const isVisible = character.is_visible !== 0
+// Role options for dropdown
+const ROLE_OPTIONS = [
+  'Protagonist',
+  'Antagonist',
+  'Supporting',
+  'Minor',
+  'Mentor',
+  'Love Interest',
+  'Sidekick',
+  'Villain',
+  'Other'
+]
+
+// Editable field with AI rewrite capability
+function EditableField({ label, value, onChange, onSave, onRewrite, placeholder, isRewriting }) {
+  const [isFocused, setIsFocused] = useState(false)
+  const [showRewriteInput, setShowRewriteInput] = useState(false)
+  const [rewriteInstruction, setRewriteInstruction] = useState('')
+  const textareaRef = useRef(null)
+  
+  const handleRewrite = async () => {
+    if (rewriteInstruction.trim() && value?.trim()) {
+      await onRewrite(rewriteInstruction.trim())
+      setRewriteInstruction('')
+      setShowRewriteInput(false)
+      setIsFocused(false)
+    }
+  }
+  
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+      e.preventDefault()
+      handleRewrite()
+    }
+    if (e.key === 'Escape') {
+      setShowRewriteInput(false)
+      setRewriteInstruction('')
+    }
+  }
+  
+  // Close rewrite input when clicking outside
+  const handleBlur = (e) => {
+    // Check if the new focus target is within our component
+    const currentTarget = e.currentTarget
+    setTimeout(() => {
+      if (!currentTarget.contains(document.activeElement) && !showRewriteInput) {
+        setIsFocused(false)
+        onSave()
+      }
+    }, 100)
+  }
   
   return (
-    <div
+    <div 
       className={clsx(
-        'character-card',
-        isSelected && 'border-accent-primary ring-2 ring-accent-primary/30'
+        "rounded-xl p-4 border transition-all",
+        isFocused || showRewriteInput
+          ? "bg-purple-50/50 border-purple-200"
+          : "bg-gray-50 border-gray-100"
       )}
-      onClick={() => onClick(character)}
+      onBlur={handleBlur}
     >
-      {/* Header */}
-      <div className="flex items-start justify-between mb-3">
-        <div className="flex items-center gap-2">
-          <span className="text-2xl">{Icons.PERSON}</span>
-          <div>
-            <h3 className="font-semibold text-text-primary">{character.name}</h3>
-            <p className="text-sm text-text-muted">{character.role || 'No role'}</p>
-          </div>
-        </div>
+      <div className="flex items-center justify-between mb-2">
+        <label className="text-sm font-medium text-gray-600">{label}</label>
         <button
-          className={clsx(
-            'w-8 h-8 flex items-center justify-center rounded-lg transition-colors',
-            isVisible
-              ? 'bg-green-500/20 text-green-400'
-              : 'bg-red-500/20 text-red-400'
-          )}
-          onClick={(e) => {
-            e.stopPropagation()
-            onToggleVisibility(character)
-          }}
-          title={isVisible ? 'Visible to AI' : 'Hidden from AI'}
+          className="w-6 h-6 flex items-center justify-center rounded text-gray-400 hover:text-gray-600 hover:bg-gray-200 transition-colors"
+          title="More options"
         >
-          {isVisible ? Icons.VISIBLE : Icons.HIDDEN}
+          {Icons.MORE}
         </button>
       </div>
       
-      {/* Preview */}
-      {character.personality_traits && (
-        <p className="text-sm text-text-secondary line-clamp-2">
-          {character.personality_traits}
-        </p>
+      <div className="relative">
+        <textarea
+          ref={textareaRef}
+          className={clsx(
+            "w-full px-3 py-3 text-sm bg-white border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent min-h-[80px] resize-none transition-all",
+            isRewriting ? "opacity-50" : ""
+          )}
+          value={value || ''}
+          onChange={(e) => onChange(e.target.value)}
+          onFocus={() => setIsFocused(true)}
+          placeholder={placeholder}
+          disabled={isRewriting}
+        />
+        
+        {/* Visibility toggle */}
+        <button
+          className="absolute top-3 right-3 w-6 h-6 flex items-center justify-center rounded text-gray-400 hover:text-gray-600 transition-colors"
+          title="Toggle visibility"
+        >
+          {Icons.VISIBLE}
+        </button>
+        
+        {/* Loading overlay */}
+        {isRewriting && (
+          <div className="absolute inset-0 flex items-center justify-center bg-white/80 rounded-lg">
+            <div className="flex items-center gap-2 text-primary-600">
+              <div className="w-5 h-5 border-2 border-primary-200 border-t-primary-600 rounded-full animate-spin" />
+              <span className="text-sm font-medium">Rewriting...</span>
+            </div>
+          </div>
+        )}
+      </div>
+      
+      {/* Rewrite Button - Shows ONLY when input is focused and has content */}
+      {isFocused && value?.trim() && !showRewriteInput && !isRewriting && (
+        <button
+          className="mt-3 flex items-center gap-1.5 text-sm text-primary-600 hover:text-primary-700 font-medium transition-colors"
+          onClick={() => setShowRewriteInput(true)}
+          onMouseDown={(e) => e.preventDefault()} // Prevent blur
+        >
+          <span className="text-base">✨</span>
+          <span>Rewrite...</span>
+        </button>
+      )}
+      
+      {/* Rewrite Input */}
+      {showRewriteInput && !isRewriting && (
+        <div className="mt-3">
+          <div className="flex items-center gap-2">
+            <input
+              type="text"
+              className="flex-1 px-3 py-2.5 text-sm bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+              placeholder={`Tell AI how to rewrite "${label}"...`}
+              value={rewriteInstruction}
+              onChange={(e) => setRewriteInstruction(e.target.value)}
+              onKeyDown={handleKeyDown}
+              autoFocus
+            />
+            <button
+              className={clsx(
+                'px-4 py-2.5 rounded-lg text-sm font-medium flex items-center gap-2 transition-all min-w-[90px] justify-center',
+                rewriteInstruction.trim() && value?.trim()
+                  ? 'bg-primary-600 text-white hover:bg-primary-700 shadow-sm'
+                  : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+              )}
+              onClick={handleRewrite}
+              disabled={!rewriteInstruction.trim() || !value?.trim() || isRewriting}
+            >
+              <span>Go</span>
+              <span className="text-xs bg-white/20 px-1.5 py-0.5 rounded">ctrl</span>
+              <span className="text-xs">↵</span>
+            </button>
+          </div>
+          <button
+            className="mt-2 text-xs text-gray-400 hover:text-gray-600 transition-colors"
+            onClick={() => {
+              setShowRewriteInput(false)
+              setRewriteInstruction('')
+            }}
+          >
+            Cancel (Esc)
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function CharacterRow({ character, onToggleVisibility, onDuplicate, onDelete, onRoleChange, onSave, onRewriteField }) {
+  const [isExpanded, setIsExpanded] = useState(false)
+  const [showMenu, setShowMenu] = useState(false)
+  const [menuPosition, setMenuPosition] = useState({ top: 0, right: 0 })
+  const [editData, setEditData] = useState(character)
+  const [isDirty, setIsDirty] = useState(false)
+  const [rewritingField, setRewritingField] = useState(null)
+  const menuRef = useRef(null)
+  const menuButtonRef = useRef(null)
+  const isVisible = character.is_visible !== 0
+  
+  // Update editData when character changes
+  useEffect(() => {
+    setEditData(character)
+    setIsDirty(false)
+  }, [character])
+  
+  // Close menu when clicking outside
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (menuRef.current && !menuRef.current.contains(event.target)) {
+        setShowMenu(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
+  
+  // Handle field change
+  const handleChange = (field, value) => {
+    setEditData(prev => ({ ...prev, [field]: value }))
+    setIsDirty(true)
+  }
+  
+  // Handle save
+  const handleSave = () => {
+    if (isDirty) {
+      onSave(editData)
+      setIsDirty(false)
+    }
+  }
+  
+  // Handle name change with blur save
+  const handleNameBlur = () => {
+    if (isDirty && editData.name?.trim()) {
+      handleSave()
+    }
+  }
+  
+  // Handle AI rewrite for a field
+  const handleRewrite = async (field, instruction) => {
+    if (!onRewriteField) return
+    
+    setRewritingField(field)
+    try {
+      const rewritten = await onRewriteField(field, editData[field], instruction, editData.name)
+      if (rewritten) {
+        handleChange(field, rewritten)
+        // Auto-save after rewrite
+        const newData = { ...editData, [field]: rewritten }
+        onSave(newData)
+      }
+    } finally {
+      setRewritingField(null)
+    }
+  }
+  
+  // Field configuration for the expanded view
+  const fields = [
+    { id: 'pronouns', label: 'Pronouns', placeholder: 'e.g., he/him, she/her, they/them' },
+    { id: 'personality_traits', label: 'Personality Traits', placeholder: 'Key personality characteristics...' },
+    { id: 'physical_description', label: 'Physical Description', placeholder: 'Appearance, mannerisms...' },
+    { id: 'backstory', label: 'Backstory', placeholder: 'Character history...' },
+    { id: 'motivations', label: 'Motivations', placeholder: 'What drives this character...' },
+    { id: 'internal_conflicts', label: 'Internal Conflicts', placeholder: 'Inner struggles...' },
+    { id: 'strengths', label: 'Strengths', placeholder: 'Character strengths...' },
+    { id: 'weaknesses', label: 'Weaknesses', placeholder: 'Character flaws...' },
+    { id: 'speech_pattern', label: 'Speech Pattern', placeholder: 'How they talk...' },
+    { id: 'character_arc', label: 'Character Arc', placeholder: 'How they change throughout the story...' },
+  ]
+  
+  return (
+    <div className="border-b border-gray-100 last:border-b-0">
+      {/* Main Row */}
+      <div className="flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-colors group">
+        {/* Drag Handle */}
+        <span className="text-gray-300 cursor-grab text-sm">{Icons.DRAG}</span>
+        
+        {/* Expand Arrow */}
+        <button
+          className="w-5 h-5 flex items-center justify-center text-gray-400 hover:text-gray-600 transition-colors"
+          onClick={() => setIsExpanded(!isExpanded)}
+        >
+          {isExpanded ? Icons.COLLAPSE : Icons.EXPAND}
+        </button>
+        
+        {/* Character Name - Editable */}
+        <input
+          type="text"
+          className="flex-1 font-medium text-gray-800 bg-transparent border-none focus:outline-none focus:ring-0 hover:bg-gray-100 focus:bg-white px-2 py-1 rounded"
+          value={editData.name || ''}
+          onChange={(e) => handleChange('name', e.target.value)}
+          onBlur={handleNameBlur}
+          placeholder="Character name..."
+        />
+        
+        {/* Role Dropdown */}
+        <div className="relative">
+          <select
+            className="appearance-none bg-gray-100 border border-gray-200 rounded-lg px-3 py-1.5 text-sm text-gray-600 cursor-pointer hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-primary-500"
+            value={editData.role || 'Other'}
+            onChange={(e) => {
+              handleChange('role', e.target.value)
+              onRoleChange(character, e.target.value)
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {ROLE_OPTIONS.map(role => (
+              <option key={role} value={role}>{role}</option>
+            ))}
+          </select>
+          <span className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400 text-xs">▼</span>
+        </div>
+        
+        {/* Action Icons */}
+        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+          {/* Visibility Toggle */}
+          <button
+            className={clsx(
+              'w-8 h-8 flex items-center justify-center rounded-lg transition-colors',
+              isVisible
+                ? 'text-gray-400 hover:text-green-500 hover:bg-green-50'
+                : 'text-red-400 hover:text-red-500 hover:bg-red-50'
+            )}
+            onClick={() => onToggleVisibility(character)}
+            title={isVisible ? 'Visible to AI (click to hide)' : 'Hidden from AI (click to show)'}
+          >
+            {isVisible ? Icons.VISIBLE : Icons.HIDDEN}
+          </button>
+          
+          {/* Clock/History (placeholder) */}
+          <button
+            className="w-8 h-8 flex items-center justify-center rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
+            title="History"
+          >
+            {Icons.CLOCK}
+          </button>
+          
+          {/* Duplicate */}
+          <button
+            className="w-8 h-8 flex items-center justify-center rounded-lg text-gray-400 hover:text-primary-600 hover:bg-primary-50 transition-colors"
+            onClick={() => onDuplicate(character)}
+            title="Duplicate"
+          >
+            {Icons.COPY}
+          </button>
+          
+          {/* More Menu */}
+          <div className="relative" ref={menuRef}>
+            <button
+              ref={menuButtonRef}
+              className="w-8 h-8 flex items-center justify-center rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
+              onClick={() => {
+                if (!showMenu && menuButtonRef.current) {
+                  const rect = menuButtonRef.current.getBoundingClientRect()
+                  setMenuPosition({
+                    top: rect.bottom + 4,
+                    right: window.innerWidth - rect.right
+                  })
+                }
+                setShowMenu(!showMenu)
+              }}
+            >
+              {Icons.MORE}
+            </button>
+            
+            {showMenu && (
+              <div 
+                className="fixed bg-white rounded-xl shadow-lg border border-gray-100 min-w-[140px] py-2 z-[9999]"
+                style={{ top: menuPosition.top, right: menuPosition.right }}
+              >
+                <button
+                  className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                  onClick={() => {
+                    onDuplicate(character)
+                    setShowMenu(false)
+                  }}
+                >
+                  {Icons.COPY} Duplicate
+                </button>
+                <button
+                  className="w-full px-4 py-2 text-left text-sm text-red-500 hover:bg-red-50 flex items-center gap-2"
+                  onClick={() => {
+                    onDelete(character)
+                    setShowMenu(false)
+                  }}
+                >
+                  {Icons.DELETE} Delete
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+      
+      {/* Expanded Content - All fields vertical */}
+      {isExpanded && (
+        <div className="px-12 pb-6 bg-gray-50/30 animate-fade-in">
+          <div className="space-y-4">
+            {fields.map(field => (
+              <EditableField
+                key={field.id}
+                label={field.label}
+                value={editData[field.id]}
+                onChange={(value) => handleChange(field.id, value)}
+                onSave={handleSave}
+                onRewrite={(instruction) => handleRewrite(field.id, instruction)}
+                placeholder={field.placeholder}
+                isRewriting={rewritingField === field.id}
+              />
+            ))}
+          </div>
+          
+          {/* Save indicator */}
+          {isDirty && (
+            <div className="mt-4 flex items-center justify-end gap-2">
+              <span className="text-xs text-gray-500">Unsaved changes</span>
+              <button
+                className="px-4 py-2 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700 font-medium"
+                onClick={handleSave}
+              >
+                Save Changes
+              </button>
+            </div>
+          )}
+        </div>
       )}
     </div>
   )
@@ -438,6 +797,7 @@ function CharacterManager() {
   const {
     getCharacters,
     saveCharacter,
+    deleteCharacter,
     isElectronApi,
     exportCharactersCsv,
     importCharactersCsv,
@@ -448,6 +808,20 @@ function CharacterManager() {
   const [isGenerating, setIsGenerating] = useState(false)
   const [showGenerateModal, setShowGenerateModal] = useState(false)
   const [showImportModal, setShowImportModal] = useState(false)
+  const [isSectionExpanded, setIsSectionExpanded] = useState(true)
+  const [showSectionMenu, setShowSectionMenu] = useState(false)
+  const sectionMenuRef = useRef(null)
+  
+  // Close section menu when clicking outside
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (sectionMenuRef.current && !sectionMenuRef.current.contains(event.target)) {
+        setShowSectionMenu(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
   
   // Refresh characters
   useEffect(() => {
@@ -560,9 +934,13 @@ function CharacterManager() {
       // Refresh characters list
       const chars = await getCharacters(currentProjectId)
       setCharacters(chars)
-      setView('list')
-      setEditingCharacter(null)
-      addNotification({ type: 'success', message: 'Character saved' })
+      
+      // Only change view if we're in edit mode (for new character creation)
+      if (view === 'edit') {
+        setView('list')
+        setEditingCharacter(null)
+        addNotification({ type: 'success', message: 'Character saved' })
+      }
     }
   }
   
@@ -579,10 +957,126 @@ function CharacterManager() {
     setCharacters(chars)
   }
   
-  // Handle edit character
-  const handleEditCharacter = (character) => {
-    setEditingCharacter(character)
-    setView('edit')
+  // Handle role change
+  const handleRoleChange = async (character, newRole) => {
+    await saveCharacter({
+      ...character,
+      role: newRole,
+    })
+    
+    // Refresh characters
+    const chars = await getCharacters(currentProjectId)
+    setCharacters(chars)
+  }
+  
+  // Handle duplicate character
+  const handleDuplicateCharacter = async (character) => {
+    const duplicateChar = {
+      ...character,
+      id: undefined,
+      name: `${character.name} (Copy)`,
+      project_id: currentProjectId,
+    }
+    
+    const success = await saveCharacter(duplicateChar)
+    if (success) {
+      const chars = await getCharacters(currentProjectId)
+      setCharacters(chars)
+      addNotification({ type: 'success', message: `Character duplicated` })
+    }
+  }
+  
+  // Handle delete character
+  const handleDeleteCharacter = async (character) => {
+    if (!confirm(`Delete "${character.name}"? This cannot be undone.`)) return
+    
+    console.log('Deleting character:', character)
+    console.log('Character ID:', character.id, 'Type:', typeof character.id)
+    
+    try {
+      if (!character.id) {
+        addNotification({ type: 'error', message: 'Character has no ID - cannot delete' })
+        return
+      }
+      
+      // Try to use deleteCharacter if available
+      if (deleteCharacter) {
+        console.log('Calling deleteCharacter with id:', character.id)
+        const result = await deleteCharacter(character.id)
+        console.log('Delete result:', result)
+        
+        if (result === false) {
+          addNotification({ type: 'error', message: 'Failed to delete character from database' })
+          return
+        }
+      } else {
+        addNotification({ type: 'error', message: 'Delete function not available' })
+        return
+      }
+      
+      const chars = await getCharacters(currentProjectId)
+      setCharacters(chars)
+      addNotification({ type: 'success', message: 'Character deleted' })
+    } catch (error) {
+      console.error('Delete error:', error)
+      addNotification({ type: 'error', message: `Failed to delete character: ${error.message}` })
+    }
+  }
+  
+  // Handle AI rewrite for a field
+  const handleRewriteField = async (fieldId, currentValue, instruction, characterName) => {
+    if (!isElectronApi) {
+      addNotification({ type: 'warning', message: 'AI rewrite requires the Python backend' })
+      return null
+    }
+    
+    if (!currentValue?.trim()) {
+      addNotification({ type: 'warning', message: 'Please add some content first before rewriting' })
+      return null
+    }
+    
+    try {
+      // Build a prompt for the AI to rewrite the field
+      const fieldLabels = {
+        pronouns: 'Pronouns',
+        personality_traits: 'Personality Traits',
+        physical_description: 'Physical Description',
+        backstory: 'Backstory',
+        motivations: 'Motivations',
+        internal_conflicts: 'Internal Conflicts',
+        strengths: 'Strengths',
+        weaknesses: 'Weaknesses',
+        speech_pattern: 'Speech Pattern',
+        character_arc: 'Character Arc',
+      }
+      
+      const fieldLabel = fieldLabels[fieldId] || fieldId
+      
+      // Use the plugin response API to rewrite
+      const prompt = `You are helping rewrite a character's ${fieldLabel} for "${characterName}".
+
+Current content:
+${currentValue}
+
+User's instruction for improvement:
+${instruction}
+
+Please rewrite the ${fieldLabel} following the user's instruction. Keep it concise and well-written. Only output the rewritten content, no explanations or formatting.`
+
+      const result = await window.api.generatePluginResponse(prompt, 'rewrite', { genre: 'fiction' })
+      
+      if (result && !result.error) {
+        addNotification({ type: 'success', message: `${fieldLabel} rewritten` })
+        return result
+      } else {
+        addNotification({ type: 'error', message: result?.error || 'Failed to rewrite' })
+        return null
+      }
+    } catch (error) {
+      console.error('Rewrite error:', error)
+      addNotification({ type: 'error', message: 'Failed to rewrite field' })
+      return null
+    }
   }
   
   // Handle CSV export
@@ -649,92 +1143,115 @@ function CharacterManager() {
   
   return (
     <div className="h-full flex flex-col p-6">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-semibold text-text-primary">Characters</h1>
-          <p className="text-text-muted mt-1">
-            {characters.length} character{characters.length !== 1 ? 's' : ''} in project
-          </p>
-        </div>
-        
-        {/* Action Buttons */}
-        <div className="flex items-center gap-2">
+      {/* Section Header - Collapsible */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 mb-4">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
           <button
-            className="btn btn-ghost"
-            onClick={() => setShowImportModal(true)}
-            title="Import CSV"
+            className="flex items-center gap-3 text-left"
+            onClick={() => setIsSectionExpanded(!isSectionExpanded)}
           >
-            <span>{Icons.IMPORT}</span>
-            <span>Import</span>
+            <span className="text-gray-400 text-sm">
+              {isSectionExpanded ? Icons.COLLAPSE : Icons.EXPAND}
+            </span>
+            <span className="text-lg">{Icons.PERSON}</span>
+            <span className="font-semibold text-gray-800">Characters</span>
           </button>
-          <button
-            className="btn btn-ghost"
-            onClick={handleExport}
-            title="Export CSV"
-          >
-            <span>{Icons.EXPORT}</span>
-            <span>Export</span>
-          </button>
-          <button 
-            className="btn btn-secondary flex items-center gap-2"
-            onClick={() => setShowGenerateModal(true)}
-            title="Generate character with AI"
-          >
-            <span>{Icons.MAGIC}</span>
-            <span>Generate with AI</span>
-          </button>
-          <button 
-            className="btn btn-primary flex items-center gap-2"
-            onClick={handleCreateBlankCharacter}
-          >
-            <span>{Icons.PLUS}</span>
-            <span>New Character</span>
-          </button>
-        </div>
-      </div>
-      
-      {/* Character Grid */}
-      <div className="flex-1 overflow-y-auto">
-        {characters.length === 0 ? (
-          <div className="h-full flex items-center justify-center">
-            <div className="text-center max-w-md">
-              <div className="text-6xl mb-6">👥</div>
-              <h2 className="text-xl font-semibold text-text-primary mb-2">
-                No Characters Yet
-              </h2>
-              <p className="text-text-muted mb-6">
-                Create your first character to start building your story's cast.
-              </p>
-              <div className="flex items-center justify-center gap-3">
-                <button
-                  className="btn btn-secondary"
-                  onClick={() => setShowGenerateModal(true)}
-                >
-                  <span>{Icons.MAGIC}</span>
-                  <span>Generate with AI</span>
-                </button>
-                <button
-                  className="btn btn-primary"
-                  onClick={handleCreateBlankCharacter}
-                >
-                  <span>{Icons.PLUS}</span>
-                  <span>Create Manually</span>
-                </button>
-              </div>
+          
+          <div className="flex items-center gap-2">
+            {/* Add Character Button */}
+            <button
+              className="flex items-center gap-1 text-primary-600 hover:text-primary-700 font-medium text-sm"
+              onClick={handleCreateBlankCharacter}
+            >
+              <span>+</span>
+              <span>Add Character</span>
+            </button>
+            
+            {/* Section Menu */}
+            <div className="relative" ref={sectionMenuRef}>
+              <button
+                className="w-8 h-8 flex items-center justify-center rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
+                onClick={() => setShowSectionMenu(!showSectionMenu)}
+              >
+                {Icons.MORE}
+              </button>
+              
+              {showSectionMenu && (
+                <div className="absolute right-0 top-full mt-1 bg-white rounded-xl shadow-lg border border-gray-100 min-w-[180px] py-2 z-50">
+                  <button
+                    className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                    onClick={() => {
+                      setShowGenerateModal(true)
+                      setShowSectionMenu(false)
+                    }}
+                  >
+                    {Icons.MAGIC} Generate with AI
+                  </button>
+                  <button
+                    className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                    onClick={() => {
+                      setShowImportModal(true)
+                      setShowSectionMenu(false)
+                    }}
+                  >
+                    {Icons.IMPORT} Import CSV
+                  </button>
+                  <button
+                    className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                    onClick={() => {
+                      handleExport()
+                      setShowSectionMenu(false)
+                    }}
+                  >
+                    {Icons.EXPORT} Export CSV
+                  </button>
+                </div>
+              )}
             </div>
           </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {characters.map(character => (
-              <CharacterCard
-                key={character.id || character.name}
-                character={character}
-                isSelected={selectedCharacterId === character.id}
-                onClick={handleEditCharacter}
-                onToggleVisibility={handleToggleVisibility}
-              />
-            ))}
+        </div>
+        
+        {/* Character List */}
+        {isSectionExpanded && (
+          <div className="max-h-[calc(100vh-250px)] overflow-y-auto">
+            {characters.length === 0 ? (
+              <div className="text-center py-12">
+                <div className="text-5xl mb-4 opacity-50">👥</div>
+                <h2 className="text-lg font-semibold text-gray-700 mb-2">
+                  No Characters Yet
+                </h2>
+                <p className="text-gray-500 mb-4 text-sm">
+                  Create your first character to start building your story's cast.
+                </p>
+                <div className="flex items-center justify-center gap-3">
+                  <button
+                    className="px-4 py-2 rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 text-sm font-medium flex items-center gap-2"
+                    onClick={() => setShowGenerateModal(true)}
+                  >
+                    {Icons.MAGIC} Generate with AI
+                  </button>
+                  <button
+                    className="px-4 py-2 rounded-lg bg-primary-600 text-white hover:bg-primary-700 text-sm font-medium flex items-center gap-2"
+                    onClick={handleCreateBlankCharacter}
+                  >
+                    {Icons.PLUS} Create Manually
+                  </button>
+                </div>
+              </div>
+            ) : (
+              characters.map(character => (
+                <CharacterRow
+                  key={character.id || character.name}
+                  character={character}
+                  onToggleVisibility={handleToggleVisibility}
+                  onDuplicate={handleDuplicateCharacter}
+                  onDelete={handleDeleteCharacter}
+                  onRoleChange={handleRoleChange}
+                  onSave={handleSaveCharacter}
+                  onRewriteField={handleRewriteField}
+                />
+              ))
+            )}
           </div>
         )}
       </div>
