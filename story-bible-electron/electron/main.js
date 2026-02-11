@@ -242,10 +242,20 @@ function sendToPython(method, params = {}) {
     // Send request to Python
     pythonProcess.stdin.write(JSON.stringify(request) + '\n');
     
-    // Timeout for response - longer for AI operations
-    const timeoutMs = method.includes('generate') || method.includes('ai') || method.includes('stream') 
-      || method.includes('lore') || method.includes('assistant')
-      ? 300000  // 5 minutes for AI generation
+    // Timeout for response - longer for AI operations and manuscript parsing
+    const isLongOperation = 
+      method.includes('generate') || 
+      method.includes('ai') || 
+      method.includes('stream') || 
+      method.includes('lore') || 
+      method.includes('assistant') ||
+      method.includes('parse') ||      // parse_manuscript
+      method.includes('import') ||     // import_manuscript
+      method.includes('extract') ||    // character/element extraction
+      method.includes('analyze');      // text analysis
+    
+    const timeoutMs = isLongOperation
+      ? 600000  // 10 minutes for AI generation and large manuscript processing
       : 60000;  // 60 seconds for regular operations
     
     setTimeout(() => {

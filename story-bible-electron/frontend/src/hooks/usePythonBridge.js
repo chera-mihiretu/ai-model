@@ -810,6 +810,50 @@ export function usePythonBridge() {
     }
   }, [isElectronApi, api])
   
+  const ttsDownload = useCallback(async (text, voice) => {
+    if (!text || !text.trim()) {
+      addNotification({ type: 'warning', message: 'No text to convert to speech' })
+      return false
+    }
+    
+    if (!isElectronApi) {
+      addNotification({ type: 'warning', message: 'Speech download requires the desktop app' })
+      return false
+    }
+    
+    try {
+      // Open save dialog
+      const result = await api.saveFileDialog({
+        title: 'Save Speech Audio',
+        defaultPath: 'speech.mp3',
+        filters: [
+          { name: 'MP3 Audio', extensions: ['mp3'] },
+        ],
+      })
+      
+      if (result.canceled || !result.filePath) {
+        return false
+      }
+      
+      addNotification({ type: 'info', message: 'Generating speech audio...' })
+      
+      // Generate MP3 to the chosen path
+      const filePath = await api.ttsGenerateMp3(text, voice, result.filePath)
+      
+      if (filePath) {
+        addNotification({ type: 'success', message: 'Speech audio saved successfully!' })
+        return true
+      } else {
+        addNotification({ type: 'error', message: 'Failed to generate speech audio' })
+        return false
+      }
+    } catch (error) {
+      console.error('TTS download failed:', error)
+      addNotification({ type: 'error', message: `Speech download failed: ${error.message}` })
+      return false
+    }
+  }, [isElectronApi, api, addNotification])
+  
   // Cleanup on unmount
   useEffect(() => {
     return () => {
@@ -868,6 +912,7 @@ export function usePythonBridge() {
     ttsSpeak,
     ttsStop,
     ttsIsPlaying,
+    ttsDownload,
     
     // World Elements
     getWorldElements,
@@ -903,95 +948,51 @@ export function usePythonBridge() {
     // Import Novel
     parseManuscript: async (content, extractAll = true) => {
       if (!isElectronApi) {
-        // Offline mode - simple chapter detection only
-        const lines = content.split('\n')
-        const chapters = []
-        let currentChapter = null
-        let currentContent = []
-        
-        for (const line of lines) {
-          if (/^(Chapter|CHAPTER|Part|PART)\s+\d+/i.test(line.trim())) {
-            if (currentChapter) {
-              chapters.push({ title: currentChapter, content: currentContent.join('\n').trim() })
-            }
-            currentChapter = line.trim()
-            currentContent = []
-          } else if (currentChapter) {
-            currentContent.push(line)
-          }
-        }
-        if (currentChapter) {
-          chapters.push({ title: currentChapter, content: currentContent.join('\n').trim() })
-        }
-        if (chapters.length === 0) {
-          chapters.push({ title: 'Chapter 1', content: content.trim() })
-        }
-        
-        return {
-          chapters,
-          synopsis: '',
-          characters: [],
-          world_elements: [],
-          word_count: content.split(/\s+/).length
-        }
+        // Use localStorageAdapter's parse function
+        return localStorageAdapter.parseManuscript(content, extractAll)
       }
       
       try {
         return await api.parseManuscript(content, extractAll)
       } catch (error) {
         console.error('Parse manuscript failed:', error)
-        return { chapters: [], synopsis: '', characters: [], world_elements: [] }
+        // Fallback to local parsing
+        return localStorageAdapter.parseManuscript(content, extractAll)
       }
     },
     
     detectChapters: async (content) => {
       if (!isElectronApi) {
-        // Same simple detection as above
-        const lines = content.split('\n')
-        const chapters = []
-        let currentChapter = null
-        let currentContent = []
-        
-        for (const line of lines) {
-          if (/^(Chapter|CHAPTER|Part|PART)\s+\d+/i.test(line.trim())) {
-            if (currentChapter) {
-              chapters.push({ title: currentChapter, content: currentContent.join('\n').trim() })
-            }
-            currentChapter = line.trim()
-            currentContent = []
-          } else if (currentChapter) {
-            currentContent.push(line)
-          }
-        }
-        if (currentChapter) {
-          chapters.push({ title: currentChapter, content: currentContent.join('\n').trim() })
-        }
-        if (chapters.length === 0) {
-          chapters.push({ title: 'Chapter 1', content: content.trim() })
-        }
-        
-        return chapters
+        // Use localStorageAdapter's chapter detection
+        return localStorageAdapter.detectChaptersFromText(content)
       }
       
       try {
         return await api.detectChapters(content)
       } catch (error) {
         console.error('Detect chapters failed:', error)
-        return []
+        // Fallback to local detection
+        return localStorageAdapter.detectChaptersFromText(content)
       }
     },
     
     importManuscriptToProject: async (content, projectName, extractAll = true) => {
       if (!isElectronApi) {
-        addNotification({ type: 'warning', message: 'Full import requires the Python backend' })
-        return { error: 'Backend not available' }
+        // Use localStorageAdapter's import function for offline mode
+        const result = localStorageAdapter.importManuscriptToProject(content, projectName, extractAll)
+        if (result.success) {
+          addNotification({ type: 'success', message: `Imported "${projectName}" successfully!` })
+        }
+        return result
       }
       
       try {
         return await api.importManuscriptToProject(content, projectName, extractAll)
       } catch (error) {
         console.error('Import manuscript failed:', error)
-        return { error: error.message }
+        // Fallback to local import
+        addNotification({ type: 'warning', message: 'Backend unavailable, using local import' })
+        return localStorageAdapter.importManuscriptToProject(content, projectName, extractAll)
       }
     },
   }

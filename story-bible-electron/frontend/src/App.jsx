@@ -5,7 +5,7 @@
  * Shows project dashboard first, then editor when a project is selected.
  */
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import useStore from './hooks/useStore'
 import { usePythonBridge } from './hooks/usePythonBridge'
 
@@ -22,12 +22,88 @@ import WorldBuilding from './components/WorldBuilding'
 import SceneEditor from './components/SceneEditor'
 import AnimatedBackground from './components/AnimatedBackground'
 
+/**
+ * ResizeHandle Component
+ * Draggable handle for resizing sidebars
+ */
+function ResizeHandle({ onResize, position = 'left', minWidth, maxWidth }) {
+  const handleRef = useRef(null)
+  const isDragging = useRef(false)
+  const startX = useRef(0)
+  const startWidth = useRef(0)
+  
+  const handleMouseDown = useCallback((e) => {
+    e.preventDefault()
+    isDragging.current = true
+    startX.current = e.clientX
+    
+    // Get the current width from the parent
+    const sidebar = position === 'left' 
+      ? handleRef.current?.previousElementSibling 
+      : handleRef.current?.nextElementSibling
+    startWidth.current = sidebar?.offsetWidth || 280
+    
+    document.body.style.cursor = 'col-resize'
+    document.body.style.userSelect = 'none'
+  }, [position])
+  
+  useEffect(() => {
+    const handleMouseMove = (e) => {
+      if (!isDragging.current) return
+      
+      const delta = position === 'left' 
+        ? e.clientX - startX.current 
+        : startX.current - e.clientX
+      
+      const newWidth = startWidth.current + delta
+      onResize(newWidth)
+    }
+    
+    const handleMouseUp = () => {
+      if (isDragging.current) {
+        isDragging.current = false
+        document.body.style.cursor = ''
+        document.body.style.userSelect = ''
+      }
+    }
+    
+    document.addEventListener('mousemove', handleMouseMove)
+    document.addEventListener('mouseup', handleMouseUp)
+    
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove)
+      document.removeEventListener('mouseup', handleMouseUp)
+    }
+  }, [onResize, position])
+  
+  return (
+    <div
+      ref={handleRef}
+      className={`
+        resize-handle group flex-shrink-0 w-1 cursor-col-resize
+        bg-transparent hover:bg-gold-rich/30 active:bg-gold-rich/50
+        transition-colors duration-150 relative z-10
+        ${position === 'left' ? 'hover:border-r hover:border-gold-rich/40' : 'hover:border-l hover:border-gold-rich/40'}
+      `}
+      onMouseDown={handleMouseDown}
+      title="Drag to resize"
+    >
+      {/* Visual indicator on hover */}
+      <div className="absolute inset-y-0 left-1/2 -translate-x-1/2 w-1 opacity-0 group-hover:opacity-100 transition-opacity bg-gold-rich/50 rounded-full" />
+    </div>
+  )
+}
+
 function App() {
   const {
     currentView,
     currentProjectId,
     sidebarCollapsed,
     assistantCollapsed,
+    sidebarWidth,
+    assistantWidth,
+    setSidebarWidth,
+    setAssistantWidth,
     setProjects,
     setCharacters,
     setStoryBibleData,
@@ -158,27 +234,51 @@ function App() {
         
         {/* Main Content Area */}
         <div className="flex-1 flex overflow-hidden relative z-0">
-          {/* Project Sidebar */}
+          {/* Project Sidebar (Left) */}
           <div 
             className={`
-              glass-sidebar transition-all duration-300 flex-shrink-0
-              ${sidebarCollapsed ? 'w-0 overflow-hidden' : 'w-[280px]'}
+              glass-sidebar flex-shrink-0 overflow-hidden
+              ${sidebarCollapsed ? 'w-0' : ''}
             `}
+            style={{ 
+              width: sidebarCollapsed ? 0 : sidebarWidth,
+              transition: sidebarCollapsed ? 'width 0.3s ease' : 'none'
+            }}
           >
             <ProjectSidebar />
           </div>
           
+          {/* Left Resize Handle */}
+          {!sidebarCollapsed && (
+            <ResizeHandle 
+              position="left" 
+              onResize={setSidebarWidth}
+            />
+          )}
+          
           {/* Center Panel */}
-          <div className="flex-1 overflow-hidden">
+          <div className="flex-1 overflow-hidden min-w-0">
             {renderMainContent()}
           </div>
           
-          {/* Assistant Panel */}
+          {/* Right Resize Handle */}
+          {!assistantCollapsed && (
+            <ResizeHandle 
+              position="right" 
+              onResize={setAssistantWidth}
+            />
+          )}
+          
+          {/* Assistant Panel (Right) */}
           <div 
             className={`
-              glass-sidebar transition-all duration-300 flex-shrink-0
-              ${assistantCollapsed ? 'w-0 overflow-hidden' : 'w-[360px]'}
+              glass-sidebar flex-shrink-0 overflow-hidden
+              ${assistantCollapsed ? 'w-0' : ''}
             `}
+            style={{ 
+              width: assistantCollapsed ? 0 : assistantWidth,
+              transition: assistantCollapsed ? 'width 0.3s ease' : 'none'
+            }}
           >
             <AssistantPanel />
           </div>

@@ -9,21 +9,18 @@ import { useState, useRef, useEffect } from 'react'
 import useStore from '../hooks/useStore'
 import { usePythonBridge } from '../hooks/usePythonBridge'
 import { clsx } from 'clsx'
+import { CgSpinner } from 'react-icons/cg'
+import {
+  LuArrowLeft, LuPenLine, LuRefreshCw, LuSparkles, LuWandSparkles,
+  LuSettings, LuCircleHelp, LuUpload, LuPlay, LuSquare,
+  LuVolume2, LuBookOpen, LuMenu, LuMessageSquare, LuX,
+  LuDownload, LuCheck, LuMinus, LuMaximize, LuMinimize,
+  LuEye, LuWind, LuDroplets, LuFingerprint, LuLightbulb,
+  LuClapperboard, LuShuffle, LuScroll,
+} from 'react-icons/lu'
 
-// Icons (matching the Python Icons class)
-const Icons = {
-  BACK: '←',
-  WRITE: '✍️',
-  REWRITE: '🔄',
-  DESCRIBE: '✨',
-  WAND: '🪄',
-  SETTINGS: '⚙️',
-  HELP: '❓',
-  EXPORT: '📤',
-  PLAY: '▶️',
-  STOP: '⏹️',
-  SPEAKER: '🔊',
-}
+// Icon size classes
+const ic = 'w-4 h-4'
 
 function ToolbarButton({ icon, label, tooltip, hasMenu, onClick, children, closeOnClick = true }) {
   const [isOpen, setIsOpen] = useState(false)
@@ -47,9 +44,9 @@ function ToolbarButton({ icon, label, tooltip, hasMenu, onClick, children, close
     <div className="relative" ref={menuRef} style={{ zIndex: isOpen ? 9999 : 'auto' }}>
       <button
         className={clsx(
-          'px-4 py-2 rounded-lg flex items-center gap-2',
+          'px-3 py-2 rounded-lg flex items-center gap-2 min-w-0',
           'bg-dark-700 border border-gold-rich/20',
-          'text-text-secondary text-sm font-medium',
+          'text-text-secondary text-sm font-medium whitespace-nowrap',
           'hover:bg-gold-rich/10 hover:border-gold-rich/40 hover:text-gold-rich',
           'transition-all duration-200',
           isOpen && 'bg-gold-rich/10 border-gold-rich/40 text-gold-rich'
@@ -57,9 +54,9 @@ function ToolbarButton({ icon, label, tooltip, hasMenu, onClick, children, close
         onClick={() => hasMenu ? setIsOpen(!isOpen) : onClick?.()}
         title={tooltip}
       >
-        <span>{icon}</span>
-        <span>{label}</span>
-        {hasMenu && <span className="text-xs">▾</span>}
+        <span className="shrink-0">{icon}</span>
+        <span className="truncate">{label}</span>
+        {hasMenu && <span className="text-xs shrink-0">▾</span>}
       </button>
       
       {hasMenu && isOpen && (
@@ -96,17 +93,17 @@ function DescribeSplitButton({ icon, label, tooltip, onDescribe, children, activ
         {/* Main Describe Button */}
         <button
           className={clsx(
-            'px-4 py-2 rounded-l-lg flex items-center gap-2',
+            'px-3 py-2 rounded-l-lg flex items-center gap-2 min-w-0',
             'bg-dark-700 border border-gold-rich/20 border-r-0',
-            'text-text-secondary text-sm font-medium',
+            'text-text-secondary text-sm font-medium whitespace-nowrap',
             'hover:bg-gold-rich/10 hover:border-gold-rich/40 hover:text-gold-rich',
             'transition-all duration-200'
           )}
           onClick={onDescribe}
           title={tooltip}
         >
-          <span>{icon}</span>
-          <span>{label}</span>
+          <span className="shrink-0">{icon}</span>
+          <span className="truncate">{label}</span>
           {activeCount > 0 && (
             <span className="ml-1 px-1.5 py-0.5 text-xs bg-gold-rich text-dark-950 rounded-full font-semibold">
               {activeCount}
@@ -150,7 +147,7 @@ function MenuItem({ icon, label, onClick, checkbox, checked, onCheck }) {
           onChange={(e) => onCheck?.(e.target.checked)}
           className="w-4 h-4 rounded border-gold-rich/30 accent-gold-rich bg-dark-700"
         />
-        {icon && <span>{icon}</span>}
+        {icon}
         <span>{label}</span>
       </label>
     )
@@ -161,7 +158,7 @@ function MenuItem({ icon, label, onClick, checkbox, checked, onCheck }) {
       className="dropdown-item w-full text-left flex items-center gap-2"
       onClick={onClick}
     >
-      {icon && <span>{icon}</span>}
+      {icon}
       <span>{label}</span>
     </button>
   )
@@ -201,6 +198,7 @@ function Toolbar() {
     generatePluginResponse,
     ttsSpeak,
     ttsStop,
+    ttsDownload,
     getContextWindow,
     getCharacters,
     getStoryBible,
@@ -351,37 +349,27 @@ function Toolbar() {
     const selectedText = selection.selectedText.trim()
     
     // Build the rewrite instruction based on style
-    let styleInstruction = ''
-    switch (style) {
-      case 'Show Don\'t Tell':
-        styleInstruction = 'Rewrite this text using "show don\'t tell" technique. Instead of stating emotions or facts directly, demonstrate them through action, dialogue, sensory details, and body language.'
-        break
-      case 'Dramatic':
-        styleInstruction = 'Rewrite this text in a more dramatic, intense style. Heighten the tension, emotions, and stakes. Make it more gripping and impactful.'
-        break
-      case 'Gritty':
-        styleInstruction = 'Rewrite this text in a gritty, raw style. Make it feel more real, edgy, and unpolished. Add texture and roughness.'
-        break
-      case 'Elegant':
-        styleInstruction = 'Rewrite this text in an elegant, refined style. Use sophisticated language, flowing sentences, and poetic imagery.'
-        break
-      case 'Concise':
-        styleInstruction = 'Rewrite this text to be more concise and punchy. Remove unnecessary words, tighten the prose, and make every word count.'
-        break
-      default:
-        styleInstruction = `Rewrite this text in a ${style.toLowerCase()} style.`
+    const styleDescriptions = {
+      'Show Don\'t Tell': 'using "show don\'t tell" - demonstrate through action, dialogue, sensory details, and body language instead of stating directly',
+      'Dramatic': 'in a more dramatic, intense style with heightened tension, emotions, and stakes',
+      'Gritty': 'in a gritty, raw style that feels more real, edgy, and unpolished',
+      'Elegant': 'in an elegant, refined style with sophisticated language and flowing sentences',
+      'Concise': 'to be more concise and punchy, removing unnecessary words',
     }
     
-    const instruction = `${styleInstruction}
+    const styleDesc = styleDescriptions[style] || `in a ${style.toLowerCase()} style`
+    
+    const instruction = `Rewrite this text ${styleDesc}:
 
-=== TEXT TO REWRITE ===
-${selectedText}
+"${selectedText}"
 
-=== INSTRUCTIONS ===
-- Keep the same meaning and key information
-- Maintain the same point of view and tense
-- Only output the rewritten text, no explanations
-- Make it approximately the same length (can be slightly shorter or longer)`
+RULES:
+- Output ONLY the rewritten text, nothing else
+- Do NOT start with "Here's" or "Here is" or any introduction
+- Do NOT end with explanations like "I maintained..." or "This version..."
+- Do NOT include quotes around the output
+- Keep the same meaning and point of view
+- The output should be ready to paste directly into a document`
     
     console.log('Rewrite - selected text length:', selectedText.length)
     console.log('Rewrite - style:', style)
@@ -464,6 +452,7 @@ ${selectedText}
   
   // Handle TTS
   const { setTtsPlaying } = useStore()
+  const [isDownloading, setIsDownloading] = useState(false)
   
   const handleTts = async () => {
     if (isTtsPlaying) {
@@ -477,6 +466,16 @@ ${selectedText}
     }
   }
   
+  const handleTtsDownload = async () => {
+    if (isDownloading) return
+    setIsDownloading(true)
+    try {
+      await ttsDownload(editorContent, selectedVoice)
+    } finally {
+      setIsDownloading(false)
+    }
+  }
+  
   // Handle back to dashboard
   const handleBackToDashboard = () => {
     setCurrentProject(null)
@@ -486,29 +485,15 @@ ${selectedText}
   return (
     <header className="h-toolbar flex items-center px-4 gap-4 glass drag-region">
       {/* Left: Navigation */}
-      <div className="flex items-center gap-3 no-drag">
+      <div className="flex items-center gap-2 no-drag shrink-0">
         {/* Back to Dashboard */}
         <button
-          className="flex items-center gap-2 px-3 py-2 rounded-lg text-text-muted hover:bg-gold-rich/10 hover:text-gold-rich transition-colors"
+          className="w-8 h-8 flex items-center justify-center rounded-lg text-text-muted hover:bg-gold-rich/10 hover:text-gold-rich transition-colors"
           onClick={handleBackToDashboard}
           title="Back to Projects"
         >
-          <span className="text-lg">{Icons.BACK}</span>
-          <span className="text-sm font-medium hidden sm:inline">Projects</span>
+          <LuArrowLeft className="w-4 h-4" />
         </button>
-        
-        {/* Separator */}
-        <div className="w-px h-6 bg-gold-rich/20" />
-        
-        {/* Current Project Name */}
-        {currentProject && (
-          <div className="flex items-center gap-2">
-            <span className="text-lg">📖</span>
-            <span className="text-sm font-medium text-gold-pale max-w-[150px] truncate">
-              {currentProject.name}
-            </span>
-          </div>
-        )}
         
         {/* Toggle Sidebar */}
         <button
@@ -516,15 +501,15 @@ ${selectedText}
           onClick={toggleSidebar}
           title="Toggle Sidebar"
         >
-          ☰
+          <LuMenu className={ic} />
         </button>
       </div>
       
       {/* Center: AI Tools */}
-      <div className="flex items-center gap-2 flex-1 justify-center no-drag">
+      <div className="flex items-center gap-2 flex-1 justify-center no-drag min-w-0 overflow-hidden">
         {/* Write Button */}
         <ToolbarButton
-          icon={Icons.WRITE}
+          icon={<LuPenLine className={ic} />}
           label={`Write: ${writeMode.split(' ')[0]}`}
           tooltip="AI writing tools"
           hasMenu
@@ -536,7 +521,7 @@ ${selectedText}
         
         {/* Rewrite Button */}
         <ToolbarButton
-          icon={Icons.REWRITE}
+          icon={<LuRefreshCw className={ic} />}
           label="Rewrite"
           tooltip="Rewrite selected text in different styles"
           hasMenu
@@ -550,7 +535,7 @@ ${selectedText}
         
         {/* Describe Button - Split button: main button describes, dropdown selects senses */}
         <DescribeSplitButton
-          icon={Icons.DESCRIBE}
+          icon={<LuSparkles className={ic} />}
           label="Describe"
           tooltip="Describe selected text with sensory details"
           onDescribe={handleDescribe}
@@ -560,42 +545,42 @@ ${selectedText}
             Select senses to describe:
           </div>
           <MenuItem
-            icon="👁️"
+            icon={<LuEye className={ic} />}
             label="Sight"
             checkbox
             checked={activeSenses.Sight}
             onCheck={(checked) => setActiveSenses(s => ({ ...s, Sight: checked }))}
           />
           <MenuItem
-            icon="🔊"
+            icon={<LuVolume2 className={ic} />}
             label="Sound"
             checkbox
             checked={activeSenses.Sound}
             onCheck={(checked) => setActiveSenses(s => ({ ...s, Sound: checked }))}
           />
           <MenuItem
-            icon="👃"
+            icon={<LuWind className={ic} />}
             label="Smell"
             checkbox
             checked={activeSenses.Smell}
             onCheck={(checked) => setActiveSenses(s => ({ ...s, Smell: checked }))}
           />
           <MenuItem
-            icon="👅"
+            icon={<LuDroplets className={ic} />}
             label="Taste"
             checkbox
             checked={activeSenses.Taste}
             onCheck={(checked) => setActiveSenses(s => ({ ...s, Taste: checked }))}
           />
           <MenuItem
-            icon="🖐️"
+            icon={<LuFingerprint className={ic} />}
             label="Touch"
             checkbox
             checked={activeSenses.Touch}
             onCheck={(checked) => setActiveSenses(s => ({ ...s, Touch: checked }))}
           />
           <MenuItem
-            icon="🎭"
+            icon={<LuLightbulb className={ic} />}
             label="Metaphor"
             checkbox
             checked={activeSenses.Metaphor}
@@ -605,22 +590,22 @@ ${selectedText}
         
         {/* More Tools Button */}
         <ToolbarButton
-          icon={Icons.WAND}
+          icon={<LuWandSparkles className={ic} />}
           label="More Tools"
           tooltip="Additional AI tools"
           hasMenu
         >
-          <MenuItem icon="🎬" label="Visualize" onClick={() => {}} />
-          <MenuItem icon="🔀" label="Twist" onClick={() => {}} />
-          <MenuItem icon="📜" label="Poem" onClick={() => {}} />
+          <MenuItem icon={<LuClapperboard className={ic} />} label="Visualize" onClick={() => {}} />
+          <MenuItem icon={<LuShuffle className={ic} />} label="Twist" onClick={() => {}} />
+          <MenuItem icon={<LuScroll className={ic} />} label="Poem" onClick={() => {}} />
           <hr className="my-2 border-gold-rich/10" />
-          <MenuItem icon={Icons.EXPORT} label="Export" onClick={() => {}} />
-          <MenuItem icon={Icons.SETTINGS} label="Settings" onClick={() => {}} />
+          <MenuItem icon={<LuUpload className={ic} />} label="Export" onClick={() => {}} />
+          <MenuItem icon={<LuSettings className={ic} />} label="Settings" onClick={() => {}} />
         </ToolbarButton>
       </div>
       
       {/* Right: Status & Controls */}
-      <div className="flex items-center gap-4 no-drag">
+      <div className="flex items-center gap-3 no-drag shrink-0">
         {/* TTS Controls */}
         <div className="flex items-center gap-1">
           {/* Voice Selector */}
@@ -640,9 +625,8 @@ ${selectedText}
           {/* Play/Stop Button */}
           <button
             className={clsx(
-              'px-3 py-1.5 flex items-center gap-2 text-sm',
+              'px-3 py-1.5 flex items-center gap-2 text-sm whitespace-nowrap',
               'transition-all duration-200',
-              ttsVoices.length > 0 ? 'rounded-r-lg' : 'rounded-lg',
               isTtsPlaying
                 ? 'bg-gold-rich text-dark-950'
                 : 'bg-dark-700 text-text-secondary border border-gold-rich/20 hover:bg-gold-rich/10 hover:text-gold-rich'
@@ -650,8 +634,27 @@ ${selectedText}
             onClick={handleTts}
             title={isTtsPlaying ? 'Stop Reading' : 'Read Aloud'}
           >
-            {isTtsPlaying ? Icons.STOP : Icons.PLAY}
+            {isTtsPlaying ? <LuSquare className={ic} /> : <LuPlay className={ic} />}
             <span>{isTtsPlaying ? 'Stop' : 'Read'}</span>
+          </button>
+          
+          {/* Download Speech Button */}
+          <button
+            className={clsx(
+              'p-1.5 flex items-center justify-center',
+              'transition-all duration-200 rounded-r-lg',
+              isDownloading
+                ? 'bg-gold-rich/60 text-dark-950 cursor-wait'
+                : 'bg-dark-700 text-text-secondary border border-gold-rich/20 hover:bg-gold-rich/10 hover:text-gold-rich'
+            )}
+            onClick={handleTtsDownload}
+            disabled={isDownloading}
+            title="Download chapter as MP3 audio"
+          >
+            {isDownloading
+              ? <CgSpinner className={`${ic} animate-spin`} />
+              : <LuDownload className={ic} />
+            }
           </button>
         </div>
         
@@ -667,7 +670,7 @@ ${selectedText}
             ? 'bg-amber-500/10 text-amber-400 border-amber-500/30'
             : 'bg-green-500/10 text-green-400 border-green-500/30'
         )}>
-          {isEditorDirty ? 'Unsaved' : '✓ Saved'}
+          {isEditorDirty ? 'Unsaved' : (<span className="flex items-center gap-1"><LuCheck className="w-3.5 h-3.5" /> Saved</span>)}
         </div>
         
         {/* AI Status */}
@@ -703,17 +706,33 @@ ${selectedText}
           onClick={toggleAssistant}
           title="Toggle Assistant Panel"
         >
-          💬
+          <LuMessageSquare className="w-5 h-5" />
         </button>
         
-        {/* Exit App Button */}
-        <button
-          className="w-10 h-10 flex items-center justify-center rounded-lg text-text-muted hover:bg-red-500/20 hover:text-red-400 transition-colors"
-          onClick={() => window.api?.windowClose?.()}
-          title="Exit Application"
-        >
-          ✕
-        </button>
+        {/* Window Controls */}
+        <div className="flex items-center ml-1">
+          <button
+            className="w-7 h-7 flex items-center justify-center rounded text-text-muted hover:bg-white/10 hover:text-text-primary transition-colors"
+            onClick={() => window.api?.windowMinimize?.()}
+            title="Minimize"
+          >
+            <LuMinus className="w-3.5 h-3.5" />
+          </button>
+          <button
+            className="w-7 h-7 flex items-center justify-center rounded text-text-muted hover:bg-white/10 hover:text-text-primary transition-colors"
+            onClick={() => window.api?.windowMaximize?.()}
+            title="Maximize"
+          >
+            <LuMaximize className="w-3 h-3" />
+          </button>
+          <button
+            className="w-7 h-7 flex items-center justify-center rounded text-text-muted hover:bg-red-500/80 hover:text-white transition-colors"
+            onClick={() => window.api?.windowClose?.()}
+            title="Close"
+          >
+            <LuX className="w-3.5 h-3.5" />
+          </button>
+        </div>
       </div>
     </header>
   )

@@ -2,6 +2,7 @@
  * Editor Component
  * ================
  * Rich text editor with TipTap and formatting toolbar.
+ * Includes Sudowrite-style floating selection menu.
  * Dark & Gold luxury theme styling.
  */
 
@@ -32,6 +33,15 @@ const Icons = {
   CHAT: '💬',
   CLOSE: '✕',
   MAGIC: '🪄',
+  // Selection menu icons
+  REWRITE: '🔄',
+  EXPAND: '📝',
+  DESCRIBE: '✨',
+  WORDS: '📖',
+  COMMENT: '💭',
+  EDIT: '✏️',
+  SHRINK: '📉',
+  CONTINUE: '➡️',
 }
 
 // Tooltips
@@ -47,6 +57,206 @@ const Tooltips = {
   H1: 'Heading 1',
   H2: 'Heading 2',
   H3: 'Heading 3',
+}
+
+/**
+ * SelectionMenu Component
+ * =======================
+ * Sudowrite-style floating menu that appears when text is selected.
+ * Shows different options based on selection length.
+ */
+function SelectionMenu({ 
+  isVisible, 
+  position, 
+  selectedText, 
+  isWord, 
+  onRewrite, 
+  onExpand,
+  onShrink,
+  onDescribe, 
+  onContinue,
+  onClose 
+}) {
+  if (!isVisible) return null
+  
+  // Calculate word count
+  const wordCount = selectedText.trim().split(/\s+/).filter(w => w.length > 0).length
+  const charCount = selectedText.length
+  
+  return (
+    <div 
+      className="selection-menu fixed z-[100] animate-fade-in"
+      style={{
+        left: `${position.x}px`,
+        top: `${position.y}px`,
+        transform: 'translateX(-50%)',
+      }}
+      onMouseDown={(e) => e.preventDefault()} // Prevent losing selection
+    >
+      <div className="selection-menu-content flex items-center gap-1 p-1.5 rounded-xl bg-dark-800/95 backdrop-blur-lg border border-gold-rich/30 shadow-lg shadow-black/50">
+        {/* Different options based on selection type */}
+        {isWord ? (
+          // Single word options
+          <>
+            <SelectionMenuButton
+              icon={Icons.DESCRIBE}
+              label="Describe"
+              onClick={onDescribe}
+              tooltip="Generate sensory descriptions"
+            />
+            <SelectionMenuButton
+              icon={Icons.WORDS}
+              label="Synonyms"
+              onClick={() => onRewrite('synonyms')}
+              tooltip="Find related words"
+            />
+            <SelectionMenuButton
+              icon={Icons.REWRITE}
+              label="Rewrite"
+              onClick={() => onRewrite('rephrase')}
+              tooltip="Rephrase this word"
+            />
+          </>
+        ) : (
+          // Passage options
+          <>
+            <SelectionMenuButton
+              icon={Icons.REWRITE}
+              label="Rewrite"
+              onClick={() => onRewrite('improve')}
+              tooltip="Rewrite this passage"
+              primary
+            />
+            <SelectionMenuButton
+              icon={Icons.EXPAND}
+              label="Expand"
+              onClick={onExpand}
+              tooltip="Expand with more detail"
+            />
+            <SelectionMenuButton
+              icon={Icons.SHRINK}
+              label="Shorten"
+              onClick={onShrink}
+              tooltip="Make more concise"
+            />
+            <SelectionMenuButton
+              icon={Icons.DESCRIBE}
+              label="Describe"
+              onClick={onDescribe}
+              tooltip="Add sensory details"
+            />
+            <SelectionMenuButton
+              icon={Icons.CONTINUE}
+              label="Continue"
+              onClick={onContinue}
+              tooltip="Continue from here"
+            />
+          </>
+        )}
+        
+        {/* Divider and close */}
+        <div className="w-px h-6 bg-gold-rich/20 mx-1" />
+        <button
+          className="w-7 h-7 flex items-center justify-center rounded-lg text-gray-500 hover:text-red-400 hover:bg-red-400/10 transition-colors text-sm"
+          onClick={onClose}
+          title="Close menu"
+        >
+          ✕
+        </button>
+      </div>
+      
+      {/* Selection info */}
+      <div className="text-center mt-1">
+        <span className="text-[10px] text-gray-500 bg-dark-900/80 px-2 py-0.5 rounded-full">
+          {wordCount} word{wordCount !== 1 ? 's' : ''} • {charCount} chars
+        </span>
+      </div>
+      
+      {/* Arrow pointing down to selection */}
+      <div className="selection-menu-arrow" />
+    </div>
+  )
+}
+
+function SelectionMenuButton({ icon, label, onClick, tooltip, primary }) {
+  return (
+    <button
+      className={clsx(
+        'flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all duration-150',
+        primary 
+          ? 'bg-gold-rich/20 text-gold-rich hover:bg-gold-rich/30 border border-gold-rich/30'
+          : 'text-gray-300 hover:text-gold-rich hover:bg-gold-rich/10'
+      )}
+      onClick={onClick}
+      title={tooltip}
+    >
+      <span className="text-sm">{icon}</span>
+      <span>{label}</span>
+    </button>
+  )
+}
+
+/**
+ * Rewrite Style Modal
+ * ===================
+ * Modal for selecting rewrite style
+ */
+function RewriteStyleModal({ isOpen, onClose, onSelect, selectedText }) {
+  const styles = [
+    { id: 'improve', label: 'Improve Writing', desc: 'Enhance clarity, flow, and impact', icon: '✨' },
+    { id: 'formal', label: 'More Formal', desc: 'Professional, sophisticated tone', icon: '🎩' },
+    { id: 'casual', label: 'More Casual', desc: 'Relaxed, conversational tone', icon: '💬' },
+    { id: 'dramatic', label: 'More Dramatic', desc: 'Heightened tension and emotion', icon: '🎭' },
+    { id: 'poetic', label: 'More Poetic', desc: 'Lyrical, evocative language', icon: '🌸' },
+    { id: 'concise', label: 'More Concise', desc: 'Tighter, more direct prose', icon: '✂️' },
+    { id: 'descriptive', label: 'More Descriptive', desc: 'Rich sensory details', icon: '🎨' },
+    { id: 'mysterious', label: 'More Mysterious', desc: 'Enigmatic, intriguing tone', icon: '🌙' },
+  ]
+  
+  if (!isOpen) return null
+  
+  return (
+    <div className="fixed inset-0 z-[110] flex items-center justify-center">
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative z-10 w-full max-w-md mx-4 glass-card p-5 animate-slide-up">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h3 className="text-lg font-semibold text-gray-100">Rewrite Style</h3>
+            <p className="text-xs text-gray-400 mt-0.5">Choose how to rewrite your selection</p>
+          </div>
+          <button 
+            className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gold-rich/10 text-gray-400 hover:text-gold-rich"
+            onClick={onClose}
+          >
+            ✕
+          </button>
+        </div>
+        
+        {/* Preview of selected text */}
+        <div className="mb-4 p-3 rounded-lg bg-dark-700/50 border border-gold-rich/10">
+          <p className="text-xs text-gray-500 mb-1">Selected text:</p>
+          <p className="text-sm text-gray-300 line-clamp-2 italic">"{selectedText}"</p>
+        </div>
+        
+        {/* Style grid */}
+        <div className="grid grid-cols-2 gap-2 max-h-[300px] overflow-y-auto">
+          {styles.map(style => (
+            <button
+              key={style.id}
+              className="flex items-start gap-2 p-3 rounded-lg bg-dark-700/50 hover:bg-gold-rich/10 border border-gold-rich/10 hover:border-gold-rich/30 transition-all text-left group"
+              onClick={() => onSelect(style.id)}
+            >
+              <span className="text-xl">{style.icon}</span>
+              <div>
+                <p className="text-sm font-medium text-gray-200 group-hover:text-gold-rich">{style.label}</p>
+                <p className="text-xs text-gray-500">{style.desc}</p>
+              </div>
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
 }
 
 function FormatButton({ icon, tooltip, isActive, onClick, disabled }) {
@@ -549,8 +759,24 @@ function Editor() {
   
   const [showOpeningsModal, setShowOpeningsModal] = useState(false)
   const [showDraftModal, setShowDraftModal] = useState(false)
+  const [showRewriteModal, setShowRewriteModal] = useState(false)
   const saveTimeoutRef = useRef(null)
   const editorRef = useRef(null)
+  const editorContainerRef = useRef(null)
+  
+  // Selection menu state
+  const [selectionMenu, setSelectionMenu] = useState({
+    isVisible: false,
+    position: { x: 0, y: 0 },
+    selectedText: '',
+    selectionStart: 0,
+    selectionEnd: 0,
+    isWord: false,
+  })
+  
+  // Track if mouse is being held down (for selection)
+  const isMouseDownRef = useRef(false)
+  const pendingSelectionRef = useRef(null)
   
   // Initialize TipTap editor
   const editor = useEditor({
@@ -588,13 +814,54 @@ function Editor() {
       // Track selection changes and store in global state
       const { from, to } = editor.state.selection
       const selectedText = editor.state.doc.textBetween(from, to, ' ')
+      const hasSelection = from !== to && selectedText.trim().length > 0
       
       setCurrentEditorSelection({
         selectedText: selectedText,
         selectionStart: from,
         selectionEnd: to,
-        hasSelection: from !== to && selectedText.trim().length > 0
+        hasSelection: hasSelection
       })
+      
+      // Store selection data but DON'T show menu yet (wait for mouseup)
+      if (hasSelection && selectedText.trim().length >= 1) {
+        // Get selection coordinates for positioning the menu
+        const domSelection = window.getSelection()
+        
+        if (domSelection && domSelection.rangeCount > 0) {
+          const range = domSelection.getRangeAt(0)
+          const rect = range.getBoundingClientRect()
+          
+          // Position menu above the selection, centered
+          const menuX = rect.left + (rect.width / 2)
+          const menuY = rect.top - 10 // 10px above selection
+          
+          // Determine if single word or passage
+          const wordCount = selectedText.trim().split(/\s+/).filter(w => w.length > 0).length
+          const isWord = wordCount <= 2
+          
+          // Store pending selection data (will show on mouseup)
+          pendingSelectionRef.current = {
+            position: { x: menuX, y: menuY },
+            selectedText: selectedText.trim(),
+            selectionStart: from,
+            selectionEnd: to,
+            isWord: isWord,
+          }
+          
+          // If mouse is not being held down (e.g., keyboard selection), show immediately
+          if (!isMouseDownRef.current) {
+            setSelectionMenu({
+              isVisible: true,
+              ...pendingSelectionRef.current,
+            })
+          }
+        }
+      } else {
+        // Hide menu and clear pending when no selection
+        pendingSelectionRef.current = null
+        setSelectionMenu(prev => ({ ...prev, isVisible: false }))
+      }
     },
   })
   
@@ -740,6 +1007,250 @@ function Editor() {
     }
     return () => setEditorInstance(null)
   }, [editor, setEditorInstance])
+  
+  // Track mouse down/up to show menu only on release
+  useEffect(() => {
+    const handleMouseDown = (e) => {
+      // Check if mousedown is in the editor
+      if (e.target.closest('.ProseMirror')) {
+        isMouseDownRef.current = true
+        // Hide menu when starting a new selection
+        setSelectionMenu(prev => ({ ...prev, isVisible: false }))
+      }
+    }
+    
+    const handleMouseUp = (e) => {
+      // Small delay to let selection finalize
+      setTimeout(() => {
+        isMouseDownRef.current = false
+        
+        // Show the menu if we have a pending selection
+        if (pendingSelectionRef.current) {
+          // Re-calculate position in case it shifted
+          const domSelection = window.getSelection()
+          if (domSelection && domSelection.rangeCount > 0 && !domSelection.isCollapsed) {
+            const range = domSelection.getRangeAt(0)
+            const rect = range.getBoundingClientRect()
+            
+            setSelectionMenu({
+              isVisible: true,
+              position: { x: rect.left + (rect.width / 2), y: rect.top - 10 },
+              selectedText: pendingSelectionRef.current.selectedText,
+              selectionStart: pendingSelectionRef.current.selectionStart,
+              selectionEnd: pendingSelectionRef.current.selectionEnd,
+              isWord: pendingSelectionRef.current.isWord,
+            })
+          }
+        }
+      }, 10)
+    }
+    
+    document.addEventListener('mousedown', handleMouseDown)
+    document.addEventListener('mouseup', handleMouseUp)
+    
+    return () => {
+      document.removeEventListener('mousedown', handleMouseDown)
+      document.removeEventListener('mouseup', handleMouseUp)
+    }
+  }, [])
+  
+  // Close selection menu when clicking outside or pressing Escape
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      // Don't close if clicking on the menu itself
+      if (e.target.closest('.selection-menu')) return
+      // Don't close if clicking in the editor (selection might change)
+      if (e.target.closest('.ProseMirror')) return
+      
+      setSelectionMenu(prev => ({ ...prev, isVisible: false }))
+      pendingSelectionRef.current = null
+    }
+    
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        setSelectionMenu(prev => ({ ...prev, isVisible: false }))
+        pendingSelectionRef.current = null
+      }
+    }
+    
+    document.addEventListener('mousedown', handleClickOutside)
+    document.addEventListener('keydown', handleKeyDown)
+    
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+      document.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [])
+  
+  // Selection menu handlers
+  const handleSelectionMenuClose = () => {
+    setSelectionMenu(prev => ({ ...prev, isVisible: false }))
+  }
+  
+  const handleRewrite = (style) => {
+    if (!selectionMenu.selectedText) return
+    
+    // For 'synonyms' or simple word rewrite, directly send request
+    // For passages, show style modal if style not specified
+    if (style === 'synonyms') {
+      // Generate synonyms/related words
+      setPendingAiRequest({
+        type: 'rewrite',
+        instruction: `Provide 5-8 synonyms for: "${selectionMenu.selectedText}"
+
+OUTPUT FORMAT: word1, word2, word3, word4, word5
+
+RULES:
+- Output ONLY the comma-separated words
+- Do NOT write "Here are synonyms" or any introduction
+- Do NOT explain your choices
+- Do NOT add any text before or after the words`,
+        style: 'synonyms',
+        originalText: selectionMenu.selectedText,
+        replaceSelection: false, // Synonyms are for reference, not replacement
+        selectionStart: selectionMenu.selectionStart,
+        selectionEnd: selectionMenu.selectionEnd,
+      })
+      setSelectionMenu(prev => ({ ...prev, isVisible: false }))
+    } else if (style === 'rephrase') {
+      // Simple word/phrase rephrase
+      setPendingAiRequest({
+        type: 'rewrite',
+        instruction: `Rewrite this text: "${selectionMenu.selectedText}"
+
+RULES:
+- Output ONLY the rewritten text, nothing else
+- Do NOT start with "Here's" or "Here is" or any introduction
+- Do NOT end with explanations like "I maintained..." or "This version..."
+- The output should be ready to paste directly into a document`,
+        style: 'rephrase',
+        originalText: selectionMenu.selectedText,
+        replaceSelection: true,
+        selectionStart: selectionMenu.selectionStart,
+        selectionEnd: selectionMenu.selectionEnd,
+      })
+      setSelectionMenu(prev => ({ ...prev, isVisible: false }))
+    } else if (style === 'improve') {
+      // Show rewrite style modal for passages
+      setShowRewriteModal(true)
+    } else {
+      // Direct rewrite with specific style
+      const styleInstructions = {
+        formal: 'in a more formal, professional tone',
+        casual: 'in a more casual, conversational tone',
+        dramatic: 'with more dramatic tension and emotion',
+        poetic: 'in a more lyrical, poetic style',
+        concise: 'to be more concise and direct',
+        descriptive: 'with richer, more vivid descriptions',
+        mysterious: 'with a more mysterious, enigmatic tone',
+      }
+      
+      setPendingAiRequest({
+        type: 'rewrite',
+        instruction: `Rewrite this text ${styleInstructions[style] || 'improved'}:
+
+"${selectionMenu.selectedText}"
+
+RULES:
+- Output ONLY the rewritten text, nothing else
+- Do NOT start with "Here's" or "Here is" or any introduction
+- Do NOT end with explanations like "I maintained..." or "This version..."
+- Do NOT include quotes around the output
+- The output should be ready to paste directly into a document`,
+        style: style,
+        originalText: selectionMenu.selectedText,
+        replaceSelection: true,
+        selectionStart: selectionMenu.selectionStart,
+        selectionEnd: selectionMenu.selectionEnd,
+      })
+      setSelectionMenu(prev => ({ ...prev, isVisible: false }))
+      setShowRewriteModal(false)
+    }
+  }
+  
+  const handleExpand = () => {
+    if (!selectionMenu.selectedText) return
+    
+    setPendingAiRequest({
+      type: 'rewrite',
+      instruction: `Expand this passage with more detail and depth:
+
+"${selectionMenu.selectedText}"
+
+Add sensory details, emotional depth, and richer prose. Make it approximately 2-3x longer.
+
+RULES:
+- Output ONLY the expanded text, nothing else
+- Do NOT start with "Here's" or "Here is" or any introduction
+- Do NOT end with explanations like "I added..." or "This version..."
+- Do NOT include quotes around the output
+- The output should be ready to paste directly into a document`,
+      style: 'expand',
+      originalText: selectionMenu.selectedText,
+      replaceSelection: true,
+      selectionStart: selectionMenu.selectionStart,
+      selectionEnd: selectionMenu.selectionEnd,
+    })
+    setSelectionMenu(prev => ({ ...prev, isVisible: false }))
+  }
+  
+  const handleShrink = () => {
+    if (!selectionMenu.selectedText) return
+    
+    setPendingAiRequest({
+      type: 'rewrite',
+      instruction: `Make this passage more concise:
+
+"${selectionMenu.selectedText}"
+
+Remove unnecessary words, tighten the prose. Reduce length by about 30-50%.
+
+RULES:
+- Output ONLY the shortened text, nothing else
+- Do NOT start with "Here's" or "Here is" or any introduction
+- Do NOT end with explanations like "I removed..." or "This version..."
+- Do NOT include quotes around the output
+- The output should be ready to paste directly into a document`,
+      style: 'shrink',
+      originalText: selectionMenu.selectedText,
+      replaceSelection: true,
+      selectionStart: selectionMenu.selectionStart,
+      selectionEnd: selectionMenu.selectionEnd,
+    })
+    setSelectionMenu(prev => ({ ...prev, isVisible: false }))
+  }
+  
+  const handleDescribe = () => {
+    if (!selectionMenu.selectedText) return
+    
+    // Use the describe feature to add sensory details
+    setPendingAiRequest({
+      type: 'describe',
+      instruction: `Generate rich sensory descriptions for this text:\n\n"${selectionMenu.selectedText}"\n\nProvide descriptions for each sense (sight, sound, smell, taste, touch) plus metaphorical descriptions. Format with clear section headers.`,
+      originalText: selectionMenu.selectedText,
+      senses: ['sight', 'sound', 'smell', 'taste', 'touch', 'metaphor'],
+      replaceSelection: false, // Descriptions are for inspiration, not replacement
+      selectionStart: selectionMenu.selectionStart,
+      selectionEnd: selectionMenu.selectionEnd,
+    })
+    setSelectionMenu(prev => ({ ...prev, isVisible: false }))
+  }
+  
+  const handleContinue = () => {
+    if (!selectionMenu.selectedText) return
+    
+    const fullText = editor?.getText() || ''
+    const textBeforeSelection = fullText.substring(0, selectionMenu.selectionEnd)
+    
+    setPendingAiRequest({
+      type: 'write',
+      instruction: `Continue writing from where this text ends. Match the style, tone, and voice of the existing writing:\n\n"${selectionMenu.selectedText}"\n\nWrite 2-3 natural paragraphs that flow seamlessly from this point.`,
+      mode: 'Continue from selection',
+      insertAtCursor: true,
+      context: textBeforeSelection,
+    })
+    setSelectionMenu(prev => ({ ...prev, isVisible: false }))
+  }
   
   // Handle generate draft with form data - sends to AssistantPanel
   const handleGenerateDraft = (formData) => {
@@ -939,6 +1450,28 @@ function Editor() {
         onGenerate={handleGenerateDraft}
         isGenerating={isAiGenerating}
         hasExistingContent={(editor?.getText() || '').trim().length > 50}
+      />
+      
+      {/* Selection Menu - Floating context menu */}
+      <SelectionMenu
+        isVisible={selectionMenu.isVisible && !isAiGenerating}
+        position={selectionMenu.position}
+        selectedText={selectionMenu.selectedText}
+        isWord={selectionMenu.isWord}
+        onRewrite={handleRewrite}
+        onExpand={handleExpand}
+        onShrink={handleShrink}
+        onDescribe={handleDescribe}
+        onContinue={handleContinue}
+        onClose={handleSelectionMenuClose}
+      />
+      
+      {/* Rewrite Style Modal */}
+      <RewriteStyleModal
+        isOpen={showRewriteModal}
+        onClose={() => setShowRewriteModal(false)}
+        onSelect={(style) => handleRewrite(style)}
+        selectedText={selectionMenu.selectedText}
       />
     </div>
   )

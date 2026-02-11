@@ -696,6 +696,241 @@ export function reorderScenes(chapterId, sceneIds) {
   return true
 }
 
+// ==================== IMPORT NOVEL METHODS ====================
+
+/**
+ * Detect chapters in manuscript text
+ * Looks for common chapter patterns like "Chapter 1", "CHAPTER ONE", "Chapter: Title", etc.
+ */
+export function detectChaptersFromText(content) {
+  const lines = content.split('\n')
+  const chapters = []
+  let currentChapter = null
+  let currentContent = []
+  
+  // Chapter detection patterns
+  const chapterPatterns = [
+    /^chapter\s+(\d+|[ivxlcdm]+)\s*[:\.\-]?\s*(.*)$/i,
+    /^chapter\s+([a-z]+)\s*[:\.\-]?\s*(.*)$/i,
+    /^part\s+(\d+|[ivxlcdm]+)\s*[:\.\-]?\s*(.*)$/i,
+    /^prologue\s*[:\.\-]?\s*(.*)$/i,
+    /^epilogue\s*[:\.\-]?\s*(.*)$/i,
+    /^\*\*\*\s*$/,  // Scene break
+    /^---\s*$/,     // Scene break
+  ]
+  
+  for (const line of lines) {
+    const trimmedLine = line.trim()
+    
+    // Check if line matches any chapter pattern
+    let isChapterStart = false
+    let chapterTitle = ''
+    
+    for (const pattern of chapterPatterns) {
+      const match = trimmedLine.match(pattern)
+      if (match) {
+        isChapterStart = true
+        chapterTitle = match[2] ? `${trimmedLine}` : trimmedLine
+        break
+      }
+    }
+    
+    if (isChapterStart) {
+      // Save previous chapter
+      if (currentChapter) {
+        currentChapter.content = currentContent.join('\n').trim()
+        chapters.push(currentChapter)
+      }
+      
+      // Start new chapter
+      currentChapter = {
+        title: chapterTitle || `Chapter ${chapters.length + 1}`,
+        content: ''
+      }
+      currentContent = []
+    } else if (currentChapter) {
+      currentContent.push(line)
+    } else {
+      // Content before first chapter marker
+      currentContent.push(line)
+    }
+  }
+  
+  // Save last chapter
+  if (currentChapter) {
+    currentChapter.content = currentContent.join('\n').trim()
+    chapters.push(currentChapter)
+  } else if (currentContent.length > 0) {
+    // No chapter markers found - treat as single chapter
+    chapters.push({
+      title: 'Chapter 1',
+      content: currentContent.join('\n').trim()
+    })
+  }
+  
+  return chapters
+}
+
+/**
+ * Extract potential character names from text using simple heuristics
+ * Looks for capitalized names that appear multiple times
+ */
+export function extractCharacterNames(content) {
+  // Common words to exclude
+  const excludeWords = new Set([
+    'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of',
+    'is', 'are', 'was', 'were', 'be', 'been', 'being', 'have', 'has', 'had',
+    'do', 'does', 'did', 'will', 'would', 'could', 'should', 'may', 'might',
+    'must', 'shall', 'can', 'need', 'dare', 'ought', 'used', 'this', 'that',
+    'these', 'those', 'i', 'you', 'he', 'she', 'it', 'we', 'they', 'me',
+    'him', 'her', 'us', 'them', 'my', 'your', 'his', 'its', 'our', 'their',
+    'what', 'which', 'who', 'whom', 'whose', 'when', 'where', 'why', 'how',
+    'all', 'each', 'every', 'both', 'few', 'more', 'most', 'other', 'some',
+    'such', 'no', 'nor', 'not', 'only', 'own', 'same', 'so', 'than', 'too',
+    'very', 'just', 'also', 'now', 'then', 'here', 'there', 'once', 'said',
+    'asked', 'replied', 'answered', 'thought', 'knew', 'felt', 'looked',
+    'mr', 'mrs', 'ms', 'dr', 'sir', 'lord', 'lady', 'king', 'queen',
+    'chapter', 'part', 'book', 'prologue', 'epilogue', 'one', 'two', 'three',
+    'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday',
+    'january', 'february', 'march', 'april', 'may', 'june', 'july', 'august',
+    'september', 'october', 'november', 'december'
+  ])
+  
+  // Find capitalized words that might be names (appear after dialogue or as subjects)
+  const namePattern = /\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)\b/g
+  const nameCounts = {}
+  
+  let match
+  while ((match = namePattern.exec(content)) !== null) {
+    const name = match[1]
+    const lowerName = name.toLowerCase()
+    
+    // Skip excluded words and very short names
+    if (excludeWords.has(lowerName) || name.length < 3) continue
+    
+    // Skip if it starts a sentence after common sentence endings
+    const beforeMatch = content.substring(Math.max(0, match.index - 3), match.index)
+    if (/[.!?]\s*$/.test(beforeMatch)) continue
+    
+    nameCounts[name] = (nameCounts[name] || 0) + 1
+  }
+  
+  // Filter to names appearing at least 3 times and sort by frequency
+  const characters = Object.entries(nameCounts)
+    .filter(([name, count]) => count >= 3)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 10) // Top 10 potential characters
+    .map(([name, count]) => ({
+      name,
+      mentions: count,
+      role: count > 20 ? 'Main Character' : count > 10 ? 'Supporting Character' : 'Minor Character'
+    }))
+  
+  return characters
+}
+
+/**
+ * Generate a basic synopsis from the text
+ */
+export function generateBasicSynopsis(content, maxLength = 500) {
+  // Get first few paragraphs as a basic synopsis
+  const paragraphs = content.split(/\n\n+/).filter(p => p.trim().length > 50)
+  
+  let synopsis = ''
+  for (const para of paragraphs.slice(0, 3)) {
+    if (synopsis.length + para.length > maxLength) break
+    synopsis += (synopsis ? '\n\n' : '') + para.trim()
+  }
+  
+  if (synopsis.length > maxLength) {
+    synopsis = synopsis.substring(0, maxLength - 3) + '...'
+  }
+  
+  return synopsis || 'No synopsis available.'
+}
+
+/**
+ * Import a manuscript and create a complete project with chapters and basic story bible
+ */
+export function importManuscriptToProject(content, projectName, extractAll = true) {
+  try {
+    // Create the project
+    const projectId = createProject(projectName, '')
+    
+    // Detect and create chapters
+    const chapters = detectChaptersFromText(content)
+    let chaptersImported = 0
+    
+    for (const chapter of chapters) {
+      createChapter(projectId, chapter.title, chapter.content)
+      chaptersImported++
+    }
+    
+    // Extract characters and populate story bible
+    let charactersImported = 0
+    let worldElementsImported = 0
+    
+    if (extractAll) {
+      // Extract character names
+      const detectedCharacters = extractCharacterNames(content)
+      for (const char of detectedCharacters) {
+        saveCharacter({
+          project_id: projectId,
+          name: char.name,
+          role: char.role,
+          description: `Mentioned ${char.mentions} times in the manuscript.`,
+          personality_traits: '',
+          backstory: '',
+        })
+        charactersImported++
+      }
+      
+      // Generate basic synopsis for story bible
+      const synopsis = generateBasicSynopsis(content)
+      saveBibleField(projectId, 'synopsis', synopsis)
+      
+      // Add word count and basic stats
+      const wordCount = content.split(/\s+/).length
+      saveBibleField(projectId, 'braindump', 
+        `Imported manuscript with ${wordCount.toLocaleString()} words and ${chaptersImported} chapters.\n\n` +
+        `Detected ${charactersImported} potential characters.`
+      )
+    }
+    
+    return {
+      success: true,
+      project_id: projectId,
+      chapters_imported: chaptersImported,
+      characters_imported: charactersImported,
+      world_elements_imported: worldElementsImported,
+      word_count: content.split(/\s+/).length
+    }
+  } catch (error) {
+    console.error('Import failed:', error)
+    return {
+      success: false,
+      error: error.message
+    }
+  }
+}
+
+/**
+ * Parse manuscript for preview (chapters + basic analysis)
+ */
+export function parseManuscript(content, extractAll = true) {
+  const chapters = detectChaptersFromText(content)
+  const characters = extractAll ? extractCharacterNames(content) : []
+  const synopsis = extractAll ? generateBasicSynopsis(content) : ''
+  
+  return {
+    chapters,
+    characters,
+    synopsis,
+    world_elements: [],
+    word_count: content.split(/\s+/).length
+  }
+}
+
 // ==================== CSV IMPORT/EXPORT METHODS ====================
 
 export function exportCharactersCsv(projectId) {
@@ -821,6 +1056,16 @@ export function ttsIsPlaying() {
   return { is_playing: false }
 }
 
+export function ttsGenerateMp3() {
+  // Not available in browser mode
+  return null
+}
+
+export function saveFileDialog() {
+  // Not available in browser mode
+  return { canceled: true }
+}
+
 // ==================== EXPORT ALL AS API OBJECT ====================
 
 const localStorageAdapter = {
@@ -874,6 +1119,8 @@ const localStorageAdapter = {
   ttsReadText,
   ttsStop,
   ttsIsPlaying,
+  ttsGenerateMp3,
+  saveFileDialog,
   
   // World Elements
   getWorldElements,
@@ -907,6 +1154,13 @@ const localStorageAdapter = {
   importCharactersCsv,
   exportWorldElementsCsv,
   importWorldElementsCsv,
+  
+  // Import Novel
+  detectChaptersFromText,
+  extractCharacterNames,
+  generateBasicSynopsis,
+  importManuscriptToProject,
+  parseManuscript,
 }
 
 export default localStorageAdapter

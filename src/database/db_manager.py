@@ -1,6 +1,7 @@
 import sqlite3
 import logging
 import os
+import json
 from pathlib import Path
 
 class DatabaseManager:
@@ -1086,7 +1087,13 @@ class DatabaseManager:
                     if k == 'is_visible':
                         values.append(data.get(k, 1)) # Default to visible
                     else:
-                        values.append(data.get(k, ''))
+                        value = data.get(k, '')
+                        # Convert lists/dicts to JSON strings for SQLite compatibility
+                        if isinstance(value, (list, dict)):
+                            value = json.dumps(value)
+                        elif value is None:
+                            value = ''
+                        values.append(value)
 
                 if character_id:
                     # Update existing character
@@ -1216,6 +1223,12 @@ class DatabaseManager:
                             series_id: int = None):
         """Create a new world building element."""
         try:
+            # Convert any list/dict values to JSON strings
+            def to_string(val):
+                if isinstance(val, (list, dict)):
+                    return json.dumps(val)
+                return val if val is not None else ''
+            
             with self.get_connection() as conn:
                 cursor = conn.cursor()
                 cursor.execute("""
@@ -1223,8 +1236,9 @@ class DatabaseManager:
                     (project_id, series_id, name, element_type, description, 
                      sensory_details, significance, custom_traits, source_project_id)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """, (project_id, series_id, name, element_type, description,
-                      sensory_details, significance, custom_traits, project_id))
+                """, (project_id, series_id, to_string(name), to_string(element_type), 
+                      to_string(description), to_string(sensory_details), 
+                      to_string(significance), to_string(custom_traits), project_id))
                 conn.commit()
                 return cursor.lastrowid
         except sqlite3.Error as e:

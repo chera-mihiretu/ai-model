@@ -9,6 +9,225 @@ import { useState, useEffect, useRef, useMemo } from 'react'
 import useStore from '../hooks/useStore'
 import { usePythonBridge } from '../hooks/usePythonBridge'
 import { clsx } from 'clsx'
+import JSZip from 'jszip'
+import { saveAs } from 'file-saver'
+import { Document, Packer, Paragraph, TextRun, HeadingLevel, UnderlineType, AlignmentType } from 'docx'
+
+// Helper: Convert TipTap HTML to DOCX paragraphs using DOMParser for reliable formatting
+function htmlToDocxParagraphs(html) {
+  if (!html) return []
+
+  const parser = new DOMParser()
+  const doc = parser.parseFromString(html, 'text/html')
+  const paragraphs = []
+
+  const HEADING_MAP = {
+    H1: HeadingLevel.HEADING_1,
+    H2: HeadingLevel.HEADING_2,
+    H3: HeadingLevel.HEADING_3,
+    H4: HeadingLevel.HEADING_4,
+    H5: HeadingLevel.HEADING_5,
+    H6: HeadingLevel.HEADING_6,
+  }
+
+  // Inline formatting tags that accumulate styles as we recurse
+  const INLINE_STYLE_TAGS = {
+    STRONG: { bold: true },
+    B: { bold: true },
+    EM: { italics: true },
+    I: { italics: true },
+    U: { underline: { type: UnderlineType.SINGLE } },
+    S: { strike: true },
+    STRIKE: { strike: true },
+    DEL: { strike: true },
+  }
+
+  // Recursively collect TextRun objects from a DOM node
+  function getTextRuns(node, styles = {}) {
+    const runs = []
+
+    for (const child of node.childNodes) {
+      // Text node
+      if (child.nodeType === Node.TEXT_NODE) {
+        const text = child.textContent
+        if (text) {
+          runs.push(new TextRun({ text, ...styles }))
+        }
+        continue
+      }
+
+      // Element node
+      if (child.nodeType === Node.ELEMENT_NODE) {
+        const tag = child.tagName
+
+        // Line break
+        if (tag === 'BR') {
+          runs.push(new TextRun({ text: '', break: 1 }))
+          continue
+        }
+
+        // Inline code
+        if (tag === 'CODE' && child.parentElement?.tagName !== 'PRE') {
+          runs.push(new TextRun({ text: child.textContent || '', font: 'Courier New', ...styles }))
+          continue
+        }
+
+        // Inline formatting - merge styles and recurse into children
+        if (INLINE_STYLE_TAGS[tag]) {
+          const merged = { ...styles, ...INLINE_STYLE_TAGS[tag] }
+          runs.push(...getTextRuns(child, merged))
+          continue
+        }
+
+        // For any other inline/unknown element, recurse with current styles
+        runs.push(...getTextRuns(child, styles))
+      }
+    }
+
+    return runs
+  }
+
+  // Walk top-level and block-level nodes
+  function walkNodes(nodes) {
+    for (const node of nodes) {
+      // Skip pure whitespace text nodes between block elements
+      if (node.nodeType === Node.TEXT_NODE) {
+        const text = node.textContent?.trim()
+        if (text) {
+          paragraphs.push(new Paragraph({ children: [new TextRun(text)] }))
+        }
+        continue
+      }
+
+      if (node.nodeType !== Node.ELEMENT_NODE) continue
+
+      const tag = node.tagName
+
+      // Headings
+      if (HEADING_MAP[tag]) {
+        const runs = getTextRuns(node)
+        paragraphs.push(new Paragraph({
+          children: runs.length > 0 ? runs : [new TextRun('')],
+          heading: HEADING_MAP[tag],
+        }))
+        continue
+      }
+
+      // Paragraph
+      if (tag === 'P') {
+        const runs = getTextRuns(node)
+        // Always add the paragraph (even if empty) to preserve spacing
+        paragraphs.push(new Paragraph({
+          children: runs.length > 0 ? runs : [new TextRun('')],
+        }))
+        continue
+      }
+
+      // Div - treat like paragraph
+      if (tag === 'DIV') {
+        const runs = getTextRuns(node)
+        if (runs.length > 0) {
+          paragraphs.push(new Paragraph({ children: runs }))
+        }
+        continue
+      }
+
+      // Unordered list
+      if (tag === 'UL') {
+        for (const li of node.children) {
+          if (li.tagName === 'LI') {
+            const runs = getTextRuns(li)
+            paragraphs.push(new Paragraph({
+              children: [
+                new TextRun({ text: '\u2022  ' }), // bullet character
+                ...(runs.length > 0 ? runs : [new TextRun('')]),
+              ],
+              indent: { left: 720 }, // 0.5 inch indent
+            }))
+          }
+        }
+        continue
+      }
+
+      // Ordered list
+      if (tag === 'OL') {
+        let num = 1
+        for (const li of node.children) {
+          if (li.tagName === 'LI') {
+            const runs = getTextRuns(li)
+            paragraphs.push(new Paragraph({
+              children: [
+                new TextRun({ text: `${num}.  ` }),
+                ...(runs.length > 0 ? runs : [new TextRun('')]),
+              ],
+              indent: { left: 720 },
+            }))
+            num++
+          }
+        }
+        continue
+      }
+
+      // Blockquote
+      if (tag === 'BLOCKQUOTE') {
+        // Recurse into blockquote children (could contain <p> elements)
+        for (const child of node.childNodes) {
+          if (child.nodeType === Node.ELEMENT_NODE && child.tagName === 'P') {
+            const runs = getTextRuns(child)
+            paragraphs.push(new Paragraph({
+              children: runs.length > 0 ? runs : [new TextRun('')],
+              indent: { left: 720 },
+            }))
+          } else if (child.nodeType === Node.TEXT_NODE) {
+            const text = child.textContent?.trim()
+            if (text) {
+              paragraphs.push(new Paragraph({
+                children: [new TextRun(text)],
+                indent: { left: 720 },
+              }))
+            }
+          }
+        }
+        continue
+      }
+
+      // Code block: <pre><code>...</code></pre>
+      if (tag === 'PRE') {
+        const codeText = node.textContent || ''
+        const lines = codeText.split('\n')
+        for (const line of lines) {
+          paragraphs.push(new Paragraph({
+            children: [new TextRun({ text: line, font: 'Courier New', size: 20 })],
+          }))
+        }
+        continue
+      }
+
+      // Horizontal rule
+      if (tag === 'HR') {
+        paragraphs.push(new Paragraph({
+          children: [new TextRun({ text: '———————————————————————————' })],
+          alignment: AlignmentType.CENTER,
+        }))
+        continue
+      }
+
+      // Fallback: recurse into any other element's children
+      walkNodes(node.childNodes)
+    }
+  }
+
+  walkNodes(doc.body.childNodes)
+
+  // Safety: if nothing was produced, create a single plain-text paragraph
+  if (paragraphs.length === 0 && html.trim()) {
+    paragraphs.push(new Paragraph({
+      children: [new TextRun(doc.body.textContent || '')],
+    }))
+  }
+
+  return paragraphs
+}
 
 import ImportNovel from './ImportNovel'
 import SeriesManager from './SeriesManager'
@@ -31,7 +250,7 @@ const Icons = {
 }
 
 // Project Card - with gold accent styling
-function ProjectCard({ project, onSelect, onDelete, onRename, onDuplicate }) {
+function ProjectCard({ project, onSelect, onDelete, onRename, onDuplicate, onExport }) {
   const [showMenu, setShowMenu] = useState(false)
   const menuRef = useRef(null)
   
@@ -91,7 +310,17 @@ function ProjectCard({ project, onSelect, onDelete, onRename, onDuplicate }) {
         </button>
         
         {showMenu && (
-          <div className="absolute right-0 top-10 bg-dark-800 rounded-xl shadow-lg shadow-black/50 border border-gold-rich/20 min-w-[140px] py-2" style={{ zIndex: 99999 }}>
+          <div className="absolute right-0 top-10 bg-dark-800 rounded-xl shadow-lg shadow-black/50 border border-gold-rich/20 min-w-[160px] py-2" style={{ zIndex: 99999 }}>
+            <button
+              className="dropdown-item flex items-center gap-2 w-full"
+              onClick={(e) => {
+                e.stopPropagation()
+                onExport?.(project, 'zip')
+                setShowMenu(false)
+              }}
+            >
+              📦 Export (.zip)
+            </button>
             <button
               className="dropdown-item flex items-center gap-2 w-full"
               onClick={(e) => {
@@ -147,7 +376,7 @@ function ProjectCard({ project, onSelect, onDelete, onRename, onDuplicate }) {
 }
 
 // Folder Card - elegant dark gold styling
-function FolderCard({ folder, onClick, onDelete, onRename, onDuplicateProject, onDeleteProject }) {
+function FolderCard({ folder, onClick, onDelete, onRename, onDuplicateProject, onDeleteProject, onExportProject }) {
   const [showMenu, setShowMenu] = useState(false)
   const [showProjectMenu, setShowProjectMenu] = useState(null)
   const menuRef = useRef(null)
@@ -354,7 +583,7 @@ function FolderCard({ folder, onClick, onDelete, onRename, onDuplicateProject, o
 }
 
 // Series Card - elegant dark gold styling with SERIES badge
-function SeriesCard({ series, onClick, onDelete, onRename, onDuplicateProject, onDeleteProject }) {
+function SeriesCard({ series, onClick, onDelete, onRename, onDuplicateProject, onDeleteProject, onExportProject }) {
   const [showMenu, setShowMenu] = useState(false)
   const [showProjectMenu, setShowProjectMenu] = useState(null)
   const menuRef = useRef(null)
@@ -606,6 +835,40 @@ function FeatureCard() {
   )
 }
 
+// Header Icons
+const HeaderIcons = {
+  PLUS: (
+    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+    </svg>
+  ),
+  IMPORT: (
+    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+    </svg>
+  ),
+  PROJECT: (
+    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+    </svg>
+  ),
+  FOLDER: (
+    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+    </svg>
+  ),
+  SERIES: (
+    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+    </svg>
+  ),
+  CHEVRON_DOWN: (
+    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+    </svg>
+  ),
+}
+
 // New Button Dropdown
 function NewButtonDropdown({ onCreateProject, onCreateFolder, onCreateSeries }) {
   const [isOpen, setIsOpen] = useState(false)
@@ -625,45 +888,53 @@ function NewButtonDropdown({ onCreateProject, onCreateFolder, onCreateSeries }) 
   return (
     <div className="relative" ref={menuRef} style={{ zIndex: 9999 }}>
       <button
-        className="flex items-center gap-2 text-gold-rich hover:text-gold-amber transition-colors font-medium"
+        className={clsx(
+          'flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all duration-200',
+          'bg-gold-rich/10 text-gold-rich hover:bg-gold-rich/20 border border-gold-rich/30 hover:border-gold-rich/50',
+          isOpen && 'bg-gold-rich/20 border-gold-rich/50'
+        )}
         onClick={() => setIsOpen(!isOpen)}
       >
-        <span className="text-lg">+</span> New
+        {HeaderIcons.PLUS}
+        <span>New</span>
+        <span className={clsx('transition-transform duration-200', isOpen && 'rotate-180')}>
+          {HeaderIcons.CHEVRON_DOWN}
+        </span>
       </button>
       
       {isOpen && (
         <div 
-          className="absolute left-0 top-full mt-2 bg-dark-800 rounded-xl shadow-lg shadow-black/50 border border-gold-rich/20 min-w-[160px] py-2"
+          className="absolute left-0 top-full mt-2 bg-dark-800 rounded-xl shadow-lg shadow-black/50 border border-gold-rich/20 min-w-[180px] py-2 animate-slide-up"
           style={{ zIndex: 99999 }}
         >
           <button
-            className="dropdown-item flex items-center gap-3 w-full"
+            className="dropdown-item flex items-center gap-3 w-full px-4 py-2.5 text-text-secondary hover:text-gold-rich hover:bg-gold-rich/10 transition-colors"
             onClick={() => {
               onCreateProject()
               setIsOpen(false)
             }}
           >
-            <span className="text-lg">📄</span>
+            <span className="text-gold-rich/70">{HeaderIcons.PROJECT}</span>
             <span>Project</span>
           </button>
           <button
-            className="dropdown-item flex items-center gap-3 w-full"
+            className="dropdown-item flex items-center gap-3 w-full px-4 py-2.5 text-text-secondary hover:text-gold-rich hover:bg-gold-rich/10 transition-colors"
             onClick={() => {
               onCreateFolder()
               setIsOpen(false)
             }}
           >
-            <span className="text-lg">📁</span>
+            <span className="text-gold-rich/70">{HeaderIcons.FOLDER}</span>
             <span>Folder</span>
           </button>
           <button
-            className="dropdown-item flex items-center gap-3 w-full"
+            className="dropdown-item flex items-center gap-3 w-full px-4 py-2.5 text-text-secondary hover:text-gold-rich hover:bg-gold-rich/10 transition-colors"
             onClick={() => {
               onCreateSeries()
               setIsOpen(false)
             }}
           >
-            <span className="text-lg">📚</span>
+            <span className="text-gold-rich/70">{HeaderIcons.SERIES}</span>
             <span>Series</span>
           </button>
         </div>
@@ -856,6 +1127,7 @@ function FolderView({ folder, onBack, onSelectProject, onCreateProject, onDelete
                 onDelete={onDeleteProject}
                 onRename={onRenameProject}
                 onDuplicate={onDuplicateProject}
+                onExport={onExportProject}
               />
             ))}
             
@@ -1151,6 +1423,7 @@ function SeriesView({
                 onDelete={onDeleteProject}
                 onRename={onRenameProject}
                 onDuplicate={onDuplicateProject}
+                onExport={onExportProject}
               />
             ))}
             
@@ -1225,6 +1498,7 @@ function Dashboard() {
     createProject,
     deleteProject,
     renameProject,
+    getChapterContent,
     storageMode: bridgeStorageMode,
   } = usePythonBridge()
   
@@ -1528,6 +1802,136 @@ function Dashboard() {
     }
   }
   
+  // Handle export project (entire project as .zip)
+  const handleExportProject = async (project, format = 'zip') => {
+    try {
+      addNotification({ type: 'info', message: 'Preparing export...' })
+      
+      // Get chapters for the project
+      const chapters = project.chapters || []
+      
+      if (chapters.length === 0) {
+        addNotification({ type: 'warning', message: 'No chapters to export' })
+        return
+      }
+      
+      // Fetch full chapter content for each chapter
+      const chaptersWithContent = await Promise.all(
+        chapters.map(async (ch) => {
+          const content = await getChapterContent(ch.id)
+          return { ...ch, content: content || '' }
+        })
+      )
+      
+      if (format === 'zip') {
+        // Create ZIP file with all chapters as .docx files
+        const zip = new JSZip()
+        
+        for (const chapter of chaptersWithContent) {
+          // Convert HTML to DOCX paragraphs with formatting preserved
+          const contentParagraphs = htmlToDocxParagraphs(chapter.content)
+          
+          // Create DOCX document for each chapter
+          const doc = new Document({
+            sections: [{
+              children: [
+                new Paragraph({
+                  text: chapter.title || `Chapter ${chapter.order || ''}`,
+                  heading: HeadingLevel.HEADING_1,
+                }),
+                new Paragraph({ text: '' }), // Empty line after title
+                ...contentParagraphs,
+              ],
+            }],
+          })
+          
+          const docxBuffer = await Packer.toBlob(doc)
+          const safeTitle = (chapter.title || `chapter_${chapter.order || chapter.id}`)
+            .replace(/[^a-z0-9]/gi, '_')
+            .substring(0, 50)
+          zip.file(`${safeTitle}.docx`, docxBuffer)
+        }
+        
+        // Also add a combined full manuscript file
+        const fullDoc = new Document({
+          sections: [{
+            children: chaptersWithContent.flatMap((chapter, idx) => {
+              const contentParagraphs = htmlToDocxParagraphs(chapter.content)
+              return [
+                new Paragraph({
+                  text: chapter.title || `Chapter ${chapter.order || idx + 1}`,
+                  heading: HeadingLevel.HEADING_1,
+                  pageBreakBefore: idx > 0,
+                }),
+                new Paragraph({ text: '' }),
+                ...contentParagraphs,
+              ]
+            }),
+          }],
+        })
+        
+        const fullDocxBuffer = await Packer.toBlob(fullDoc)
+        zip.file('_Full_Manuscript.docx', fullDocxBuffer)
+        
+        // Generate and download the zip
+        const zipBlob = await zip.generateAsync({ type: 'blob' })
+        const safeProjectName = project.name.replace(/[^a-z0-9]/gi, '_').substring(0, 50)
+        saveAs(zipBlob, `${safeProjectName}_export.zip`)
+        
+        addNotification({ 
+          type: 'success', 
+          message: `Exported ${chaptersWithContent.length} chapters to ${safeProjectName}_export.zip` 
+        })
+      }
+    } catch (error) {
+      console.error('Export failed:', error)
+      addNotification({ type: 'error', message: 'Failed to export project' })
+    }
+  }
+  
+  // Handle export single chapter as .docx
+  const handleExportChapter = async (chapter) => {
+    try {
+      addNotification({ type: 'info', message: 'Preparing export...' })
+      
+      // Get chapter content
+      const content = await getChapterContent(chapter.id)
+      
+      if (!content) {
+        addNotification({ type: 'warning', message: 'Chapter has no content to export' })
+        return
+      }
+      
+      // Convert HTML to DOCX paragraphs with formatting preserved
+      const contentParagraphs = htmlToDocxParagraphs(content)
+      
+      // Create DOCX document
+      const doc = new Document({
+        sections: [{
+          children: [
+            new Paragraph({
+              text: chapter.title || 'Chapter',
+              heading: HeadingLevel.HEADING_1,
+            }),
+            new Paragraph({ text: '' }),
+            ...contentParagraphs,
+          ],
+        }],
+      })
+      
+      const docxBlob = await Packer.toBlob(doc)
+      const safeTitle = (chapter.title || 'chapter')
+        .replace(/[^a-z0-9]/gi, '_')
+        .substring(0, 50)
+      saveAs(docxBlob, `${safeTitle}.docx`)
+      
+      addNotification({ type: 'success', message: `Exported "${chapter.title}" to ${safeTitle}.docx` })
+    } catch (error) {
+      console.error('Export chapter failed:', error)
+      addNotification({ type: 'error', message: 'Failed to export chapter' })
+    }
+  }
+  
   // Handle delete folder
   const handleDeleteFolder = (folder) => {
     if (!confirm(`Delete folder "${folder.name}"? Projects inside will become standalone.`)) {
@@ -1772,7 +2176,7 @@ function Dashboard() {
       <header className="px-8 py-4 glass relative" style={{ zIndex: 100000 }}>
         <div className="max-w-6xl mx-auto flex items-center justify-between">
           {/* Left side - New & Import */}
-          <div className="flex items-center gap-6">
+          <div className="flex items-center gap-4">
             <NewButtonDropdown
               onCreateProject={() => {
                 setCreateType('project')
@@ -1789,10 +2193,14 @@ function Dashboard() {
             />
             
             <button
-              className="flex items-center gap-2 text-text-secondary hover:text-gold-rich transition-colors font-medium"
+              className={clsx(
+                'flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all duration-200',
+                'bg-transparent text-text-secondary hover:text-gold-rich hover:bg-gold-rich/10 border border-transparent hover:border-gold-rich/30'
+              )}
               onClick={() => setShowImportModal(true)}
             >
-              <span className="text-sm">↓</span> Import Novel
+              {HeaderIcons.IMPORT}
+              <span>Import</span>
             </button>
           </div>
           
@@ -1833,6 +2241,7 @@ function Dashboard() {
                   onDelete={handleDeleteProject}
                   onRename={handleRenameProject}
                   onDuplicate={(p) => handleDuplicateProject(p, null)}
+                  onExport={handleExportProject}
                 />
               ))}
               
@@ -1846,6 +2255,7 @@ function Dashboard() {
                   onRename={handleRenameFolder}
                   onDuplicateProject={handleDuplicateProject}
                   onDeleteProject={handleDeleteProject}
+                  onExportProject={handleExportProject}
                 />
               ))}
               
@@ -1859,6 +2269,7 @@ function Dashboard() {
                   onRename={handleRenameSeries}
                   onDuplicateProject={handleDuplicateProject}
                   onDeleteProject={handleDeleteProject}
+                  onExportProject={handleExportProject}
                 />
               ))}
               
@@ -1914,12 +2325,21 @@ function Dashboard() {
       {/* Import Novel Modal */}
       <ImportNovel
         isOpen={showImportModal}
-        onClose={() => {
+        onClose={(skipRefresh = false) => {
           setShowImportModal(false)
-          // Refresh projects after import
-          getProjectsWithChapters().then(projectList => {
-            setProjects(projectList || [])
-          })
+          // Only refresh projects if not navigating to a project (skipRefresh = false means refresh)
+          if (!skipRefresh) {
+            getProjectsWithChapters().then(projectList => {
+              setProjects(projectList || [])
+            })
+          }
+        }}
+        onImportComplete={async (result) => {
+          // Immediately refresh the projects list when import completes
+          const updatedProjects = await getProjectsWithChapters()
+          if (updatedProjects) {
+            setProjects(updatedProjects)
+          }
         }}
       />
     </div>

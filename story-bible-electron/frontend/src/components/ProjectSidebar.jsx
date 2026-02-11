@@ -9,6 +9,224 @@ import { useState, useEffect } from 'react'
 import useStore from '../hooks/useStore'
 import { usePythonBridge } from '../hooks/usePythonBridge'
 import { clsx } from 'clsx'
+import { Document, Packer, Paragraph, TextRun, HeadingLevel, UnderlineType, AlignmentType } from 'docx'
+import { saveAs } from 'file-saver'
+
+// Helper: Convert TipTap HTML to DOCX paragraphs using DOMParser for reliable formatting
+function htmlToDocxParagraphs(html) {
+  if (!html) return []
+
+  const parser = new DOMParser()
+  const doc = parser.parseFromString(html, 'text/html')
+  const paragraphs = []
+
+  const HEADING_MAP = {
+    H1: HeadingLevel.HEADING_1,
+    H2: HeadingLevel.HEADING_2,
+    H3: HeadingLevel.HEADING_3,
+    H4: HeadingLevel.HEADING_4,
+    H5: HeadingLevel.HEADING_5,
+    H6: HeadingLevel.HEADING_6,
+  }
+
+  // Inline formatting tags that accumulate styles as we recurse
+  const INLINE_STYLE_TAGS = {
+    STRONG: { bold: true },
+    B: { bold: true },
+    EM: { italics: true },
+    I: { italics: true },
+    U: { underline: { type: UnderlineType.SINGLE } },
+    S: { strike: true },
+    STRIKE: { strike: true },
+    DEL: { strike: true },
+  }
+
+  // Recursively collect TextRun objects from a DOM node
+  function getTextRuns(node, styles = {}) {
+    const runs = []
+
+    for (const child of node.childNodes) {
+      // Text node
+      if (child.nodeType === Node.TEXT_NODE) {
+        const text = child.textContent
+        if (text) {
+          runs.push(new TextRun({ text, ...styles }))
+        }
+        continue
+      }
+
+      // Element node
+      if (child.nodeType === Node.ELEMENT_NODE) {
+        const tag = child.tagName
+
+        // Line break
+        if (tag === 'BR') {
+          runs.push(new TextRun({ text: '', break: 1 }))
+          continue
+        }
+
+        // Inline code
+        if (tag === 'CODE' && child.parentElement?.tagName !== 'PRE') {
+          runs.push(new TextRun({ text: child.textContent || '', font: 'Courier New', ...styles }))
+          continue
+        }
+
+        // Inline formatting - merge styles and recurse into children
+        if (INLINE_STYLE_TAGS[tag]) {
+          const merged = { ...styles, ...INLINE_STYLE_TAGS[tag] }
+          runs.push(...getTextRuns(child, merged))
+          continue
+        }
+
+        // For any other inline/unknown element, recurse with current styles
+        runs.push(...getTextRuns(child, styles))
+      }
+    }
+
+    return runs
+  }
+
+  // Walk top-level and block-level nodes
+  function walkNodes(nodes) {
+    for (const node of nodes) {
+      // Skip pure whitespace text nodes between block elements
+      if (node.nodeType === Node.TEXT_NODE) {
+        const text = node.textContent?.trim()
+        if (text) {
+          paragraphs.push(new Paragraph({ children: [new TextRun(text)] }))
+        }
+        continue
+      }
+
+      if (node.nodeType !== Node.ELEMENT_NODE) continue
+
+      const tag = node.tagName
+
+      // Headings
+      if (HEADING_MAP[tag]) {
+        const runs = getTextRuns(node)
+        paragraphs.push(new Paragraph({
+          children: runs.length > 0 ? runs : [new TextRun('')],
+          heading: HEADING_MAP[tag],
+        }))
+        continue
+      }
+
+      // Paragraph
+      if (tag === 'P') {
+        const runs = getTextRuns(node)
+        // Always add the paragraph (even if empty) to preserve spacing
+        paragraphs.push(new Paragraph({
+          children: runs.length > 0 ? runs : [new TextRun('')],
+        }))
+        continue
+      }
+
+      // Div - treat like paragraph
+      if (tag === 'DIV') {
+        const runs = getTextRuns(node)
+        if (runs.length > 0) {
+          paragraphs.push(new Paragraph({ children: runs }))
+        }
+        continue
+      }
+
+      // Unordered list
+      if (tag === 'UL') {
+        for (const li of node.children) {
+          if (li.tagName === 'LI') {
+            const runs = getTextRuns(li)
+            paragraphs.push(new Paragraph({
+              children: [
+                new TextRun({ text: '\u2022  ' }), // bullet character
+                ...(runs.length > 0 ? runs : [new TextRun('')]),
+              ],
+              indent: { left: 720 }, // 0.5 inch indent
+            }))
+          }
+        }
+        continue
+      }
+
+      // Ordered list
+      if (tag === 'OL') {
+        let num = 1
+        for (const li of node.children) {
+          if (li.tagName === 'LI') {
+            const runs = getTextRuns(li)
+            paragraphs.push(new Paragraph({
+              children: [
+                new TextRun({ text: `${num}.  ` }),
+                ...(runs.length > 0 ? runs : [new TextRun('')]),
+              ],
+              indent: { left: 720 },
+            }))
+            num++
+          }
+        }
+        continue
+      }
+
+      // Blockquote
+      if (tag === 'BLOCKQUOTE') {
+        // Recurse into blockquote children (could contain <p> elements)
+        for (const child of node.childNodes) {
+          if (child.nodeType === Node.ELEMENT_NODE && child.tagName === 'P') {
+            const runs = getTextRuns(child)
+            paragraphs.push(new Paragraph({
+              children: runs.length > 0 ? runs : [new TextRun('')],
+              indent: { left: 720 },
+            }))
+          } else if (child.nodeType === Node.TEXT_NODE) {
+            const text = child.textContent?.trim()
+            if (text) {
+              paragraphs.push(new Paragraph({
+                children: [new TextRun(text)],
+                indent: { left: 720 },
+              }))
+            }
+          }
+        }
+        continue
+      }
+
+      // Code block: <pre><code>...</code></pre>
+      if (tag === 'PRE') {
+        const codeText = node.textContent || ''
+        const lines = codeText.split('\n')
+        for (const line of lines) {
+          paragraphs.push(new Paragraph({
+            children: [new TextRun({ text: line, font: 'Courier New', size: 20 })],
+          }))
+        }
+        continue
+      }
+
+      // Horizontal rule
+      if (tag === 'HR') {
+        paragraphs.push(new Paragraph({
+          children: [new TextRun({ text: '———————————————————————————' })],
+          alignment: AlignmentType.CENTER,
+        }))
+        continue
+      }
+
+      // Fallback: recurse into any other element's children
+      walkNodes(node.childNodes)
+    }
+  }
+
+  walkNodes(doc.body.childNodes)
+
+  // Safety: if nothing was produced, create a single plain-text paragraph
+  if (paragraphs.length === 0 && html.trim()) {
+    paragraphs.push(new Paragraph({
+      children: [new TextRun(doc.body.textContent || '')],
+    }))
+  }
+
+  return paragraphs
+}
 
 // Icons
 const Icons = {
@@ -30,6 +248,7 @@ const Icons = {
   SCENE: '🎬',
   EXPAND: '▼',
   COLLAPSE: '▶',
+  EXPORT: '📤',
 }
 
 // Story Bible tabs configuration
@@ -44,7 +263,7 @@ const BIBLE_TABS = [
   { id: 'scenes', label: 'Scene Editor', icon: Icons.SCENE },
 ]
 
-function ChapterItem({ chapter, index, isActive, onClick, onDelete, onRename, onMoveUp, onMoveDown, isFirst, isLast }) {
+function ChapterItem({ chapter, index, isActive, onClick, onDelete, onRename, onMoveUp, onMoveDown, onExport, isFirst, isLast }) {
   const [isHovered, setIsHovered] = useState(false)
   const [isEditing, setIsEditing] = useState(false)
   const [editTitle, setEditTitle] = useState(chapter.title || `Chapter ${index + 1}`)
@@ -139,6 +358,16 @@ function ChapterItem({ chapter, index, isActive, onClick, onDelete, onRename, on
             title="Rename"
           >
             {Icons.EDIT}
+          </button>
+          <button
+            className="w-5 h-5 flex items-center justify-center rounded text-gray-500 hover:text-gold-rich hover:bg-gold-rich/10 text-xs"
+            onClick={(e) => {
+              e.stopPropagation()
+              onExport?.(chapter)
+            }}
+            title="Export (.docx)"
+          >
+            {Icons.EXPORT}
           </button>
           <button
             className="w-5 h-5 flex items-center justify-center rounded text-gray-500 hover:text-red-400 hover:bg-red-400/10 text-xs"
@@ -250,6 +479,7 @@ function ProjectSidebar() {
     renameChapter,
     moveChapterUp,
     moveChapterDown,
+    getChapterContent,
   } = usePythonBridge()
   
   const [showNewChapterModal, setShowNewChapterModal] = useState(false)
@@ -345,6 +575,49 @@ function ProjectSidebar() {
     }
   }
   
+  // Handle export chapter as .docx
+  const handleExportChapter = async (chapter) => {
+    try {
+      addNotification({ type: 'info', message: 'Preparing export...' })
+      
+      // Get chapter content
+      const content = await getChapterContent(chapter.id)
+      
+      if (!content) {
+        addNotification({ type: 'warning', message: 'Chapter has no content to export' })
+        return
+      }
+      
+      // Convert HTML to DOCX paragraphs with formatting preserved
+      const contentParagraphs = htmlToDocxParagraphs(content)
+      
+      // Create DOCX document
+      const doc = new Document({
+        sections: [{
+          children: [
+            new Paragraph({
+              text: chapter.title || 'Chapter',
+              heading: HeadingLevel.HEADING_1,
+            }),
+            new Paragraph({ text: '' }),
+            ...contentParagraphs,
+          ],
+        }],
+      })
+      
+      const docxBlob = await Packer.toBlob(doc)
+      const safeTitle = (chapter.title || 'chapter')
+        .replace(/[^a-z0-9]/gi, '_')
+        .substring(0, 50)
+      saveAs(docxBlob, `${safeTitle}.docx`)
+      
+      addNotification({ type: 'success', message: `Exported "${chapter.title}" to ${safeTitle}.docx` })
+    } catch (error) {
+      console.error('Export chapter failed:', error)
+      addNotification({ type: 'error', message: 'Failed to export chapter' })
+    }
+  }
+  
   // Handle Bible tab click
   const handleBibleTabClick = (tabId) => {
     setCurrentBibleTab(tabId)
@@ -415,6 +688,7 @@ function ProjectSidebar() {
               onRename={handleRenameChapter}
               onMoveUp={handleMoveUp}
               onMoveDown={handleMoveDown}
+              onExport={handleExportChapter}
               isFirst={index === 0}
               isLast={index === chapters.length - 1}
             />

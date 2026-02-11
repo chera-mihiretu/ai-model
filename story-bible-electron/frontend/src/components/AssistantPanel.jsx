@@ -10,6 +10,7 @@ import { useState, useRef, useEffect } from 'react'
 import useStore from '../hooks/useStore'
 import { usePythonBridge } from '../hooks/usePythonBridge'
 import { clsx } from 'clsx'
+import { LuDownload } from 'react-icons/lu'
 
 // Icons
 const Icons = {
@@ -105,7 +106,7 @@ function MarkdownContent({ content }) {
   )
 }
 
-function ChatMessage({ role, content, onCopy, onSpeak, onInsert, onReplace, messageType, canReplace, selectionStart, selectionEnd, senses }) {
+function ChatMessage({ role, content, onCopy, onSpeak, onDownload, onInsert, onReplace, messageType, canReplace, selectionStart, selectionEnd, senses }) {
   const isAi = role === 'assistant'
   
   // Get the icon based on message type
@@ -116,6 +117,16 @@ function ChatMessage({ role, content, onCopy, onSpeak, onInsert, onReplace, mess
     if (messageType === 'rewrite') return Icons.REWRITE
     if (messageType === 'describe') return Icons.DESCRIBE
     return Icons.AI
+  }
+  
+  // Wrapper to pass messageType to onInsert
+  const handleInsertClick = () => {
+    onInsert(content, messageType)
+  }
+  
+  // Wrapper to pass messageType to onReplace
+  const handleReplaceClick = () => {
+    onReplace(content, selectionStart, selectionEnd, messageType)
   }
   
   // Parse describe content into separate sense sections
@@ -176,7 +187,7 @@ function ChatMessage({ role, content, onCopy, onSpeak, onInsert, onReplace, mess
               {messageType === 'rewrite' && canReplace && (
                 <button
                   className="px-3 py-1.5 text-xs font-medium rounded-lg bg-green-500 text-white hover:bg-green-600 flex items-center gap-1 transition-colors"
-                  onClick={() => onReplace(content, selectionStart, selectionEnd)}
+                  onClick={handleReplaceClick}
                   title="Replace selected text with this rewrite"
                 >
                   {Icons.REPLACE} Replace Selection
@@ -191,7 +202,7 @@ function ChatMessage({ role, content, onCopy, onSpeak, onInsert, onReplace, mess
                     ? "bg-dark-600 text-gray-300 hover:bg-dark-500"
                     : "bg-gold-rich text-dark-950 hover:bg-gold-amber"
                 )}
-                onClick={() => onInsert(content)}
+                onClick={handleInsertClick}
                 title="Insert at cursor position in editor"
               >
                 {Icons.INSERT} Insert to Editor
@@ -208,6 +219,13 @@ function ChatMessage({ role, content, onCopy, onSpeak, onInsert, onReplace, mess
                 onClick={() => onSpeak(content)}
               >
                 {Icons.SPEAKER} Read
+              </button>
+              <button
+                className="text-gray-500 hover:text-gold-rich flex items-center"
+                onClick={() => onDownload(content)}
+                title="Download as MP3"
+              >
+                <LuDownload className="w-3.5 h-3.5" />
               </button>
             </div>
           )}
@@ -244,7 +262,7 @@ function ChatMessage({ role, content, onCopy, onSpeak, onInsert, onReplace, mess
           <div className="flex items-center gap-3 px-4 py-2 border-t border-gold-rich/10">
             <button
               className="text-sm text-gray-400 hover:text-gold-rich flex items-center gap-1 transition-colors"
-              onClick={() => onInsert(section.content)}
+              onClick={() => onInsert(section.content, 'describe')}
               title="Insert this description"
             >
               ⊕ Insert
@@ -289,6 +307,7 @@ function AssistantPanel() {
     getDeepMemory,
     ttsSpeak,
     ttsStop,
+    ttsDownload,
     generatePluginResponse,
   } = usePythonBridge()
   
@@ -508,29 +527,22 @@ function AssistantPanel() {
     }
   }
   
-  // Handle insert to editor
-  const handleInsert = (text) => {
+  // Handle download speech
+  const handleDownloadSpeech = (text) => {
+    ttsDownload(text, selectedVoice)
+  }
+  
+  // Handle insert to editor - insert text as-is (prompts handle formatting)
+  const handleInsert = (text, messageType) => {
     console.log('handleInsert called, callback exists:', !!editorInsertCallback)
-    console.log('editorInsertCallback type:', typeof editorInsertCallback)
     
     if (editorInsertCallback && typeof editorInsertCallback === 'function') {
-      // Strip markdown formatting for plain text insertion
-      const plainText = text
-        .replace(/\*\*([^*]+)\*\*/g, '$1')  // Remove bold
-        .replace(/__([^_]+)__/g, '$1')
-        .replace(/\*([^*]+)\*/g, '$1')  // Remove italic
-        .replace(/_([^_]+)_/g, '$1')
-        .replace(/^#{1,6}\s*/gm, '')  // Remove headers
-        .replace(/^>\s*/gm, '')  // Remove blockquotes
-        .replace(/^[\*\-]\s*/gm, '')  // Remove list markers
-        .replace(/^\d+\.\s*/gm, '')  // Remove numbered list markers
-        .replace(/`([^`]+)`/g, '$1')  // Remove inline code
-        .replace(/```[^`]*```/gs, '')  // Remove code blocks
-        .trim()
+      // Insert text as-is - the AI prompts are designed to output clean text
+      const insertText = (text || '').trim()
       
-      console.log('Calling editorInsertCallback with text length:', plainText.length)
+      console.log('Calling editorInsertCallback with text length:', insertText.length)
       try {
-        editorInsertCallback(plainText)
+        editorInsertCallback(insertText)
         addNotification({ type: 'success', message: 'Content inserted into editor' })
       } catch (err) {
         console.error('Error calling editorInsertCallback:', err)
@@ -542,29 +554,18 @@ function AssistantPanel() {
     }
   }
   
-  // Handle replace selection (for rewrite)
-  const handleReplace = (text, selectionStart, selectionEnd) => {
+  // Handle replace selection (for rewrite) - insert text as-is
+  const handleReplace = (text, selectionStart, selectionEnd, messageType) => {
     console.log('handleReplace called, callback exists:', !!editorReplaceSelectionCallback)
     console.log('Selection positions:', selectionStart, selectionEnd)
     
     if (editorReplaceSelectionCallback && typeof editorReplaceSelectionCallback === 'function') {
-      // Strip markdown formatting for plain text replacement
-      const plainText = text
-        .replace(/\*\*([^*]+)\*\*/g, '$1')  // Remove bold
-        .replace(/__([^_]+)__/g, '$1')
-        .replace(/\*([^*]+)\*/g, '$1')  // Remove italic
-        .replace(/_([^_]+)_/g, '$1')
-        .replace(/^#{1,6}\s*/gm, '')  // Remove headers
-        .replace(/^>\s*/gm, '')  // Remove blockquotes
-        .replace(/^[\*\-]\s*/gm, '')  // Remove list markers
-        .replace(/^\d+\.\s*/gm, '')  // Remove numbered list markers
-        .replace(/`([^`]+)`/g, '$1')  // Remove inline code
-        .replace(/```[^`]*```/gs, '')  // Remove code blocks
-        .trim()
+      // Insert text as-is - the AI prompts are designed to output clean text
+      const replaceText = (text || '').trim()
       
       try {
         // Pass the stored selection positions to replace at the correct location
-        const success = editorReplaceSelectionCallback(plainText, selectionStart, selectionEnd)
+        const success = editorReplaceSelectionCallback(replaceText, selectionStart, selectionEnd)
         if (success) {
           addNotification({ type: 'success', message: 'Selection replaced with rewritten text' })
         } else {
@@ -636,6 +637,7 @@ function AssistantPanel() {
                 messageType={msg.type}
                 onCopy={handleCopy}
                 onSpeak={handleSpeak}
+                onDownload={handleDownloadSpeech}
                 onInsert={handleInsert}
                 onReplace={handleReplace}
                 canReplace={msg.replaceSelection}

@@ -169,9 +169,31 @@ export const useStore = create((set, get) => ({
   showSettings: false,
   storageMode: 'local', // 'local' | 'backend'
   
+  // Sidebar widths (resizable)
+  sidebarWidth: 280, // Left sidebar width in pixels
+  assistantWidth: 360, // Right sidebar (AI assistant) width in pixels
+  
+  // Min/max constraints for sidebars
+  SIDEBAR_MIN_WIDTH: 200,
+  SIDEBAR_MAX_WIDTH: 400,
+  ASSISTANT_MIN_WIDTH: 300,
+  ASSISTANT_MAX_WIDTH: 600,
+  
   setCurrentView: (view) => set({ currentView: view }),
   
   setStorageMode: (mode) => set({ storageMode: mode }),
+  
+  setSidebarWidth: (width) => {
+    const { SIDEBAR_MIN_WIDTH, SIDEBAR_MAX_WIDTH } = get()
+    const clampedWidth = Math.min(Math.max(width, SIDEBAR_MIN_WIDTH), SIDEBAR_MAX_WIDTH)
+    set({ sidebarWidth: clampedWidth })
+  },
+  
+  setAssistantWidth: (width) => {
+    const { ASSISTANT_MIN_WIDTH, ASSISTANT_MAX_WIDTH } = get()
+    const clampedWidth = Math.min(Math.max(width, ASSISTANT_MIN_WIDTH), ASSISTANT_MAX_WIDTH)
+    set({ assistantWidth: clampedWidth })
+  },
   
   // When project is cleared, go back to dashboard
   clearCurrentProject: () => set({ 

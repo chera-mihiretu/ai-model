@@ -673,3 +673,163 @@ body {
   );
   opacity: 0.5;
 }
+
+/* ============================================================
+   RESIZE HANDLE - Sidebar resizer
+   ============================================================ */
+
+.resize-handle {
+  position: relative;
+  width: 4px;
+  flex-shrink: 0;
+  cursor: col-resize;
+  background: transparent;
+  transition: background-color 0.15s ease;
+  z-index: 10;
+}
+
+.resize-handle::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 4px;
+  height: 48px;
+  background: linear-gradient(180deg, 
+    transparent 0%, 
+    rgba(212, 175, 55, 0.3) 20%,
+    rgba(212, 175, 55, 0.5) 50%,
+    rgba(212, 175, 55, 0.3) 80%,
+    transparent 100%
+  );
+  border-radius: 2px;
+  opacity: 0;
+  transition: opacity 0.2s ease, height 0.2s ease;
+}
+
+.resize-handle:hover::before {
+  opacity: 1;
+  height: 80px;
+}
+
+.resize-handle:active::before {
+  opacity: 1;
+  height: 100%;
+  background: linear-gradient(180deg, 
+    transparent 0%, 
+    rgba(212, 175, 55, 0.4) 10%,
+    rgba(212, 175, 55, 0.6) 50%,
+    rgba(212, 175, 55, 0.4) 90%,
+    transparent 100%
+  );
+}
+
+.resize-handle:hover {
+  background: rgba(212, 175, 55, 0.08);
+}
+
+.resize-handle:active {
+  background: rgba(212, 175, 55, 0.15);
+}
+
+/* Grip dots indicator */
+.resize-handle::after {
+  content: '⋮';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: var(--gold-rich);
+  font-size: 10px;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  pointer-events: none;
+}
+
+.resize-handle:hover::after {
+  opacity: 0.6;
+}
+
+/* ============================================================
+   SELECTION MENU - Sudowrite-style floating context menu
+   ============================================================ */
+
+.selection-menu {
+  pointer-events: auto;
+  animation: selectionMenuFadeIn 0.15s ease-out;
+}
+
+@keyframes selectionMenuFadeIn {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+}
+
+.selection-menu-content {
+  box-shadow: 
+    0 4px 20px rgba(0, 0, 0, 0.5),
+    0 0 1px rgba(212, 175, 55, 0.3),
+    0 0 40px rgba(212, 175, 55, 0.1);
+}
+
+/* Arrow pointing to selection */
+.selection-menu-arrow {
+  position: absolute;
+  bottom: -6px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 0;
+  height: 0;
+  border-left: 8px solid transparent;
+  border-right: 8px solid transparent;
+  border-top: 8px solid var(--dark-800);
+  filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.3));
+}
+
+.selection-menu-arrow::before {
+  content: '';
+  position: absolute;
+  bottom: 1px;
+  left: -9px;
+  width: 0;
+  height: 0;
+  border-left: 9px solid transparent;
+  border-right: 9px solid transparent;
+  border-top: 9px solid rgba(212, 175, 55, 0.3);
+  z-index: -1;
+}
+
+/* Menu button hover effects */
+.selection-menu button {
+  transition: all 0.15s ease;
+}
+
+.selection-menu button:hover {
+  transform: translateY(-1px);
+}
+
+.selection-menu button:active {
+  transform: translateY(0);
+}
+
+/* Ensure menu stays visible while interacting */
+.selection-menu:hover {
+  opacity: 1 !important;
+}
+
+/* Selection highlight enhancement */
+.ProseMirror ::selection {
+  background: rgba(212, 175, 55, 0.35);
+  color: inherit;
+}
+
+/* Make selection more visible */
+.ProseMirror:focus ::selection {
+  background: rgba(212, 175, 55, 0.4);
+}
