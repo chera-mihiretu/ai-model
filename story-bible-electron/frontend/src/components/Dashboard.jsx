@@ -1137,7 +1137,7 @@ function RenameModal({ isOpen, onClose, onRename, currentName, type = 'project' 
 }
 
 // Folder View - when inside a folder
-function FolderView({ folder, onBack, onSelectProject, onCreateProject, onDeleteProject, onRenameProject, onDuplicateProject }) {
+function FolderView({ folder, onBack, onSelectProject, onCreateProject, onDeleteProject, onRenameProject, onDuplicateProject, onExportProject }) {
   const formatTime = (timestamp) => {
     if (!timestamp) return 'Just now'
     const date = new Date(timestamp)
@@ -1411,6 +1411,7 @@ function SeriesView({
   onDeleteProject, 
   onRenameProject, 
   onDuplicateProject,
+  onExportProject,
   onReorderProjects,
   onMoveProjectToHome
 }) {
@@ -2198,6 +2199,7 @@ function Dashboard() {
           onDeleteProject={handleDeleteProject}
           onRenameProject={handleRenameProject}
           onDuplicateProject={(p) => handleDuplicateProject(p, currentFolder)}
+          onExportProject={handleExportProject}
         />
         
         <CreateModal
@@ -2253,6 +2255,7 @@ function Dashboard() {
           onDeleteProject={handleDeleteProject}
           onRenameProject={handleRenameProject}
           onDuplicateProject={(p) => handleDuplicateProject(p, currentSeries)}
+          onExportProject={handleExportProject}
           onReorderProjects={handleReorderSeriesProjects}
           onMoveProjectToHome={handleMoveProjectToHome}
         />

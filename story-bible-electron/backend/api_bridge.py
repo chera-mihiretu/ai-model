@@ -400,6 +400,19 @@ class APIBridge:
                 pass
             return {'tokens': tokens, 'done': is_done}
         
+        elif method == 'ai_stream_stop':
+            # Stop AI generation: drain the queue and signal completion
+            try:
+                while not self.ai_response_queue.empty():
+                    try:
+                        self.ai_response_queue.get_nowait()
+                    except queue.Empty:
+                        break
+                self.ai_response_queue.put('[[END]]')
+            except Exception as e:
+                logging.error(f"ai_stream_stop error: {e}")
+            return {'status': 'stopped'}
+        
         elif method == 'generate_summary':
             text = params.get('text')
             mode = params.get('mode', 'incremental')

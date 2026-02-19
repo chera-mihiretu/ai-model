@@ -46,60 +46,60 @@ function MarkdownContent({ content }) {
   // Parse markdown into HTML
   const parseMarkdown = (text) => {
     if (!text) return ''
-    
+
     let html = text
-    
+
     // Escape HTML
     html = html.replace(/</g, '&lt;').replace(/>/g, '&gt;')
-    
+
     // Headers
     html = html.replace(/^### (.*$)/gm, '<h3 class="text-lg font-bold text-gold-soft mt-4 mb-2">$1</h3>')
     html = html.replace(/^## (.*$)/gm, '<h2 class="text-xl font-bold text-gold-soft mt-4 mb-2">$1</h2>')
     html = html.replace(/^# (.*$)/gm, '<h1 class="text-2xl font-bold text-gold-soft mt-4 mb-3">$1</h1>')
-    
+
     // Bold
     html = html.replace(/\*\*([^*]+)\*\*/g, '<strong class="font-bold text-gray-100">$1</strong>')
     html = html.replace(/__([^_]+)__/g, '<strong class="font-bold text-gray-100">$1</strong>')
-    
+
     // Italic
     html = html.replace(/\*([^*]+)\*/g, '<em class="italic">$1</em>')
     html = html.replace(/_([^_]+)_/g, '<em class="italic">$1</em>')
-    
+
     // Code blocks
     html = html.replace(/```([^`]+)```/gs, '<pre class="bg-dark-700 p-3 rounded-lg my-2 overflow-x-auto font-mono text-sm text-gray-300">$1</pre>')
-    
+
     // Inline code
     html = html.replace(/`([^`]+)`/g, '<code class="bg-dark-700 px-1 rounded font-mono text-sm text-gray-300">$1</code>')
-    
+
     // Blockquotes
     html = html.replace(/^> (.*$)/gm, '<blockquote class="border-l-4 border-gold-rich pl-4 my-2 italic text-gray-400">$1</blockquote>')
-    
+
     // Horizontal rule
     html = html.replace(/^---$/gm, '<hr class="border-gold-rich/20 my-4" />')
-    
+
     // Unordered lists
     html = html.replace(/^\* (.*$)/gm, '<li class="ml-4 list-disc">$1</li>')
     html = html.replace(/^- (.*$)/gm, '<li class="ml-4 list-disc">$1</li>')
-    
+
     // Numbered lists
     html = html.replace(/^\d+\. (.*$)/gm, '<li class="ml-4 list-decimal">$1</li>')
-    
+
     // Wrap consecutive <li> tags in <ul> or <ol>
     html = html.replace(/(<li class="ml-4 list-disc">.*<\/li>\n?)+/g, '<ul class="my-2">$&</ul>')
     html = html.replace(/(<li class="ml-4 list-decimal">.*<\/li>\n?)+/g, '<ol class="my-2">$&</ol>')
-    
+
     // Line breaks (preserve paragraphs)
     html = html.replace(/\n\n/g, '</p><p class="mb-3">')
     html = html.replace(/\n/g, '<br />')
-    
+
     // Wrap in paragraph
     html = '<p class="mb-3">' + html + '</p>'
-    
+
     return html
   }
-  
+
   return (
-    <div 
+    <div
       className="prose max-w-none text-sm text-gray-300"
       dangerouslySetInnerHTML={{ __html: parseMarkdown(content) }}
     />
@@ -108,7 +108,7 @@ function MarkdownContent({ content }) {
 
 function ChatMessage({ role, content, onCopy, onSpeak, onDownload, onInsert, onReplace, messageType, canReplace, selectionStart, selectionEnd, senses, isStreaming }) {
   const isAi = role === 'assistant'
-  
+
   // Get the icon based on message type
   const getTypeIcon = () => {
     if (messageType === 'openings') return Icons.OPENINGS
@@ -118,24 +118,24 @@ function ChatMessage({ role, content, onCopy, onSpeak, onDownload, onInsert, onR
     if (messageType === 'describe') return Icons.DESCRIBE
     return Icons.AI
   }
-  
+
   // Wrapper to pass messageType to onInsert
   const handleInsertClick = () => {
     onInsert(content, messageType)
   }
-  
+
   // Wrapper to pass messageType to onReplace
   const handleReplaceClick = () => {
     onReplace(content, selectionStart, selectionEnd, messageType)
   }
-  
+
   // Parse describe content into separate sense sections
   const parseDescribeSections = (text) => {
     if (messageType !== 'describe' || !text) return null
-    
+
     const sections = []
     const senseRegex = /##\s*(SIGHT|SOUND|SMELL|TASTE|TOUCH|METAPHOR)\s*\n([\s\S]*?)(?=##\s*(?:SIGHT|SOUND|SMELL|TASTE|TOUCH|METAPHOR)|$)/gi
-    
+
     let match
     while ((match = senseRegex.exec(text)) !== null) {
       sections.push({
@@ -143,14 +143,14 @@ function ChatMessage({ role, content, onCopy, onSpeak, onDownload, onInsert, onR
         content: match[2].trim()
       })
     }
-    
+
     // If no sections found, return null to use default rendering
     if (sections.length === 0) return null
     return sections
   }
-  
+
   const describeSections = parseDescribeSections(content)
-  
+
   // For user messages or non-describe AI messages, use standard rendering
   if (!isAi || messageType !== 'describe' || !describeSections) {
     return (
@@ -165,7 +165,7 @@ function ChatMessage({ role, content, onCopy, onSpeak, onDownload, onInsert, onR
         )}>
           {isAi ? getTypeIcon() : Icons.USER}
         </div>
-        
+
         {/* Message */}
         <div className={clsx(
           'flex-1 p-3 rounded-lg',
@@ -184,7 +184,7 @@ function ChatMessage({ role, content, onCopy, onSpeak, onDownload, onInsert, onR
               {content}
             </p>
           )}
-          
+
           {/* Actions - hidden while streaming */}
           {isAi && content && !isStreaming && (
             <div className="flex items-center gap-2 mt-3 pt-2 border-t border-gold-rich/10 flex-wrap">
@@ -198,7 +198,7 @@ function ChatMessage({ role, content, onCopy, onSpeak, onDownload, onInsert, onR
                   {Icons.REPLACE} Replace Selection
                 </button>
               )}
-              
+
               {/* Insert Button */}
               <button
                 className={clsx(
@@ -212,7 +212,7 @@ function ChatMessage({ role, content, onCopy, onSpeak, onDownload, onInsert, onR
               >
                 {Icons.INSERT} Insert to Editor
               </button>
-              
+
               <button
                 className="text-xs text-gray-500 hover:text-gold-rich flex items-center gap-1"
                 onClick={() => onCopy(content)}
@@ -238,7 +238,7 @@ function ChatMessage({ role, content, onCopy, onSpeak, onDownload, onInsert, onR
       </div>
     )
   }
-  
+
   // Special rendering for describe messages - show each sense as a separate card
   return (
     <div className="space-y-3 animate-fade-in">
@@ -257,12 +257,12 @@ function ChatMessage({ role, content, onCopy, onSpeak, onDownload, onInsert, onR
               •••
             </button>
           </div>
-          
+
           {/* Sense Content */}
           <div className="p-4">
             <MarkdownContent content={section.content} />
           </div>
-          
+
           {/* Actions */}
           <div className="flex items-center gap-3 px-4 py-2 border-t border-gold-rich/10">
             <button
@@ -307,7 +307,7 @@ function AssistantPanel() {
     editorInsertCallback,
     editorReplaceSelectionCallback,
   } = useStore()
-  
+
   const {
     startLoreStream,
     askLoreAssistant,
@@ -322,20 +322,21 @@ function AssistantPanel() {
     ttsStop,
     ttsDownload,
     generatePluginResponse,
+    stopAiStream,
   } = usePythonBridge()
-  
+
   const [messages, setMessages] = useState([])
   const [inputValue, setInputValue] = useState('')
   const [isLoading, setIsLoading] = useState(false)
-  
+
   const messagesEndRef = useRef(null)
   const inputRef = useRef(null)
-  
+
   // Scroll to bottom on new messages or when streaming text updates
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, aiStreamedText])
-  
+
   // Handle pending AI requests from Editor
   useEffect(() => {
     if (pendingAiRequest && !isLoading) {
@@ -343,12 +344,12 @@ function AssistantPanel() {
       clearPendingAiRequest()
     }
   }, [pendingAiRequest])
-  
+
   // Finalize streaming: read final text from Zustand store and update the placeholder message
   const finalizeStream = (meta) => {
     // Read the final accumulated text directly from the store (most reliable)
     const finalText = useStore.getState().aiStreamedText || ''
-    
+
     // Update the last (placeholder) assistant message with the final content
     setMessages(prev => {
       const updated = [...prev]
@@ -362,7 +363,7 @@ function AssistantPanel() {
       }
       return updated
     })
-    
+
     // Auto-insert for 'write' type
     if (finalText && meta?.insertAtCursor && meta?.type === 'write' && editorInsertCallback) {
       const plainText = finalText
@@ -377,7 +378,7 @@ function AssistantPanel() {
         .replace(/`([^`]+)`/g, '$1')
         .replace(/```[^`]*```/gs, '')
         .trim()
-      
+
       try {
         editorInsertCallback('\n\n' + plainText)
         addNotification({ type: 'success', message: 'AI text inserted at cursor position' })
@@ -385,16 +386,16 @@ function AssistantPanel() {
         console.error('Error auto-inserting text:', err)
       }
     }
-    
+
     setIsLoading(false)
     clearAiStream()
   }
-  
+
   // Helper: start a streamed AI request with blocking fallback
   const startStreamedRequest = async (instruction, projectMemory, meta, structuredContext = null) => {
     // Add placeholder assistant message that will show streaming text
-    setMessages(prev => [...prev, { 
-      role: 'assistant', 
+    setMessages(prev => [...prev, {
+      role: 'assistant',
       content: '',
       type: meta.type,
       isStreaming: true,
@@ -406,12 +407,12 @@ function AssistantPanel() {
       selectionEnd: meta.selectionEnd,
       senses: meta.senses,
     }])
-    
+
     // Pass the instruction as the query and the summarized memory as project_memory
     // The backend will put project_memory into the STORY DATA section of the system prompt
     // and the instruction/query into the user section
     // If structured_context is provided, backend will use token-budgeted assembly
-    
+
     // Try streaming first for real-time token display
     let streamedText = ''
     try {
@@ -420,20 +421,20 @@ function AssistantPanel() {
     } catch (err) {
       console.warn('Streaming failed, will fall back to blocking call:', err)
     }
-    
+
     // If streaming produced output, finalize with it
     if (streamedText.trim()) {
       finalizeStream(meta)
       return
     }
-    
+
     // Fallback: use the blocking askLoreAssistant call (proven reliable)
     console.log('Streaming produced no output, falling back to blocking call...')
     clearAiStream()
-    
+
     try {
       const response = await askLoreAssistant(instruction, projectMemory, 'Current Project', structuredContext)
-      
+
       if (response && response.trim()) {
         // Update the placeholder message with the blocking response
         setMessages(prev => {
@@ -448,7 +449,7 @@ function AssistantPanel() {
           }
           return updated
         })
-        
+
         // Auto-insert for 'write' type
         if (meta?.insertAtCursor && meta?.type === 'write' && editorInsertCallback) {
           const plainText = response
@@ -500,28 +501,28 @@ function AssistantPanel() {
         return updated
       })
     }
-    
+
     setIsLoading(false)
     clearAiStream()
   }
-  
+
   // Process pending request from Editor
   const handlePendingRequest = async (request) => {
     if (!request) return
-    
+
     // Chat Ideas just focuses the input
     if (request.type === 'chat') {
       inputRef.current?.focus()
       addNotification({ type: 'info', message: 'Ask the AI about your story ideas!' })
       return
     }
-    
+
     // Check AI status
     if (aiStatus !== 'ready') {
       addNotification({ type: 'warning', message: 'AI is not ready. Please wait for the model to load.' })
       return
     }
-    
+
     // Add user message showing what was requested
     let userMessage = '⚡ Generate Story Draft'
     if (request.type === 'openings') {
@@ -534,21 +535,21 @@ function AssistantPanel() {
       const sensesList = request.senses?.join(', ') || 'selected senses'
       userMessage = `✨ Describe: "${request.originalText?.substring(0, 50)}${request.originalText?.length > 50 ? '...' : ''}"\n\nSenses: ${sensesList}`
     }
-    
-    setMessages(prev => [...prev, { 
-      role: 'user', 
+
+    setMessages(prev => [...prev, {
+      role: 'user',
       content: userMessage,
-      type: request.type 
+      type: request.type
     }])
-    
+
     setIsLoading(true)
-    
+
     try {
       // Build structured context for server-side token budgeting
       // This gives the AI full awareness of the project (Sudowrite-style)
       let projectMemory = ''
       let structuredContext = null
-      
+
       if (currentProjectId) {
         try {
           // For write requests, context was already gathered by Toolbar
@@ -571,7 +572,7 @@ function AssistantPanel() {
               const [bible, characters, contextWindow, sceneData, seriesCtx] = await Promise.all([
                 getStoryBible(currentProjectId),
                 getCharacters(currentProjectId),
-                currentChapterId 
+                currentChapterId
                   ? getContextWindow(currentProjectId, currentChapterId, 2000)
                   : Promise.resolve(null),
                 currentChapterId
@@ -579,7 +580,7 @@ function AssistantPanel() {
                   : Promise.resolve([]),
                 getSeriesContextForProject(currentProjectId),
               ])
-              
+
               let characterStr = ''
               if (characters && characters.length > 0) {
                 const visibleChars = characters.filter(c => c.is_visible !== 0)
@@ -590,7 +591,7 @@ function AssistantPanel() {
                   return entry
                 }).join('\n')
               }
-              
+
               // Build scene context string from scene data
               let sceneStr = ''
               if (sceneData && sceneData.length > 0) {
@@ -603,7 +604,7 @@ function AssistantPanel() {
                   return parts.join(' | ')
                 }).filter(Boolean).join('\n')
               }
-              
+
               structuredContext = {
                 synopsis: bible?.synopsis_summary || bible?.synopsis?.substring(0, 800) || '',
                 worldbuilding: bible?.worldbuilding_summary || bible?.worldbuilding?.substring(0, 600) || '',
@@ -613,7 +614,7 @@ function AssistantPanel() {
                 scene_context: sceneStr,
                 series_context: seriesCtx || '',
               }
-              
+
               // For rewrite/describe, include surrounding editor context if available
               if ((request.type === 'rewrite' || request.type === 'describe') && request.context) {
                 structuredContext.preceding_text = request.context?.precedingText || ''
@@ -637,7 +638,7 @@ function AssistantPanel() {
           console.warn('Context building failed:', e)
         }
       }
-      
+
       // Start streamed response with structured context
       await startStreamedRequest(request.instruction, projectMemory, {
         type: request.type,
@@ -651,37 +652,37 @@ function AssistantPanel() {
       }, structuredContext)
     } catch (error) {
       console.error('AI request error:', error)
-      setMessages(prev => [...prev, { 
-        role: 'assistant', 
+      setMessages(prev => [...prev, {
+        role: 'assistant',
         content: `Error: ${error.message || 'Unknown error occurred'}. Please try again.`,
-        type: request.type 
+        type: request.type
       }])
       setIsLoading(false)
     }
   }
-  
+
   // Handle send message
   const handleSend = async () => {
     if (!inputValue.trim() || isLoading) return
-    
+
     // Check AI status first
     if (aiStatus !== 'ready') {
       addNotification({ type: 'warning', message: 'AI is not ready. Please wait for the model to load.' })
       return
     }
-    
+
     const userMessage = inputValue.trim()
     setInputValue('')
-    
+
     // Add user message
     setMessages(prev => [...prev, { role: 'user', content: userMessage, type: 'chat' }])
-    
+
     setIsLoading(true)
     try {
       // Build structured context for chat - gives AI full project awareness
       let projectMemory = ''
       let structuredContext = null
-      
+
       if (currentProjectId) {
         try {
           const [bible, characters, seriesCtx] = await Promise.all([
@@ -689,7 +690,7 @@ function AssistantPanel() {
             getCharacters(currentProjectId),
             getSeriesContextForProject(currentProjectId),
           ])
-          
+
           let characterStr = ''
           if (characters && characters.length > 0) {
             const visibleChars = characters.filter(c => c.is_visible !== 0)
@@ -701,7 +702,7 @@ function AssistantPanel() {
               return entry
             }).join('\n')
           }
-          
+
           structuredContext = {
             synopsis: bible?.synopsis_summary || bible?.synopsis?.substring(0, 800) || '',
             worldbuilding: bible?.worldbuilding_summary || bible?.worldbuilding?.substring(0, 600) || '',
@@ -722,20 +723,20 @@ function AssistantPanel() {
           }
         }
       }
-      
+
       // Start streamed response with structured context
       await startStreamedRequest(userMessage, projectMemory, { type: 'chat' }, structuredContext)
     } catch (error) {
       console.error('Chat error:', error)
-      setMessages(prev => [...prev, { 
-        role: 'assistant', 
+      setMessages(prev => [...prev, {
+        role: 'assistant',
         content: `Error: ${error.message || 'Unknown error occurred'}. Please try again.`,
         type: 'chat'
       }])
       setIsLoading(false)
     }
   }
-  
+
   // Handle keyboard submit
   const handleKeyDown = (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -743,13 +744,13 @@ function AssistantPanel() {
       handleSend()
     }
   }
-  
+
   // Handle copy
   const handleCopy = (text) => {
     navigator.clipboard.writeText(text)
     addNotification({ type: 'success', message: 'Copied to clipboard' })
   }
-  
+
   // Handle speak
   const handleSpeak = (text) => {
     if (isTtsPlaying) {
@@ -758,20 +759,20 @@ function AssistantPanel() {
       ttsSpeak(text, selectedVoice)
     }
   }
-  
+
   // Handle download speech
   const handleDownloadSpeech = (text) => {
     ttsDownload(text, selectedVoice)
   }
-  
+
   // Handle insert to editor - insert text as-is (prompts handle formatting)
   const handleInsert = (text, messageType) => {
     console.log('handleInsert called, callback exists:', !!editorInsertCallback)
-    
+
     if (editorInsertCallback && typeof editorInsertCallback === 'function') {
       // Insert text as-is - the AI prompts are designed to output clean text
       const insertText = (text || '').trim()
-      
+
       console.log('Calling editorInsertCallback with text length:', insertText.length)
       try {
         editorInsertCallback(insertText)
@@ -785,16 +786,16 @@ function AssistantPanel() {
       addNotification({ type: 'warning', message: 'No editor available. Open a chapter first.' })
     }
   }
-  
+
   // Handle replace selection (for rewrite) - insert text as-is
   const handleReplace = (text, selectionStart, selectionEnd, messageType) => {
     console.log('handleReplace called, callback exists:', !!editorReplaceSelectionCallback)
     console.log('Selection positions:', selectionStart, selectionEnd)
-    
+
     if (editorReplaceSelectionCallback && typeof editorReplaceSelectionCallback === 'function') {
       // Insert text as-is - the AI prompts are designed to output clean text
       const replaceText = (text || '').trim()
-      
+
       try {
         // Pass the stored selection positions to replace at the correct location
         const success = editorReplaceSelectionCallback(replaceText, selectionStart, selectionEnd)
@@ -811,13 +812,38 @@ function AssistantPanel() {
       addNotification({ type: 'warning', message: 'No editor available. Open a chapter first.' })
     }
   }
-  
+
   // Clear chat
   const handleClear = () => {
     setMessages([])
     clearAiStream()
   }
-  
+
+  // Stop AI generation
+  const handleStop = () => {
+    // Stop polling and backend generation
+    stopAiStream()
+
+    // Finalize the current streaming message with whatever text has accumulated
+    const currentText = useStore.getState().aiStreamedText || ''
+    setMessages(prev => {
+      const updated = [...prev]
+      const lastIdx = updated.length - 1
+      if (lastIdx >= 0 && updated[lastIdx].role === 'assistant' && updated[lastIdx].isStreaming) {
+        updated[lastIdx] = {
+          ...updated[lastIdx],
+          content: currentText || 'Generation stopped.',
+          isStreaming: false,
+        }
+      }
+      return updated
+    })
+
+    setIsLoading(false)
+    clearAiStream()
+    addNotification({ type: 'info', message: 'AI generation stopped' })
+  }
+
   return (
     <div className="h-full flex flex-col p-4">
       {/* Header */}
@@ -826,15 +852,15 @@ function AssistantPanel() {
           <span className="text-xl">{Icons.BRAIN}</span>
           <h2 className="font-semibold text-gold-soft">Lore Assistant</h2>
         </div>
-        
+
         <div className="flex items-center gap-2">
           {/* AI Status */}
           <div className={clsx(
             'w-2 h-2 rounded-full',
-            aiStatus === 'ready' ? 'bg-green-400' : 
-            aiStatus === 'loading' ? 'bg-gold-rich' : 'bg-red-400'
+            aiStatus === 'ready' ? 'bg-green-400' :
+              aiStatus === 'loading' ? 'bg-gold-rich' : 'bg-red-400'
           )} />
-          
+
           <button
             className="w-8 h-8 flex items-center justify-center rounded-lg text-gray-500 hover:bg-gold-rich/10 hover:text-gold-rich"
             onClick={handleClear}
@@ -844,7 +870,7 @@ function AssistantPanel() {
           </button>
         </div>
       </div>
-      
+
       {/* Messages Area */}
       <div className="flex-1 overflow-y-auto space-y-4 mb-4">
         {messages.length === 0 ? (
@@ -866,7 +892,7 @@ function AssistantPanel() {
               const isStreamingMsg = msg.isStreaming && isLastMessage
               // For streaming messages, show the live aiStreamedText
               const displayContent = isStreamingMsg ? aiStreamedText : msg.content
-              
+
               return (
                 <ChatMessage
                   key={idx}
@@ -886,7 +912,7 @@ function AssistantPanel() {
                 />
               )
             })}
-            
+
             {/* Show a waiting indicator only if loading but no streaming text yet */}
             {isLoading && !aiStreamedText && messages.length > 0 && messages[messages.length - 1].role === 'user' && (
               <div className="flex gap-3">
@@ -901,12 +927,12 @@ function AssistantPanel() {
                 </div>
               </div>
             )}
-            
+
             <div ref={messagesEndRef} />
           </>
         )}
       </div>
-      
+
       {/* Input Area */}
       <div className="relative">
         <textarea
@@ -919,21 +945,33 @@ function AssistantPanel() {
           rows={2}
           disabled={isLoading || aiStatus !== 'ready'}
         />
-        <button
-          className={clsx(
-            'absolute right-3 bottom-3 w-8 h-8 rounded-lg flex items-center justify-center',
-            'transition-colors',
-            inputValue.trim() && !isLoading
-              ? 'bg-gold-rich text-dark-950 hover:bg-gold-amber'
-              : 'bg-dark-600 text-gray-500 cursor-not-allowed'
-          )}
-          onClick={handleSend}
-          disabled={!inputValue.trim() || isLoading}
-        >
-          {Icons.SEND}
-        </button>
+
+        {/* Send / Stop button */}
+        {isLoading ? (
+          <button
+            className="absolute right-3 bottom-3 w-8 h-8 rounded-lg flex items-center justify-center bg-red-600 text-white hover:bg-red-700 transition-colors animate-pulse"
+            onClick={handleStop}
+            title="Stop generation"
+          >
+            {Icons.STOP}
+          </button>
+        ) : (
+          <button
+            className={clsx(
+              'absolute right-3 bottom-3 w-8 h-8 rounded-lg flex items-center justify-center',
+              'transition-colors',
+              inputValue.trim() && !isLoading
+                ? 'bg-gold-rich text-dark-950 hover:bg-gold-amber'
+                : 'bg-dark-600 text-gray-500 cursor-not-allowed'
+            )}
+            onClick={handleSend}
+            disabled={!inputValue.trim() || isLoading}
+          >
+            {Icons.SEND}
+          </button>
+        )}
       </div>
-      
+
       {/* Quick Prompts */}
       <div className="mt-3 flex flex-wrap gap-2">
         {['Who is...', 'What happens in...', 'Describe the...'].map(prompt => (
