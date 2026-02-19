@@ -312,6 +312,35 @@ export function usePythonBridge() {
     }
   }, [isElectronApi, api])
   
+  const getSummarizedMemory = useCallback(async (projectId) => {
+    if (!isElectronApi) {
+      return ''
+    }
+    
+    try {
+      const contextSize = useStore.getState().aiContextSize
+      const tier = contextSize <= 4096 ? 1000 : 1500
+      const result = await api.getSummarizedMemory(projectId, tier)
+      return result || ''
+    } catch (error) {
+      console.error('Failed to get summarized memory:', error)
+      // Fall back to deep memory
+      return ''
+    }
+  }, [isElectronApi, api])
+  
+  const getContextHealth = useCallback(async (projectId) => {
+    if (!isElectronApi) {
+      return null
+    }
+    try {
+      return await api.getContextHealth(projectId)
+    } catch (error) {
+      console.error('Failed to get context health:', error)
+      return null
+    }
+  }, [isElectronApi, api])
+  
   const getContextWindow = useCallback(async (projectId, chapterId, charLimit = 3000) => {
     if (!isElectronApi) {
       return { prev_summary: '', recent_summary: '' }
@@ -336,16 +365,84 @@ export function usePythonBridge() {
       
       setAiStatus(
         status.is_loaded ? 'ready' : 'error',
-        status.status
+        status.status,
+        status.context_size || 0
       )
       return status
     } catch (error) {
       console.error('Failed to get AI status:', error)
-      setAiStatus('error', 'Failed to connect to AI')
-      return { status: 'error', is_loaded: false }
+      setAiStatus('error', 'Failed to connect to AI', 0)
+      return { status: 'error', is_loaded: false, context_size: 0 }
     }
   }, [isElectronApi, api, setAiStatus])
   
+  const listModels = useCallback(async () => {
+    try {
+      const result = isElectronApi
+        ? await api.listModels()
+        : api.listModels()
+      return result?.models || []
+    } catch (error) {
+      console.error('Failed to list models:', error)
+      return []
+    }
+  }, [isElectronApi, api])
+
+  const selectModel = useCallback(async (modelPath) => {
+    if (!isElectronApi) {
+      addNotification({ type: 'warning', message: 'Model selection requires the desktop app' })
+      return { status: 'unavailable', is_loaded: false }
+    }
+    
+    try {
+      addNotification({ type: 'info', message: 'Loading model... This may take a moment.' })
+      const result = await api.selectModel(modelPath)
+      
+      if (result?.is_loaded) {
+        setAiStatus('ready', result.status, result.context_size || 0)
+        addNotification({ type: 'success', message: result.status })
+      } else {
+        setAiStatus('error', result?.status || 'Failed to load model', 0)
+        addNotification({ type: 'error', message: result?.status || 'Failed to load model' })
+      }
+      
+      return result
+    } catch (error) {
+      console.error('Failed to select model:', error)
+      addNotification({ type: 'error', message: `Model loading failed: ${error.message}` })
+      return { status: `Error: ${error.message}`, is_loaded: false }
+    }
+  }, [isElectronApi, api, setAiStatus, addNotification])
+
+  const browseForModel = useCallback(async () => {
+    if (!isElectronApi) {
+      addNotification({ type: 'warning', message: 'Model browsing requires the desktop app' })
+      return null
+    }
+    
+    try {
+      const result = await api.openFileDialog({
+        title: 'Select a GGUF Model File',
+        filters: [
+          { name: 'GGUF Models', extensions: ['gguf'] },
+          { name: 'All Files', extensions: ['*'] },
+        ],
+        properties: ['openFile'],
+      })
+      
+      if (result.canceled || !result.filePaths || result.filePaths.length === 0) {
+        return null
+      }
+      
+      const selectedPath = result.filePaths[0]
+      return await selectModel(selectedPath)
+    } catch (error) {
+      console.error('Failed to browse for model:', error)
+      addNotification({ type: 'error', message: `Browse failed: ${error.message}` })
+      return null
+    }
+  }, [isElectronApi, api, selectModel, addNotification])
+
   const startAiStream = useCallback(async (instruction, options = {}) => {
     // In offline mode, show message instead of trying to stream
     if (!isElectronApi) {
@@ -410,6 +507,77 @@ export function usePythonBridge() {
     }
   }, [isElectronApi, api, setAiGenerating, appendAiToken, addNotification])
   
+  const startLoreStream = useCallback(async (query, projectMemory = '', projectName = 'Current Project', structuredContext = null) => {
+    if (!isElectronApi) {
+      addNotification({ 
+        type: 'warning', 
+        message: 'AI features require the full Electron app with Python backend' 
+      })
+      return false
+    }
+    
+    try {
+      // Clear any previous polling interval to avoid conflicts
+      if (pollingRef.current) {
+        clearInterval(pollingRef.current)
+        pollingRef.current = null
+      }
+      
+      setAiGenerating(true)
+      
+      await api.loreStreamStart(query, projectMemory, projectName, structuredContext)
+      
+      // Start polling for tokens (same pattern as startAiStream)
+      let errorCount = 0
+      const maxErrors = 10
+      let isPolling = false // Guard against overlapping poll calls
+      
+      return new Promise((resolve) => {
+        pollingRef.current = setInterval(async () => {
+          // Skip if a previous poll is still in-flight
+          if (isPolling) return
+          isPolling = true
+          
+          try {
+            const result = await api.aiStreamPoll()
+            
+            if (result.tokens && result.tokens.length > 0) {
+              result.tokens.forEach(token => appendAiToken(token))
+              errorCount = 0
+            }
+            
+            if (result.done) {
+              clearInterval(pollingRef.current)
+              pollingRef.current = null
+              setAiGenerating(false)
+              resolve(true)
+              return
+            }
+          } catch (error) {
+            console.error('Lore stream polling error:', error)
+            errorCount++
+            
+            if (errorCount >= maxErrors) {
+              clearInterval(pollingRef.current)
+              pollingRef.current = null
+              setAiGenerating(false)
+              addNotification({ type: 'error', message: 'AI streaming connection lost' })
+              resolve(false)
+              return
+            }
+          } finally {
+            isPolling = false
+          }
+        }, 50) // Poll every 50ms for smooth streaming
+      })
+    } catch (error) {
+      console.error('Failed to start lore stream:', error)
+      setAiGenerating(false)
+      addNotification({ type: 'error', message: `AI generation failed: ${error.message}` })
+      return false
+    }
+  }, [isElectronApi, api, setAiGenerating, appendAiToken, addNotification])
+
   const generatePluginResponse = useCallback(async (text, pluginType, contextData) => {
     if (!isElectronApi) {
       return 'AI features require the full Electron app with Python backend'
@@ -424,13 +592,13 @@ export function usePythonBridge() {
     }
   }, [isElectronApi, api, addNotification])
   
-  const askLoreAssistant = useCallback(async (query, projectMemory, projectName) => {
+  const askLoreAssistant = useCallback(async (query, projectMemory, projectName, structuredContext = null) => {
     if (!isElectronApi) {
       return 'AI features require the full Electron app with Python backend'
     }
     
     try {
-      return await api.askLoreAssistant(query, projectMemory, projectName)
+      return await api.askLoreAssistant(query, projectMemory, projectName, structuredContext)
     } catch (error) {
       console.error('Lore assistant failed:', error)
       return ''
@@ -700,6 +868,42 @@ export function usePythonBridge() {
     }
   }, [isElectronApi, api])
   
+  const getSceneContext = useCallback(async (chapterId) => {
+    if (!isElectronApi) {
+      return null
+    }
+    try {
+      return await api.getSceneContext(chapterId)
+    } catch (error) {
+      console.error('Failed to get scene context:', error)
+      return null
+    }
+  }, [isElectronApi, api])
+  
+  const getProjectSeriesId = useCallback(async (projectId) => {
+    if (!isElectronApi) {
+      return null
+    }
+    try {
+      return await api.getProjectSeriesId(projectId)
+    } catch (error) {
+      console.error('Failed to get project series ID:', error)
+      return null
+    }
+  }, [isElectronApi, api])
+  
+  const getSeriesContextForProject = useCallback(async (projectId) => {
+    if (!isElectronApi) {
+      return null
+    }
+    try {
+      return await api.getSeriesContextForProject(projectId)
+    } catch (error) {
+      console.error('Failed to get series context:', error)
+      return null
+    }
+  }, [isElectronApi, api])
+  
   // ==================== CSV IMPORT/EXPORT METHODS ====================
   
   const exportCharactersCsv = useCallback(async (projectId) => {
@@ -897,11 +1101,17 @@ export function usePythonBridge() {
     
     // Context
     getDeepMemory,
+    getSummarizedMemory,
     getContextWindow,
+    getContextHealth,
     
     // AI
     getAiStatus,
+    listModels,
+    selectModel,
+    browseForModel,
     startAiStream,
+    startLoreStream,
     generatePluginResponse,
     askLoreAssistant,
     generateSingleCharacter,
@@ -938,6 +1148,11 @@ export function usePythonBridge() {
     createScene,
     updateScene,
     deleteScene,
+    getSceneContext,
+    
+    // Project helpers
+    getProjectSeriesId,
+    getSeriesContextForProject,
     
     // CSV Import/Export
     exportCharactersCsv,

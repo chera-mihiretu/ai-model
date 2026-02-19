@@ -299,8 +299,8 @@ function AnimatedBackground() {
   const [init, setInit] = useState(false);
   const containerRef = useRef(null);
   
-  // Extract logo particle positions - more particles for precision, higher scale for detail
-  const logoPoints = useLogoParticles('/assets/logo.svg', 8000, 3);
+  // Extract logo particle positions - reduced from 8000 to 2000 for lower memory usage
+  const logoPoints = useLogoParticles('/assets/logo.svg', 2000, 1.5);
 
   // Initialize tsParticles engine
   useEffect(() => {
@@ -327,7 +327,7 @@ function AnimatedBackground() {
           value: 'transparent',
         },
       },
-      fpsLimit: 60,
+      fpsLimit: 30,
       detectRetina: true,
       interactivity: {
         detectsOn: 'window',
@@ -369,7 +369,7 @@ function AnimatedBackground() {
           },
         },
         number: {
-          value: 150,
+          value: 60,
           density: {
             enable: true,
             width: 1920,

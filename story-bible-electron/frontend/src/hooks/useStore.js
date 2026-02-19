@@ -87,6 +87,7 @@ export const useStore = create((set, get) => ({
   // ==================== AI STATE ====================
   aiStatus: 'loading',
   aiStatusMessage: 'Initializing...',
+  aiContextSize: 0,
   isAiGenerating: false,
   aiStreamedText: '',
   
@@ -111,10 +112,11 @@ export const useStore = create((set, get) => ({
   // Editor reference for direct access
   editorInstance: null,
   
-  setAiStatus: (status, message) => set({ 
+  setAiStatus: (status, message, contextSize) => set((state) => ({ 
     aiStatus: status, 
-    aiStatusMessage: message 
-  }),
+    aiStatusMessage: message,
+    aiContextSize: contextSize !== undefined ? contextSize : state.aiContextSize
+  })),
   
   setAiGenerating: (isGenerating) => set({ 
     isAiGenerating: isGenerating,
@@ -219,12 +221,11 @@ export const useStore = create((set, get) => ({
   // ==================== NOTIFICATION STATE ====================
   notifications: [],
   
-  addNotification: (notification) => set((state) => ({
-    notifications: [...state.notifications, { 
-      id: Date.now(), 
-      ...notification 
-    }]
-  })),
+  addNotification: (notification) => set((state) => {
+    // Cap notifications at 20 to prevent unbounded memory growth
+    const updated = [...state.notifications, { id: Date.now(), ...notification }];
+    return { notifications: updated.length > 20 ? updated.slice(-20) : updated };
+  }),
   
   removeNotification: (id) => set((state) => ({
     notifications: state.notifications.filter(n => n.id !== id)

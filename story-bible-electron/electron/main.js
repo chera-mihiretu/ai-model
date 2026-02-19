@@ -16,6 +16,7 @@ let pythonReady = false;
 let pendingRequests = new Map();
 let requestId = 0;
 
+
 // Determine if we're in development or production
 const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged;
 
@@ -167,7 +168,8 @@ function startPythonBackend() {
           
           // Handle normal responses
           if (response.id && pendingRequests.has(response.id)) {
-            const { resolve, reject } = pendingRequests.get(response.id);
+            const { resolve, reject, timeoutHandle } = pendingRequests.get(response.id);
+            if (timeoutHandle) clearTimeout(timeoutHandle);
             pendingRequests.delete(response.id);
             
             if (response.error) {
@@ -237,8 +239,6 @@ function sendToPython(method, params = {}) {
       id: id
     };
     
-    pendingRequests.set(id, { resolve, reject });
-    
     // Send request to Python
     pythonProcess.stdin.write(JSON.stringify(request) + '\n');
     
@@ -252,18 +252,25 @@ function sendToPython(method, params = {}) {
       method.includes('parse') ||      // parse_manuscript
       method.includes('import') ||     // import_manuscript
       method.includes('extract') ||    // character/element extraction
-      method.includes('analyze');      // text analysis
+      method.includes('analyze') ||    // text analysis
+      method.includes('model') ||      // list_models, select_model (may wait for AI lock)
+      method.includes('context') ||    // context_health, scene_context, etc.
+      method.includes('series');       // series operations
     
     const timeoutMs = isLongOperation
       ? 600000  // 10 minutes for AI generation and large manuscript processing
       : 60000;  // 60 seconds for regular operations
     
-    setTimeout(() => {
+    
+    const timeoutHandle = setTimeout(() => {
       if (pendingRequests.has(id)) {
         pendingRequests.delete(id);
         reject(new Error(`Request timeout: ${method}`));
       }
     }, timeoutMs);
+    
+    // Store timeout handle so we can clear it when response arrives
+    pendingRequests.set(id, { resolve, reject, timeoutHandle });
   });
 }
 
@@ -290,7 +297,8 @@ function createWindow() {
   if (isDev) {
     // Development: load from Vite dev server
     mainWindow.loadURL('http://localhost:5173');
-    mainWindow.webContents.openDevTools();
+    // DevTools removed from auto-open to save ~200-500MB of RAM.
+    // Open manually with Ctrl+Shift+I when needed.
   } else {
     // Production: load from bundled files in resources
     const frontendPath = path.join(process.resourcesPath, 'frontend', 'index.html');

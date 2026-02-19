@@ -406,6 +406,14 @@ export function askLoreAssistant() {
   return 'AI features require the Python backend. Please run the full Electron app.'
 }
 
+export function loreStreamStart() {
+  return { status: 'unavailable' }
+}
+
+export function getSummarizedMemory() {
+  return ''
+}
+
 // ==================== WORLD ELEMENTS METHODS ====================
 
 export function getWorldElements(projectId, seriesId = null, elementType = null) {
@@ -1105,12 +1113,17 @@ const localStorageAdapter = {
   
   // Context
   getDeepMemory,
+  getSummarizedMemory,
   getContextWindow,
   
   // AI (stubs)
   getAiStatus,
+  getAiConfig: () => ({ model_path: null, n_gpu_layers: 0, n_ctx: 0, n_batch: 0, temperature: 0 }),
+  listModels: () => ({ models: [] }),
+  selectModel: () => ({ status: 'AI unavailable in offline mode', is_loaded: false }),
   aiStreamStart,
   aiStreamPoll,
+  loreStreamStart: () => ({ status: 'unavailable' }),
   generatePluginResponse,
   askLoreAssistant,
   

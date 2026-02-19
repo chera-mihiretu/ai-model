@@ -171,6 +171,29 @@ class DatabaseManager:
                 
                 cursor.execute("CREATE INDEX IF NOT EXISTS idx_story_bible_project_id ON story_bible (project_id)")
                 
+                # Project Summaries - tiered pre-computed summaries for AI context
+                cursor.execute("""
+                    CREATE TABLE IF NOT EXISTS project_summaries (
+                        project_id    INTEGER NOT NULL,
+                        content_type  TEXT NOT NULL,
+                        token_tier    INTEGER NOT NULL,
+                        summary_text  TEXT DEFAULT '',
+                        source_version INTEGER DEFAULT 0,
+                        updated_at    DATETIME DEFAULT CURRENT_TIMESTAMP,
+                        PRIMARY KEY (project_id, content_type, token_tier)
+                    )
+                """)
+                
+                # Content Versions - tracks staleness of each content type
+                cursor.execute("""
+                    CREATE TABLE IF NOT EXISTS content_versions (
+                        project_id   INTEGER NOT NULL,
+                        content_type TEXT NOT NULL,
+                        version      INTEGER DEFAULT 0,
+                        PRIMARY KEY (project_id, content_type)
+                    )
+                """)
+                
                 # Version 1: Baseline (Baseline for this consolidated manager)
                 if current_version < 1:
                     logging.info("Running migration: Version 1 (Baseline)")
@@ -300,6 +323,34 @@ class DatabaseManager:
                     conn.execute("UPDATE schema_version SET version = 4")
                     current_version = 4
                 
+                # Version 5: Tiered Summarization System
+                if current_version < 5:
+                    logging.info("Running migration: Version 5 (Tiered Summarization)")
+                    
+                    conn.execute("""
+                        CREATE TABLE IF NOT EXISTS project_summaries (
+                            project_id    INTEGER NOT NULL,
+                            content_type  TEXT NOT NULL,
+                            token_tier    INTEGER NOT NULL,
+                            summary_text  TEXT DEFAULT '',
+                            source_version INTEGER DEFAULT 0,
+                            updated_at    DATETIME DEFAULT CURRENT_TIMESTAMP,
+                            PRIMARY KEY (project_id, content_type, token_tier)
+                        )
+                    """)
+                    
+                    conn.execute("""
+                        CREATE TABLE IF NOT EXISTS content_versions (
+                            project_id   INTEGER NOT NULL,
+                            content_type TEXT NOT NULL,
+                            version      INTEGER DEFAULT 0,
+                            PRIMARY KEY (project_id, content_type)
+                        )
+                    """)
+                    
+                    conn.execute("UPDATE schema_version SET version = 5")
+                    current_version = 5
+                
                 conn.commit()
                 logging.info(f"Database setup complete at version {current_version}")
                 
@@ -355,6 +406,279 @@ class DatabaseManager:
             
         conn.commit()
 
+    # --- Content Version & Summary Methods ---
+    
+    def increment_content_version(self, project_id: int, content_type: str):
+        """Bump the version counter for a content type, marking summaries as stale."""
+        try:
+            with self.get_connection() as conn:
+                conn.execute("""
+                    INSERT INTO content_versions (project_id, content_type, version)
+                    VALUES (?, ?, 1)
+                    ON CONFLICT(project_id, content_type)
+                    DO UPDATE SET version = version + 1
+                """, (project_id, content_type))
+                conn.commit()
+        except sqlite3.Error as e:
+            logging.error(f"Increment content version error: {e}")
+    
+    def get_content_version(self, project_id: int, content_type: str) -> int:
+        """Get the current version number for a content type."""
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.execute(
+                    "SELECT version FROM content_versions WHERE project_id = ? AND content_type = ?",
+                    (project_id, content_type)
+                )
+                row = cursor.fetchone()
+                return row[0] if row else 0
+        except sqlite3.Error as e:
+            logging.error(f"Get content version error: {e}")
+            return 0
+    
+    def get_summary(self, project_id: int, content_type: str, token_tier: int) -> dict:
+        """Get a pre-computed summary for a content type and tier."""
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.execute(
+                    "SELECT summary_text, source_version FROM project_summaries WHERE project_id = ? AND content_type = ? AND token_tier = ?",
+                    (project_id, content_type, token_tier)
+                )
+                row = cursor.fetchone()
+                if row:
+                    return {'summary_text': row[0], 'source_version': row[1]}
+                return {'summary_text': '', 'source_version': 0}
+        except sqlite3.Error as e:
+            logging.error(f"Get summary error: {e}")
+            return {'summary_text': '', 'source_version': 0}
+    
+    def save_summary(self, project_id: int, content_type: str, token_tier: int, summary_text: str, source_version: int):
+        """Store a pre-computed summary for a content type and tier."""
+        try:
+            with self.get_connection() as conn:
+                conn.execute("""
+                    INSERT INTO project_summaries (project_id, content_type, token_tier, summary_text, source_version, updated_at)
+                    VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                    ON CONFLICT(project_id, content_type, token_tier)
+                    DO UPDATE SET summary_text = ?, source_version = ?, updated_at = CURRENT_TIMESTAMP
+                """, (project_id, content_type, token_tier, summary_text, source_version,
+                      summary_text, source_version))
+                conn.commit()
+        except sqlite3.Error as e:
+            logging.error(f"Save summary error: {e}")
+    
+    def get_raw_content_for_type(self, project_id: int, content_type: str) -> str:
+        """Get the full raw content for a content type to be summarized."""
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                
+                if content_type == 'characters':
+                    cursor.execute("""
+                        SELECT name, role, pronouns, personality_traits, physical_description,
+                               backstory, motivations, internal_conflicts, strengths, weaknesses,
+                               speech_pattern, character_arc
+                        FROM characters
+                        WHERE project_id = ? AND is_visible = 1
+                    """, (project_id,))
+                    rows = cursor.fetchall()
+                    if not rows:
+                        return ''
+                    parts = []
+                    for c in rows:
+                        name, role, pronouns, traits, physical, backstory, motivations, conflicts, strengths, weaknesses, speech, arc = c
+                        lines = [f"CHARACTER: {name}"]
+                        if role: lines.append(f"Role: {role}")
+                        if pronouns: lines.append(f"Pronouns: {pronouns}")
+                        if traits: lines.append(f"Personality: {traits}")
+                        if physical: lines.append(f"Appearance: {physical}")
+                        if backstory: lines.append(f"Backstory: {backstory}")
+                        if motivations: lines.append(f"Motivations: {motivations}")
+                        if conflicts: lines.append(f"Internal Conflicts: {conflicts}")
+                        if strengths: lines.append(f"Strengths: {strengths}")
+                        if weaknesses: lines.append(f"Weaknesses: {weaknesses}")
+                        if speech: lines.append(f"Speech: {speech}")
+                        if arc: lines.append(f"Arc: {arc}")
+                        parts.append("\n".join(lines))
+                    return "\n\n".join(parts)
+                
+                elif content_type == 'world_elements':
+                    cursor.execute("""
+                        SELECT name, element_type, description, sensory_details, significance
+                        FROM world_elements
+                        WHERE project_id = ? AND is_visible = 1
+                    """, (project_id,))
+                    rows = cursor.fetchall()
+                    if not rows:
+                        return ''
+                    parts = []
+                    for name, elem_type, description, sensory, significance in rows:
+                        lines = [f"{(elem_type or 'element').upper()}: {name}"]
+                        if description: lines.append(f"Description: {description}")
+                        if sensory: lines.append(f"Sensory: {sensory}")
+                        if significance: lines.append(f"Significance: {significance}")
+                        parts.append("\n".join(lines))
+                    return "\n\n".join(parts)
+                
+                elif content_type == 'synopsis':
+                    cursor.execute("SELECT synopsis FROM story_bible WHERE project_id = ?", (project_id,))
+                    row = cursor.fetchone()
+                    return (row[0] or '') if row else ''
+                
+                elif content_type == 'outline':
+                    cursor.execute("SELECT outline FROM story_bible WHERE project_id = ?", (project_id,))
+                    row = cursor.fetchone()
+                    if not row or not row[0]:
+                        return ''
+                    outline_data = row[0]
+                    try:
+                        import json
+                        chapters = json.loads(outline_data)
+                        if isinstance(chapters, list):
+                            parts = []
+                            for ch in chapters:
+                                ch_num = ch.get('chapter_number', '?')
+                                ch_title = ch.get('title', 'Untitled')
+                                ch_summary = ch.get('summary', '')
+                                ch_events = ch.get('key_events', '')
+                                lines = [f"Chapter {ch_num}: {ch_title}"]
+                                if ch_summary: lines.append(f"Summary: {ch_summary}")
+                                if ch_events: lines.append(f"Events: {ch_events}")
+                                parts.append("\n".join(lines))
+                            return "\n\n".join(parts)
+                    except Exception:
+                        pass
+                    return outline_data
+                
+                elif content_type == 'chapters':
+                    cursor.execute("""
+                        SELECT title, content FROM chapters
+                        WHERE project_id = ? ORDER BY chapter_order
+                    """, (project_id,))
+                    rows = cursor.fetchall()
+                    if not rows:
+                        return ''
+                    parts = []
+                    for title, content in rows:
+                        if content and content.strip():
+                            # Truncate each chapter to prevent extremely long inputs
+                            snippet = content[:2000] if len(content) > 2000 else content
+                            parts.append(f"CHAPTER: {title}\n{snippet}")
+                    return "\n\n".join(parts)
+                
+                return ''
+        except sqlite3.Error as e:
+            logging.error(f"Get raw content for type error: {e}")
+            return ''
+    
+    def get_context_health(self, project_id: int) -> dict:
+        """
+        Check the health/freshness of all summarized context for a project.
+        Returns a dict with status for each content type: 'fresh', 'stale', or 'missing'.
+        This helps the UI show whether the AI has up-to-date context.
+        """
+        content_types = ['characters', 'world_elements', 'synopsis', 'outline', 'chapters']
+        health = {}
+        
+        for ctype in content_types:
+            current_version = self.get_content_version(project_id, ctype)
+            summary_data = self.get_summary(project_id, ctype, 1000)
+            summary_text = summary_data.get('summary_text', '')
+            summarized_version = summary_data.get('source_version', 0)
+            
+            # Check if there's any raw content
+            raw_content = self.get_raw_content_for_type(project_id, ctype)
+            has_content = bool(raw_content and raw_content.strip())
+            
+            if not has_content:
+                health[ctype] = 'empty'  # No content to summarize
+            elif not summary_text.strip():
+                health[ctype] = 'missing'  # Content exists but no summary
+            elif summarized_version < current_version:
+                health[ctype] = 'stale'  # Summary exists but is outdated
+            else:
+                health[ctype] = 'fresh'  # Summary is up-to-date
+        
+        # Overall status
+        statuses = [v for v in health.values() if v != 'empty']
+        if not statuses:
+            health['overall'] = 'empty'
+        elif all(s == 'fresh' for s in statuses):
+            health['overall'] = 'fresh'
+        elif any(s == 'missing' for s in statuses):
+            health['overall'] = 'missing'
+        else:
+            health['overall'] = 'stale'
+        
+        return health
+
+    def get_summarized_memory(self, project_id: int, token_tier: int = 1000) -> str:
+        """Get pre-computed summaries for all content types, assembled into a context string."""
+        memory = []
+        for content_type in ['characters', 'world_elements', 'synopsis', 'outline', 'chapters']:
+            summary_data = self.get_summary(project_id, content_type, token_tier)
+            summary_text = summary_data.get('summary_text', '')
+            if summary_text and summary_text.strip():
+                label = content_type.upper().replace('_', ' ')
+                memory.append(f"[{label}]\n{summary_text}\n")
+        
+        if not memory:
+            # Fallback: if no summaries exist yet, return a trimmed version of deep memory
+            logging.info(f"No summaries found for project {project_id}, falling back to raw content")
+            return self._get_fallback_memory(project_id)
+        
+        return "\n".join(memory)
+    
+    def _get_fallback_memory(self, project_id: int) -> str:
+        """Lightweight fallback when no summaries exist yet. Returns truncated raw content."""
+        memory = []
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                
+                # Characters (brief)
+                cursor.execute("""
+                    SELECT name, role, personality_traits FROM characters
+                    WHERE project_id = ? AND is_visible = 1
+                """, (project_id,))
+                chars = cursor.fetchall()
+                if chars:
+                    memory.append("[CHARACTERS]")
+                    for name, role, traits in chars:
+                        line = f"- {name}"
+                        if role: line += f" ({role})"
+                        if traits: line += f": {traits[:100]}"
+                        memory.append(line)
+                    memory.append("")
+                
+                # Synopsis (brief)
+                cursor.execute("SELECT synopsis FROM story_bible WHERE project_id = ?", (project_id,))
+                row = cursor.fetchone()
+                if row and row[0]:
+                    memory.append("[SYNOPSIS]")
+                    memory.append(row[0][:500] + ("..." if len(row[0]) > 500 else ""))
+                    memory.append("")
+                
+                # Outline (just titles)
+                cursor.execute("SELECT outline FROM story_bible WHERE project_id = ?", (project_id,))
+                row = cursor.fetchone()
+                if row and row[0]:
+                    try:
+                        import json
+                        chapters = json.loads(row[0])
+                        if isinstance(chapters, list) and chapters:
+                            memory.append("[OUTLINE]")
+                            for ch in chapters[:15]:
+                                memory.append(f"- Ch {ch.get('chapter_number', '?')}: {ch.get('title', 'Untitled')}")
+                            memory.append("")
+                    except Exception:
+                        pass
+                
+            return "\n".join(memory)
+        except sqlite3.Error as e:
+            logging.error(f"Fallback memory error: {e}")
+            return ""
+    
     # --- Story Bible Methods ---
     def save_bible_field(self, project_id: str, field_name: str, content: str) -> None:
         """Atomically update exactly ONE Story Bible field."""
@@ -371,6 +695,13 @@ class DatabaseManager:
                 cursor.execute("INSERT OR IGNORE INTO story_bible (project_id) VALUES (?)", (project_id,))
                 cursor.execute(f"UPDATE story_bible SET {field_name} = ? WHERE project_id = ?", (content, project_id))
                 conn.commit()
+            
+            # Mark the relevant summary as stale (only for base fields, not summary fields)
+            if field_name in base_fields and project_id:
+                if field_name == 'synopsis':
+                    self.increment_content_version(int(project_id), 'synopsis')
+                elif field_name == 'outline':
+                    self.increment_content_version(int(project_id), 'outline')
         except sqlite3.Error as e:
             logging.error(f"Failed to save story bible field {field_name}: {e}")
 
@@ -707,6 +1038,9 @@ class DatabaseManager:
             with self.get_connection() as conn:
                 conn.execute("UPDATE chapters SET content = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?", (content, chapter_id))
                 conn.commit()
+                # Note: We do NOT bump content version here because chapter content
+                # auto-saves on every keystroke. Chapter summaries are updated lazily
+                # when the AI assistant is actually queried.
                 return True
         except sqlite3.Error as e:
             logging.error(f"Update chapter error: {e}")
@@ -1115,6 +1449,12 @@ class DatabaseManager:
                     """, values)
                 
                 conn.commit()
+                
+                # Mark characters summary as stale
+                project_id = data.get('project_id')
+                if project_id:
+                    self.increment_content_version(int(project_id), 'characters')
+                
                 return True
         except sqlite3.Error as e:
             logging.error(f"Save character error: {e}")
@@ -1240,6 +1580,11 @@ class DatabaseManager:
                       to_string(description), to_string(sensory_details), 
                       to_string(significance), to_string(custom_traits), project_id))
                 conn.commit()
+                
+                # Mark world_elements summary as stale
+                if project_id:
+                    self.increment_content_version(int(project_id), 'world_elements')
+                
                 return cursor.lastrowid
         except sqlite3.Error as e:
             logging.error(f"Create world element error: {e}")
@@ -1290,8 +1635,18 @@ class DatabaseManager:
             values.append(element_id)
             
             with self.get_connection() as conn:
+                # Get project_id before updating so we can mark version stale
+                cursor = conn.execute("SELECT project_id FROM world_elements WHERE id = ?", (element_id,))
+                row = cursor.fetchone()
+                project_id = row[0] if row else None
+                
                 conn.execute(f"UPDATE world_elements SET {', '.join(updates)} WHERE id = ?", values)
                 conn.commit()
+                
+                # Mark world_elements summary as stale
+                if project_id:
+                    self.increment_content_version(int(project_id), 'world_elements')
+                
                 return True
         except sqlite3.Error as e:
             logging.error(f"Update world element error: {e}")
@@ -1662,6 +2017,138 @@ class DatabaseManager:
         except sqlite3.Error as e:
             logging.error(f"Reorder scenes error: {e}")
             return False
+
+    def get_scene_context(self, chapter_id: int):
+        """
+        Get scene context for a chapter - returns all scenes with their metadata
+        (POV character, location, summary) to inject into AI context.
+        This allows the AI to be aware of scene structure, similar to Sudowrite.
+        """
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                    SELECT id, scene_order, title, summary, pov_character, location
+                    FROM scenes
+                    WHERE chapter_id = ?
+                    ORDER BY scene_order
+                """, (chapter_id,))
+                scenes = cursor.fetchall()
+                
+                if not scenes:
+                    return None
+                
+                scene_list = []
+                for s in scenes:
+                    scene_data = {
+                        'id': s[0],
+                        'scene_order': s[1],
+                        'title': s[2] or '',
+                        'summary': s[3] or '',
+                        'pov_character': s[4] or '',
+                        'location': s[5] or '',
+                    }
+                    scene_list.append(scene_data)
+                
+                # Build a formatted scene context string
+                context_parts = []
+                for sc in scene_list:
+                    parts = []
+                    if sc['title']:
+                        parts.append(f"Scene: {sc['title']}")
+                    if sc['pov_character']:
+                        parts.append(f"POV: {sc['pov_character']}")
+                    if sc['location']:
+                        parts.append(f"Location: {sc['location']}")
+                    if sc['summary']:
+                        parts.append(f"Summary: {sc['summary']}")
+                    if parts:
+                        context_parts.append(' | '.join(parts))
+                
+                return {
+                    'scenes': scene_list,
+                    'formatted': '\n'.join(context_parts),
+                }
+        except sqlite3.Error as e:
+            logging.error(f"Get scene context error: {e}")
+            return None
+
+    def get_project_series_id(self, project_id: int):
+        """Get the series ID for a project, if it belongs to one."""
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    "SELECT series_id FROM series_projects WHERE project_id = ?",
+                    (project_id,)
+                )
+                row = cursor.fetchone()
+                return row[0] if row else None
+        except sqlite3.Error as e:
+            logging.error(f"Get project series ID error: {e}")
+            return None
+
+    def get_series_context_for_project(self, project_id: int):
+        """
+        If this project belongs to a series, fetch shared characters and worldbuilding
+        from sibling projects to provide cross-book context (Sudowrite-style series awareness).
+        Returns a formatted string or None if project is not in a series.
+        """
+        try:
+            series_id = self.get_project_series_id(project_id)
+            if not series_id:
+                return None
+            
+            series = self.get_series(series_id)
+            if not series or not series.get('projects'):
+                return None
+            
+            parts = []
+            parts.append(f"Series: {series.get('name', 'Unnamed Series')}")
+            if series.get('description'):
+                parts.append(f"Description: {series['description']}")
+            
+            # Get characters from OTHER projects in the series (not current project)
+            sibling_chars = []
+            sibling_world = []
+            for proj in series['projects']:
+                if proj['id'] == project_id:
+                    continue  # Skip current project
+                
+                # Characters from sibling
+                chars = self.get_characters(proj['id'])
+                for c in chars:
+                    if c.get('is_visible', 1) != 0:
+                        entry = f"- {c['name']}"
+                        if c.get('role'): entry += f" ({c['role']})"
+                        if c.get('personality_traits'): entry += f": {c['personality_traits'][:100]}"
+                        entry += f" [from {proj['name']}]"
+                        sibling_chars.append(entry)
+                
+                # World elements from sibling
+                elements = self.get_world_elements(project_id=proj['id'])
+                for e in elements:
+                    if e.get('is_visible', 1) != 0:
+                        entry = f"- {e['name']} ({e.get('element_type', 'other')})"
+                        if e.get('description'): entry += f": {e['description'][:80]}"
+                        entry += f" [from {proj['name']}]"
+                        sibling_world.append(entry)
+            
+            if sibling_chars:
+                parts.append("\nShared Characters from Other Books:")
+                parts.extend(sibling_chars[:15])  # Cap to 15 characters
+            
+            if sibling_world:
+                parts.append("\nShared World Elements from Other Books:")
+                parts.extend(sibling_world[:10])  # Cap to 10 elements
+            
+            # Only return if we have meaningful series context
+            if sibling_chars or sibling_world:
+                return '\n'.join(parts)
+            return None
+        except Exception as e:
+            logging.error(f"Get series context for project error: {e}")
+            return None
 
     # ==================== CHARACTER VERSION METHODS ====================
     

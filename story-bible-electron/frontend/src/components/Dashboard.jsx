@@ -1056,6 +1056,86 @@ function CreateModal({ isOpen, onClose, onCreate, type = 'project' }) {
   )
 }
 
+// Rename Modal (for Project, Folder, or Series)
+function RenameModal({ isOpen, onClose, onRename, currentName, type = 'project' }) {
+  const [name, setName] = useState('')
+  
+  const titles = {
+    project: 'Rename Project',
+    folder: 'Rename Folder',
+    series: 'Rename Series',
+  }
+  
+  useEffect(() => {
+    if (isOpen && currentName) {
+      setName(currentName)
+    }
+    if (!isOpen) {
+      setName('')
+    }
+  }, [isOpen, currentName])
+  
+  const handleSubmit = (e) => {
+    e.preventDefault()
+    if (name.trim() && name.trim() !== currentName) {
+      onRename(name.trim())
+      onClose()
+    }
+  }
+  
+  if (!isOpen) return null
+  
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center">
+      {/* Backdrop */}
+      <div 
+        className="absolute inset-0 bg-black/70 backdrop-blur-sm"
+        onClick={onClose}
+      />
+      
+      {/* Modal */}
+      <div className="relative z-10 w-full max-w-md mx-4 glass-card p-6 animate-slide-up">
+        <h2 className="text-xl font-semibold text-text-primary mb-6">
+          {titles[type]}
+        </h2>
+        
+        <form onSubmit={handleSubmit}>
+          <div className="mb-4">
+            <label className="block text-sm font-medium text-gold-pale mb-2">
+              New Name *
+            </label>
+            <input
+              type="text"
+              className="input"
+              placeholder={`Enter new ${type} name...`}
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              autoFocus
+            />
+          </div>
+          
+          <div className="flex items-center justify-end gap-3 mt-6">
+            <button
+              type="button"
+              className="btn btn-ghost"
+              onClick={onClose}
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="btn btn-primary"
+              disabled={!name.trim() || name.trim() === currentName}
+            >
+              Rename
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}
+
 // Folder View - when inside a folder
 function FolderView({ folder, onBack, onSelectProject, onCreateProject, onDeleteProject, onRenameProject, onDuplicateProject }) {
   const formatTime = (timestamp) => {
@@ -1506,6 +1586,9 @@ function Dashboard() {
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [createType, setCreateType] = useState('project')
   const [showImportModal, setShowImportModal] = useState(false)
+  const [showRenameModal, setShowRenameModal] = useState(false)
+  const [renameTarget, setRenameTarget] = useState(null)
+  const [renameType, setRenameType] = useState('project')
   
   // Folder/Series state
   const [folders, setFolders] = useState([])
@@ -1739,18 +1822,23 @@ function Dashboard() {
   }
   
   // Handle rename project
-  const handleRenameProject = async (project) => {
-    const newName = prompt('Enter new project name:', project.name)
-    if (newName && newName.trim() && newName !== project.name) {
-      try {
-        await renameProject(project.id, newName.trim())
-        const updatedProjects = await getProjectsWithChapters()
-        setProjects(updatedProjects || [])
-        addNotification({ type: 'success', message: 'Project renamed' })
-      } catch (error) {
-        console.error('Failed to rename project:', error)
-        addNotification({ type: 'error', message: 'Failed to rename project' })
-      }
+  const handleRenameProject = (project) => {
+    setRenameTarget(project)
+    setRenameType('project')
+    setShowRenameModal(true)
+  }
+  
+  // Execute project rename (called from RenameModal)
+  const executeRenameProject = async (newName) => {
+    if (!renameTarget) return
+    try {
+      await renameProject(renameTarget.id, newName)
+      const updatedProjects = await getProjectsWithChapters()
+      setProjects(updatedProjects || [])
+      addNotification({ type: 'success', message: 'Project renamed' })
+    } catch (error) {
+      console.error('Failed to rename project:', error)
+      addNotification({ type: 'error', message: 'Failed to rename project' })
     }
   }
   
@@ -1945,17 +2033,22 @@ function Dashboard() {
   
   // Handle rename folder
   const handleRenameFolder = (folder) => {
-    const newName = prompt('Enter new folder name:', folder.name)
-    if (newName && newName.trim() && newName !== folder.name) {
-      setFolders(prev => {
-        const updated = prev.map(f => 
-          f.id === folder.id ? { ...f, name: newName.trim(), updated_at: Date.now() } : f
-        )
-        localStorage.setItem('exelsias_folders', JSON.stringify(updated))
-        return updated
-      })
-      addNotification({ type: 'success', message: 'Folder renamed' })
-    }
+    setRenameTarget(folder)
+    setRenameType('folder')
+    setShowRenameModal(true)
+  }
+  
+  // Execute folder rename (called from RenameModal)
+  const executeRenameFolder = (newName) => {
+    if (!renameTarget) return
+    setFolders(prev => {
+      const updated = prev.map(f => 
+        f.id === renameTarget.id ? { ...f, name: newName, updated_at: Date.now() } : f
+      )
+      localStorage.setItem('exelsias_folders', JSON.stringify(updated))
+      return updated
+    })
+    addNotification({ type: 'success', message: 'Folder renamed' })
   }
   
   // Handle delete series
@@ -1971,17 +2064,22 @@ function Dashboard() {
   
   // Handle rename series
   const handleRenameSeries = (s) => {
-    const newName = prompt('Enter new series name:', s.name)
-    if (newName && newName.trim() && newName !== s.name) {
-      setSeries(prev => {
-        const updated = prev.map(ser => 
-          ser.id === s.id ? { ...ser, name: newName.trim(), updated_at: Date.now() } : ser
-        )
-        localStorage.setItem('exelsias_series', JSON.stringify(updated))
-        return updated
-      })
-      addNotification({ type: 'success', message: 'Series renamed' })
-    }
+    setRenameTarget(s)
+    setRenameType('series')
+    setShowRenameModal(true)
+  }
+  
+  // Execute series rename (called from RenameModal)
+  const executeRenameSeries = (newName) => {
+    if (!renameTarget) return
+    setSeries(prev => {
+      const updated = prev.map(ser => 
+        ser.id === renameTarget.id ? { ...ser, name: newName, updated_at: Date.now() } : ser
+      )
+      localStorage.setItem('exelsias_series', JSON.stringify(updated))
+      return updated
+    })
+    addNotification({ type: 'success', message: 'Series renamed' })
   }
   
   // Handle reorder projects in series (drag and drop timeline)
@@ -2320,6 +2418,22 @@ function Dashboard() {
         onClose={() => setShowCreateModal(false)}
         onCreate={handleCreate}
         type={createType}
+      />
+      
+      {/* Rename Modal */}
+      <RenameModal
+        isOpen={showRenameModal}
+        onClose={() => {
+          setShowRenameModal(false)
+          setRenameTarget(null)
+        }}
+        onRename={(newName) => {
+          if (renameType === 'project') executeRenameProject(newName)
+          else if (renameType === 'folder') executeRenameFolder(newName)
+          else if (renameType === 'series') executeRenameSeries(newName)
+        }}
+        currentName={renameTarget?.name || ''}
+        type={renameType}
       />
       
       {/* Import Novel Modal */}

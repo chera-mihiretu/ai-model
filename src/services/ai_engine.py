@@ -1,4 +1,5 @@
 import logging
+import os
 import sys
 import queue
 import threading
@@ -185,10 +186,16 @@ STRICT RULES:
 <|eot_id|>"""
 
 class AIEngine:
+    # Maximum context size to prevent OOM on systems with limited RAM.
+    # LLaMA 3.1 reports 131072 (128K) native context, but allocating KV cache
+    # for that requires ~8GB+ RAM. Cap to a safe value.
+    MAX_SAFE_CONTEXT = 8192
+
     def __init__(self):
         self.config_manager = ConfigManager()
         self.llm: Optional[Llama] = None
         self.status_message = "Initializing..."
+        self.context_size = 4096  # Default fallback, updated after model loads
         self.lock = threading.Lock()
         self._initialize_model()
 
@@ -207,7 +214,7 @@ class AIEngine:
             return
 
         try:
-            logging.info(f"Loading model from {config.model_path} with n_gpu_layers={config.n_gpu_layers}")
+            logging.info(f"Loading model from {config.model_path} with n_gpu_layers={config.n_gpu_layers}, n_ctx={config.n_ctx}")
             self.llm = Llama(
                 model_path=config.model_path,
                 n_gpu_layers=config.n_gpu_layers,
@@ -215,8 +222,18 @@ class AIEngine:
                 n_batch=config.n_batch,
                 verbose=False
             )
-            self.status_message = "Model Loaded: Llama 3.1 8B (GPU)"
-            logging.info("Model loaded successfully.")
+            # Read the actual context size from the loaded model, but cap it
+            try:
+                raw_ctx = self.llm.n_ctx()
+                if raw_ctx > self.MAX_SAFE_CONTEXT:
+                    logging.warning(f"Model reports n_ctx={raw_ctx}, capping to {self.MAX_SAFE_CONTEXT} to prevent OOM")
+                self.context_size = min(raw_ctx, self.MAX_SAFE_CONTEXT)
+            except Exception:
+                self.context_size = 4096  # Fallback
+            
+            model_name = os.path.basename(config.model_path).replace('.gguf', '')
+            self.status_message = f"Model Loaded: {model_name} ({self.context_size} ctx)"
+            logging.info(f"Model loaded successfully. Context size: {self.context_size}")
         except Exception as e:
             self.status_message = f"Error: Failed to load model ({e})"
             logging.error(f"Failed to load model: {e}")
@@ -274,7 +291,7 @@ class AIEngine:
         available_output = max_tokens
         
         # Trim input to avoid overflowing context window during compression
-        max_input = 4096 - available_output - instruction_tokens - 100
+        max_input = self.context_size - available_output - instruction_tokens - 100
         trimmed_input = self.smart_trim(text, max_input)
 
         prompt = (
@@ -295,7 +312,7 @@ class AIEngine:
     def assemble_context(self, instruction: str, chapter_summary: str, bible_summaries: list, recent_summary: str, recent_text: str, long_form: bool = False) -> str:
         """
         Assembles a strictly budgeted context string.
-        Total Limit: 4096 tokens (minus output buffer).
+        Total Limit: self.context_size tokens (minus output buffer).
         
         Priority:
         1. Recent Text (Last Chapter Summary + Raw Recent) - Critical Short Term Memory
@@ -305,7 +322,7 @@ class AIEngine:
         """
         OUTPUT_BUFFER = 4000 if long_form else 800
         SYSTEM_BUFFER = 50 if long_form else 200 # Extreme squeeze for long form
-        TOTAL_LIMIT = 4096 - OUTPUT_BUFFER - SYSTEM_BUFFER
+        TOTAL_LIMIT = self.context_size - OUTPUT_BUFFER - SYSTEM_BUFFER
         
         # Ensure we have at least SOME tokens for instruction
         if TOTAL_LIMIT < 50:
@@ -477,12 +494,12 @@ class AIEngine:
         max_output_tokens = 4000 if long_form else 800
         # Verify total
         total_input = self.count_tokens(full_prompt)
-        if total_input + max_output_tokens > 4096:
+        if total_input + max_output_tokens > self.context_size:
              logging.warning(f"Final prompt over budget ({total_input}). Trimming...")
              # Last ditch safety check is inside generate_stream but strictly we should handle it here
              pass
 
-        logging.info(f"Budget Check: {total_input} input + {max_output_tokens} output = {total_input + max_output_tokens} / 4096")
+        logging.info(f"Budget Check: {total_input} input + {max_output_tokens} output = {total_input + max_output_tokens} / {self.context_size}")
         self.generate_stream(full_prompt, response_queue, max_tokens=max_output_tokens)
 
     def generate_beat_summary(self, text: str) -> str:
@@ -492,7 +509,7 @@ class AIEngine:
 
         max_output_tokens = 150
         # Increased safety buffer to 250
-        total_budget = 4096 - max_output_tokens - 250
+        total_budget = self.context_size - max_output_tokens - 250
         trimmed_text = self.smart_trim(text, total_budget)
 
         prompt = (
@@ -545,8 +562,73 @@ class AIEngine:
             logging.error(f"Generate summary error: {e}")
             return "Error."
 
-    def ask_lore_assistant(self, query: str, response_queue: queue.Queue, project_memory: str, project_name: str = "Current Project") -> None:
-        """Lore Assistant with budgeting - enhanced for chapter writing."""
+    def assemble_structured_context(self, structured_context: dict, total_budget: int) -> str:
+        """
+        Assembles a token-budgeted context string from structured context data.
+        Similar to Sudowrite: prose, characters, worldbuilding, outline, scenes all get
+        proportional token budgets based on priority.
+        
+        Priority allocation:
+        1. Instruction/preceding text (must fit - critical)
+        2. Scene context (high priority - immediate narrative unit)
+        3. Characters (high priority - consistency)
+        4. Story synopsis (medium priority)
+        5. Worldbuilding (medium priority)
+        6. Outline (medium priority)
+        7. Chapter continuity (medium priority)
+        8. Text after cursor (low priority - awareness only)
+        9. Series context (low priority - cross-book consistency)
+        """
+        parts = []
+        
+        # Extract all context sources
+        chapter_continuity = structured_context.get('chapter_continuity', '')
+        synopsis = structured_context.get('synopsis', '')
+        worldbuilding = structured_context.get('worldbuilding', '')
+        outline = structured_context.get('outline', '')
+        characters = structured_context.get('characters', '')
+        scene_context = structured_context.get('scene_context', '')
+        text_after = structured_context.get('text_after', '')
+        series_context = structured_context.get('series_context', '')
+        preceding_text = structured_context.get('preceding_text', '')
+        
+        # Calculate total available budget (excluding preceding_text which is in the instruction)
+        # Distribute proportionally
+        sources = []
+        if scene_context:
+            sources.append(('CURRENT SCENE', scene_context, 0.15))
+        if characters:
+            sources.append(('KEY CHARACTERS', characters, 0.20))
+        if synopsis:
+            sources.append(('STORY SYNOPSIS', synopsis, 0.15))
+        if worldbuilding:
+            sources.append(('WORLDBUILDING', worldbuilding, 0.15))
+        if outline:
+            sources.append(('STORY OUTLINE', outline, 0.10))
+        if chapter_continuity:
+            sources.append(('PREVIOUS CHAPTER SUMMARY', chapter_continuity, 0.10))
+        if text_after:
+            sources.append(('TEXT AHEAD', text_after, 0.05))
+        if series_context:
+            sources.append(('SERIES CONTEXT', series_context, 0.10))
+        
+        # Normalize weights
+        total_weight = sum(w for _, _, w in sources)
+        if total_weight > 0:
+            for label, content, weight in sources:
+                allocated = int(total_budget * (weight / total_weight))
+                trimmed = self.smart_trim(content, allocated, keep_start=True)
+                if trimmed.strip():
+                    parts.append(f"[{label}]\n{trimmed}")
+        
+        return "\n\n".join(parts)
+
+    def ask_lore_assistant(self, query: str, response_queue: queue.Queue, project_memory: str, project_name: str = "Current Project", structured_context: dict = None) -> None:
+        """Lore Assistant with budgeting - enhanced for chapter writing.
+        
+        If structured_context is provided, uses token-budgeted assembly for richer context.
+        Otherwise falls back to the flat project_memory string.
+        """
         if not self.llm:
             response_queue.put("Error: AI Model is not loaded.")
             response_queue.put("[[END]]")
@@ -554,7 +636,7 @@ class AIEngine:
 
         max_output_tokens = 1200  # Increased for longer responses when writing chapters
         # Increased safety buffer to 250
-        total_budget = 4096 - max_output_tokens - 250
+        total_budget = self.context_size - max_output_tokens - 250
         
         sys_prefix = f"""<|begin_of_text|><|start_header_id|>system<|end_header_id|>
 You are the OMNISCIENT LORE KEEPER and WRITING ASSISTANT for the story '{project_name}'.
@@ -582,7 +664,13 @@ WRITING RULES:
         
         query_part = f"<|start_header_id|>user<|end_header_id|>\n{query}\n<|eot_id|>\n<|start_header_id|>assistant<|end_header_id|>"
         fixed_tokens = self.count_tokens(sys_prefix + sys_suffix + query_part)
-        trimmed_memory = self.smart_trim(project_memory, total_budget - fixed_tokens)
+        memory_budget = total_budget - fixed_tokens
+        
+        # Use structured context assembly if available, otherwise flat memory
+        if structured_context:
+            trimmed_memory = self.assemble_structured_context(structured_context, memory_budget)
+        else:
+            trimmed_memory = self.smart_trim(project_memory, memory_budget)
 
         full_prompt = sys_prefix + trimmed_memory + sys_suffix + query_part
         self.generate_stream(full_prompt, response_queue, max_tokens=max_output_tokens)
@@ -600,16 +688,22 @@ WRITING RULES:
             input_len = len(prompt_tokens)
             
             # Context Window Overflow Protection
-            if input_len + max_tokens > 4096:
-                adjusted_max = 4096 - input_len - 5  # 5 token safety margin
-                logging.warning(f"Context limit imminent! Adjusting max_tokens from {max_tokens} to {adjusted_max} (Input: {input_len})")
+            if input_len + max_tokens > self.context_size:
+                adjusted_max = self.context_size - input_len - 5  # 5 token safety margin
+                logging.warning(f"Context limit imminent! Adjusting max_tokens from {max_tokens} to {adjusted_max} (Input: {input_len}, Context: {self.context_size})")
+                if adjusted_max < 50:
+                    response_queue.put(f"\n[Your text is too long for this model's context window ({self.context_size:,} tokens). Please select less text or use a model with a larger context window.]")
+                    response_queue.put("[[END]]")
+                    return
                 max_tokens = max(1, adjusted_max)
             
-            if input_len >= 4096:
-                logging.error(f"CRITICAL: Final prompt exceeds hard 4096 limit ({input_len}). Emergency truncating input.")
-                # Last resort: truncate the literal string to hopefully fix the token count
-                prompt = prompt[-12000:] # Roughly 3000 tokens
-                max_tokens = 500
+            if input_len >= self.context_size:
+                logging.error(f"CRITICAL: Final prompt exceeds hard {self.context_size} limit ({input_len}). Emergency truncating input.")
+                # Last resort: truncate the literal string to hopefully fit
+                chars_per_token = max(len(prompt) / max(input_len, 1), 3)
+                target_chars = int((self.context_size * 0.75) * chars_per_token)
+                prompt = prompt[-target_chars:]
+                max_tokens = min(500, self.context_size // 4)
 
             logging.info(f"Generating AI response (Input: {input_len}, max_tokens={max_tokens})...")
             
@@ -638,13 +732,208 @@ WRITING RULES:
                 response_queue.put(f"\n[AI Error: {error_msg}]")
             response_queue.put("[[END]]")
 
+    # --- Tiered Summarization Methods ---
+    
+    SUMMARIZATION_PROMPTS = {
+        'characters': "Summarize these character profiles. Preserve each character's name, role, key personality traits, relationships, speech patterns, and story arc. Be concise but complete.",
+        'world_elements': "Summarize these world-building elements. Preserve each element's name, type, key description, and significance to the story.",
+        'synopsis': "Summarize this story synopsis. Preserve the main plot points, key conflicts, character motivations, and resolution.",
+        'outline': "Summarize this chapter outline. Preserve chapter titles, key events per chapter, and the overall story progression.",
+        'chapters': "Summarize these chapter contents. Preserve plot progression, important character actions, key dialogue, and state changes.",
+    }
+    
+    def summarize_for_tier(self, existing_summary: str, new_content: str, content_type: str, target_tokens: int) -> str:
+        """Core incremental summarization: merge existing summary with new content, then compress to target tokens."""
+        if not self.llm:
+            logging.warning("summarize_for_tier: LLM not loaded, returning empty")
+            return ''
+        
+        if not new_content or not new_content.strip():
+            return existing_summary or ''
+        
+        # Get the type-specific prompt
+        type_prompt = self.SUMMARIZATION_PROMPTS.get(content_type, "Summarize the following content concisely.")
+        
+        # Build input: merge existing summary with new content
+        if existing_summary and existing_summary.strip():
+            input_text = f"EXISTING SUMMARY:\n{existing_summary}\n\nUPDATED FULL CONTENT:\n{new_content}"
+        else:
+            input_text = new_content
+        
+        max_output_tokens = target_tokens
+        # Reserve tokens for the prompt structure
+        prompt_overhead = 200
+        available_input = self.context_size - max_output_tokens - prompt_overhead - 50
+        
+        if available_input < 100:
+            logging.warning(f"summarize_for_tier: Not enough context budget for {content_type} (available_input={available_input})")
+            return self.smart_trim(new_content, target_tokens, keep_start=True)
+        
+        # Trim input if needed
+        trimmed_input = self.smart_trim(input_text, available_input, keep_start=True)
+        
+        full_prompt = (
+            f"<|begin_of_text|><|start_header_id|>system<|end_header_id|>\n"
+            f"{type_prompt}\n"
+            f"Compress the output to fit within approximately {target_tokens} tokens.\n"
+            f"Output ONLY the summary, no preamble.\n"
+            f"<|eot_id|><|start_header_id|>user<|end_header_id|>\n"
+            f"{trimmed_input}\n"
+            f"<|eot_id|><|start_header_id|>assistant<|end_header_id|>"
+        )
+        
+        try:
+            with self.lock:
+                output = self.llm(
+                    full_prompt,
+                    max_tokens=max_output_tokens,
+                    stop=["<|eot_id|>"],
+                    echo=False,
+                    temperature=0.3
+                )
+            result = output['choices'][0]['text'].strip()
+            logging.info(f"summarize_for_tier({content_type}, tier={target_tokens}): produced {self.count_tokens(result)} tokens")
+            return result
+        except Exception as e:
+            logging.error(f"summarize_for_tier error ({content_type}): {e}")
+            # Fallback: just trim the content
+            return self.smart_trim(new_content, target_tokens, keep_start=True)
+    
+    def generate_content_summaries(self, project_id: int, content_type: str, db_manager) -> bool:
+        """Orchestrator: check if summaries are stale and regenerate for all tiers.
+        This runs in the background and will bail out if the AI model is busy."""
+        try:
+            # Bail out early if the model is currently busy with user-facing work
+            if self.lock.locked():
+                logging.info(f"Skipping summary generation for {content_type}: AI model is busy")
+                return False
+            
+            current_version = db_manager.get_content_version(project_id, content_type)
+            
+            # Check each tier
+            tiers = [1000, 1500]
+            any_updated = False
+            
+            for tier in tiers:
+                # Re-check if model got busy between tiers
+                if self.lock.locked():
+                    logging.info(f"Aborting summary generation mid-tier for {content_type}: AI model became busy")
+                    break
+                
+                summary_data = db_manager.get_summary(project_id, content_type, tier)
+                summarized_version = summary_data.get('source_version', 0)
+                
+                if summarized_version >= current_version:
+                    logging.debug(f"Summary for {content_type} tier={tier} is up to date (v{summarized_version} >= v{current_version})")
+                    continue
+                
+                logging.info(f"Regenerating summary for {content_type} tier={tier} (v{summarized_version} -> v{current_version})")
+                
+                # Get existing summary and full current content
+                existing_summary = summary_data.get('summary_text', '')
+                full_content = db_manager.get_raw_content_for_type(project_id, content_type)
+                
+                if not full_content or not full_content.strip():
+                    logging.info(f"No content for {content_type}, clearing summary")
+                    db_manager.save_summary(project_id, content_type, tier, '', current_version)
+                    continue
+                
+                # Generate the summary
+                new_summary = self.summarize_for_tier(existing_summary, full_content, content_type, tier)
+                
+                # Store it
+                db_manager.save_summary(project_id, content_type, tier, new_summary, current_version)
+                any_updated = True
+                logging.info(f"Summary updated for {content_type} tier={tier}")
+            
+            return any_updated
+        except Exception as e:
+            logging.error(f"generate_content_summaries error ({content_type}): {e}", exc_info=True)
+            return False
+    
     def unload_model(self):
+        """Fully unload the current model and free all memory."""
+        import gc
+        import ctypes
+        
         if self.llm:
-            logging.info("Unloading model...")
-            del self.llm
+            logging.info("Unloading model - waiting for AI lock...")
+            # Wait for any in-progress generation to finish (up to 30s)
+            acquired = self.lock.acquire(timeout=30)
+            try:
+                logging.info("Unloading model - destroying Llama instance...")
+                
+                # Try to close/reset the llama-cpp model explicitly
+                try:
+                    if hasattr(self.llm, 'close'):
+                        self.llm.close()
+                except Exception as e:
+                    logging.warning(f"Model close() failed (non-fatal): {e}")
+                
+                try:
+                    if hasattr(self.llm, 'reset'):
+                        self.llm.reset()
+                except Exception as e:
+                    logging.warning(f"Model reset() failed (non-fatal): {e}")
+                
+                # Try to free the underlying C model if accessible
+                try:
+                    if hasattr(self.llm, '_model') and self.llm._model is not None:
+                        self.llm._model = None
+                    if hasattr(self.llm, '_ctx') and self.llm._ctx is not None:
+                        self.llm._ctx = None
+                except Exception as e:
+                    logging.warning(f"Model internal cleanup failed (non-fatal): {e}")
+                
+                # Remove our reference
+                self.llm = None
+            finally:
+                if acquired:
+                    self.lock.release()
+        else:
             self.llm = None
-            import gc
-            gc.collect()
+        
+        # Aggressive garbage collection to reclaim memory
+        gc.collect()
+        gc.collect()  # Second pass for cyclic references
+        
+        # Try to release memory back to the OS (Linux)
+        try:
+            ctypes.CDLL("libc.so.6").malloc_trim(0)
+        except Exception:
+            pass  # Not on Linux or libc not available
+        
+        logging.info("Model unloaded, memory freed")
+
+    def reload_model(self, model_path: str) -> dict:
+        """Fully kill the current model first, then load the new one."""
+        logging.info(f"Reload model requested: {model_path}")
+        
+        # Update config first (validation only, no loading yet)
+        valid, message = self.config_manager.set_model_path(model_path)
+        if not valid:
+            self.status_message = f"Error: {message}"
+            return {'status': self.status_message, 'is_loaded': False}
+        
+        # Step 1: Fully unload and free the current model BEFORE loading the new one
+        self.status_message = "Unloading current model..."
+        logging.info("Step 1: Killing current model to free memory...")
+        self.unload_model()
+        
+        # Give the OS a moment to reclaim memory
+        import time
+        time.sleep(0.5)
+        
+        # Step 2: Now load the new model into the freed memory
+        self.status_message = "Loading new model..."
+        logging.info("Step 2: Loading new model...")
+        self._initialize_model()
+        
+        return {
+            'status': self.status_message,
+            'is_loaded': self.llm is not None,
+            'context_size': self.context_size,
+        }
 
     def generate_plugin_response(self, text: str, plugin_type: str, response_queue: queue.Queue, context_data: dict = None) -> None:
         """Handles Describe/Rewrite plugins with budgeting."""
@@ -658,7 +947,7 @@ WRITING RULES:
         elif plugin_type == "sensory_lab": max_output_tokens = 200
 
         # Increased safety buffer to 250
-        total_budget = 4096 - max_output_tokens - 250
+        total_budget = self.context_size - max_output_tokens - 250
         genre = context_data.get('genre', 'General Fiction') if context_data else 'General Fiction'
         char_name = context_data.get('char_name', 'Unknown') if context_data else 'Unknown'
         dossier = context_data.get('dossier', '') if context_data else ''
@@ -692,7 +981,7 @@ WRITING RULES:
 
         max_output_tokens = 800
         # Increased safety buffer to 250
-        total_budget = 4096 - max_output_tokens - 250
+        total_budget = self.context_size - max_output_tokens - 250
         system_tokens = self.count_tokens(PROMPT_EXPAND_SCENE)
         trimmed_context = self.smart_trim(context_text, total_budget - system_tokens)
 
@@ -737,7 +1026,7 @@ WRITING RULES:
         
         max_output_tokens = 1500
         # Increased safety buffer to 250
-        total_budget = 4096 - max_output_tokens - 250
+        total_budget = self.context_size - max_output_tokens - 250
 
         char_text = "\n".join([f"- {c['name']}: {c.get('traits', '')}" for c in lore_package.get('characters', [])])
         story_text = "\n".join(lore_package.get('story_so_far', []))
@@ -765,7 +1054,7 @@ WRITING RULES:
         
         max_output_tokens = 400
         # Increased safety buffer to 250
-        total_budget = 4096 - max_output_tokens - 250
+        total_budget = self.context_size - max_output_tokens - 250
         trimmed_prose = self.smart_trim(prose_text, total_budget - 100)
 
         full_prompt = (
@@ -786,7 +1075,7 @@ WRITING RULES:
         
         max_output_tokens = 500
         # Increased safety buffer to 250
-        total_budget = 4096 - max_output_tokens - 250
+        total_budget = self.context_size - max_output_tokens - 250
 
         char_summary = "\n".join([f"- {c['name']}: {c.get('traits', '')}" for c in lore_package.get('characters', [])])
         story_summary = "\n".join(lore_package.get('story_so_far', []))
@@ -818,7 +1107,7 @@ WRITING RULES:
             return []
         
         max_output_tokens = 2000
-        total_budget = 4096 - max_output_tokens - 250
+        total_budget = self.context_size - max_output_tokens - 250
         
         system_prompt = """<|begin_of_text|><|start_header_id|>system<|end_header_id|>
 You are a literary analyst creating character profiles from a story synopsis.
@@ -1026,7 +1315,7 @@ Return ONLY a JSON object with these exact keys (no markdown, no explanation):
             return []
         
         max_output_tokens = 2000
-        total_budget = 4096 - max_output_tokens - 250
+        total_budget = self.context_size - max_output_tokens - 250
         
         system_prompt = """<|begin_of_text|><|start_header_id|>system<|end_header_id|>
 You are a worldbuilding expert extracting story elements from a synopsis.
@@ -1245,7 +1534,7 @@ Write the synopsis as smooth, engaging prose without any headers or labels.
         import json
         
         max_output_tokens = 2000
-        total_budget = 4096 - max_output_tokens - 250
+        total_budget = self.context_size - max_output_tokens - 250
         
         system_prompt = """<|begin_of_text|><|start_header_id|>system<|end_header_id|>
 You are a story structure expert creating chapter outlines.
@@ -1350,7 +1639,7 @@ Return a JSON array of chapter objects.
             return ""
         
         max_output_tokens = 300
-        total_budget = 4096 - max_output_tokens - 250
+        total_budget = self.context_size - max_output_tokens - 250
         
         system_prompt = """<|begin_of_text|><|start_header_id|>system<|end_header_id|>
 You are a literary assistant creating concise chapter summaries.
@@ -1380,7 +1669,7 @@ CHAPTER CONTENT:
             return ""
         
         max_output_tokens = 1000
-        total_budget = 4096 - max_output_tokens - 250
+        total_budget = self.context_size - max_output_tokens - 250
         
         system_prompt = f"""<|begin_of_text|><|start_header_id|>system<|end_header_id|>
 You are a professional {genre} author expanding scene summaries into vivid prose.

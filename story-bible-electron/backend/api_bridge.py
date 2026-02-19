@@ -71,7 +71,77 @@ class APIBridge:
         self.ai_response_queue = queue.Queue()
         self.ai_thread = None
         
+        # Summarization debounce: track last trigger time per (project_id, content_type)
+        self._summary_cooldowns = {}  # key: "pid:ctype" -> timestamp
+        self._summary_running = False  # prevent overlapping summarizations
+        self._SUMMARY_COOLDOWN_SECS = 120  # minimum seconds between summarizations per type
+        
         logging.info("API Bridge initialized successfully")
+    
+    def _trigger_bg_summary(self, project_id: int = None, content_type: str = '', chapter_id: int = None, element_id: int = None):
+        """Trigger background summarization with debouncing and busy-check."""
+        import time
+        
+        try:
+            # Resolve project_id from chapter_id or element_id if not provided
+            if not project_id and chapter_id:
+                try:
+                    with self.db.get_connection() as conn:
+                        cursor = conn.execute("SELECT project_id FROM chapters WHERE id = ?", (chapter_id,))
+                        row = cursor.fetchone()
+                        project_id = row[0] if row else None
+                except Exception:
+                    pass
+            
+            if not project_id and element_id:
+                try:
+                    with self.db.get_connection() as conn:
+                        cursor = conn.execute("SELECT project_id FROM world_elements WHERE id = ?", (element_id,))
+                        row = cursor.fetchone()
+                        project_id = row[0] if row else None
+                except Exception:
+                    pass
+            
+            if not project_id or not content_type:
+                return
+            
+            # --- Debounce check ---
+            cooldown_key = f"{project_id}:{content_type}"
+            now = time.time()
+            last_trigger = self._summary_cooldowns.get(cooldown_key, 0)
+            if now - last_trigger < self._SUMMARY_COOLDOWN_SECS:
+                logging.debug(f"Skipping bg summary for {cooldown_key}: cooldown ({int(now - last_trigger)}s < {self._SUMMARY_COOLDOWN_SECS}s)")
+                return
+            
+            # --- Skip if AI is currently busy with user-facing work ---
+            if self._summary_running:
+                logging.debug(f"Skipping bg summary for {cooldown_key}: another summarization already running")
+                return
+            if self.ai.lock.locked():
+                logging.debug(f"Skipping bg summary for {cooldown_key}: AI model is busy")
+                return
+            
+            # Mark cooldown and start
+            self._summary_cooldowns[cooldown_key] = now
+            
+            def _bg_summarize(pid, ctype):
+                try:
+                    self._summary_running = True
+                    logging.info(f"Background summarization started: project={pid}, type={ctype}")
+                    self.ai.generate_content_summaries(pid, ctype, self.db)
+                    logging.info(f"Background summarization complete: project={pid}, type={ctype}")
+                except Exception as e:
+                    logging.error(f"Background summarization error ({ctype}): {e}", exc_info=True)
+                finally:
+                    self._summary_running = False
+            
+            threading.Thread(
+                target=_bg_summarize,
+                args=(int(project_id), content_type),
+                daemon=True
+            ).start()
+        except Exception as e:
+            logging.error(f"_trigger_bg_summary error: {e}")
     
     def handle_request(self, request: Dict) -> Dict:
         """
@@ -145,9 +215,18 @@ class APIBridge:
             return self.db.get_chapter_content(chapter_id)
         
         elif method == 'update_chapter_content':
+            # Note: chapter saves happen on every auto-save, so we use an extra-long
+            # cooldown for chapter summarization. The _SUMMARY_COOLDOWN_SECS (120s) plus
+            # the lock-busy check prevents summarization from blocking user-facing AI ops.
             chapter_id = params.get('chapter_id')
             content = params.get('content')
-            return self.db.update_chapter_content(chapter_id, content)
+            result = self.db.update_chapter_content(chapter_id, content)
+            # Only trigger summarization for substantial content and with a very
+            # conservative debounce - we rely on the 120s cooldown in _trigger_bg_summary
+            # and the lock-busy check to avoid starving user-facing operations
+            if result and chapter_id and content and len(content) > 2000:
+                self._trigger_bg_summary(chapter_id=chapter_id, content_type='chapters')
+            return result
         
         elif method == 'rename_chapter':
             chapter_id = params.get('chapter_id')
@@ -191,7 +270,12 @@ class APIBridge:
         
         elif method == 'save_character':
             data = params.get('data')
-            return self.db.save_character(data)
+            result = self.db.save_character(data)
+            # Trigger background summary update for characters
+            project_id = data.get('project_id') if data else None
+            if result and project_id:
+                self._trigger_bg_summary(project_id=int(project_id), content_type='characters')
+            return result
         
         elif method == 'delete_character':
             character_id = params.get('character_id')
@@ -207,6 +291,20 @@ class APIBridge:
             field_name = params.get('field_name')
             content = params.get('content')
             self.db.save_bible_field(project_id, field_name, content)
+            # Trigger background summary update for all summarizable bible fields
+            summarizable_fields = ('synopsis', 'outline', 'worldbuilding', 'braindump', 'style', 'genre')
+            if project_id and field_name in summarizable_fields:
+                # Map bible field names to content_type names used in summarization
+                content_type_map = {
+                    'synopsis': 'synopsis',
+                    'outline': 'outline',
+                    'worldbuilding': 'world_elements',  # worldbuilding shares world_elements summary type
+                    'braindump': 'synopsis',  # braindump contributes to synopsis context
+                    'style': 'synopsis',
+                    'genre': 'synopsis',
+                }
+                ctype = content_type_map.get(field_name, field_name)
+                self._trigger_bg_summary(project_id=int(project_id), content_type=ctype)
             return True
         
         elif method == 'get_bible_field':
@@ -237,6 +335,15 @@ class APIBridge:
             query = params.get('query')
             return self.db.get_deep_memory(project_id, query)
         
+        elif method == 'get_summarized_memory':
+            project_id = params.get('project_id')
+            token_tier = params.get('token_tier', 1000)
+            return self.db.get_summarized_memory(project_id, token_tier)
+        
+        elif method == 'get_context_health':
+            project_id = params.get('project_id')
+            return self.db.get_context_health(project_id)
+        
         elif method == 'get_full_project_content':
             project_id = params.get('project_id')
             return self.db.get_full_project_content(project_id)
@@ -245,7 +352,8 @@ class APIBridge:
         elif method == 'get_ai_status':
             return {
                 'status': self.ai.status_message,
-                'is_loaded': self.ai.llm is not None
+                'is_loaded': self.ai.llm is not None,
+                'context_size': self.ai.context_size
             }
         
         elif method == 'ai_stream_start':
@@ -259,10 +367,19 @@ class APIBridge:
             
             # Start AI generation in background thread
             self.ai_response_queue = queue.Queue()
+            
+            def _safe_ai_stream(q):
+                try:
+                    self.ai.stream_response(instruction, q, bible_data, current_text,
+                          character_context, rag_context, style, long_form)
+                except Exception as e:
+                    logging.error(f"AI stream thread error: {e}")
+                    q.put(f"\n[AI Error: {str(e)}]")
+                    q.put("[[END]]")
+            
             self.ai_thread = threading.Thread(
-                target=self.ai.stream_response,
-                args=(instruction, self.ai_response_queue, bible_data, current_text,
-                      character_context, rag_context, style, long_form),
+                target=_safe_ai_stream,
+                args=(self.ai_response_queue,),
                 daemon=True
             )
             self.ai_thread.start()
@@ -327,9 +444,10 @@ class APIBridge:
             query = params.get('query')
             project_memory = params.get('project_memory')
             project_name = params.get('project_name', 'Current Project')
+            structured_context = params.get('structured_context')
             
             response_queue = queue.Queue()
-            self.ai.ask_lore_assistant(query, response_queue, project_memory, project_name)
+            self.ai.ask_lore_assistant(query, response_queue, project_memory, project_name, structured_context)
             
             # Collect all tokens
             result = []
@@ -339,6 +457,36 @@ class APIBridge:
                     break
                 result.append(token)
             return ''.join(result)
+        
+        elif method == 'lore_stream_start':
+            query = params.get('query')
+            project_memory = params.get('project_memory', '')
+            project_name = params.get('project_name', 'Current Project')
+            structured_context = params.get('structured_context')
+            
+            logging.info(f"lore_stream_start: query length={len(query or '')}, memory length={len(project_memory or '')}, structured={structured_context is not None}")
+            
+            # Use the shared response queue for streaming (same as ai_stream_start)
+            self.ai_response_queue = queue.Queue()
+            
+            # Wrap in safety function to guarantee [[END]] is always sent
+            def _safe_lore_stream(q, qry, mem, name, struct_ctx):
+                try:
+                    logging.info("Lore stream thread: starting ask_lore_assistant...")
+                    self.ai.ask_lore_assistant(qry, q, mem, name, struct_ctx)
+                    logging.info(f"Lore stream thread: finished. Queue size ~{q.qsize()}")
+                except Exception as e:
+                    logging.error(f"Lore stream thread error: {e}", exc_info=True)
+                    q.put(f"\n[AI Error: {str(e)}]")
+                    q.put("[[END]]")
+            
+            self.ai_thread = threading.Thread(
+                target=_safe_lore_stream,
+                args=(self.ai_response_queue, query, project_memory, project_name, structured_context),
+                daemon=True
+            )
+            self.ai_thread.start()
+            return {'status': 'started'}
         
         elif method == 'get_genre_context':
             genre = params.get('genre')
@@ -398,10 +546,26 @@ class APIBridge:
             valid, message = self.config.validate_model_path()
             return {'valid': valid, 'message': message}
         
+        elif method == 'list_models':
+            return {'models': self.config.list_available_models()}
+        
+        elif method == 'select_model':
+            model_path = params.get('model_path')
+            if not model_path:
+                return {'status': 'Error: No model path provided', 'is_loaded': False}
+            # Block any background summarization from starting during model switch
+            self._summary_running = True
+            try:
+                result = self.ai.reload_model(model_path)
+            finally:
+                self._summary_running = False
+            return result
+        
         # ==================== WORLD ELEMENTS METHODS ====================
         elif method == 'create_world_element':
-            return self.db.create_world_element(
-                project_id=params.get('project_id'),
+            project_id = params.get('project_id')
+            result = self.db.create_world_element(
+                project_id=project_id,
                 name=params.get('name'),
                 element_type=params.get('element_type', 'other'),
                 description=params.get('description', ''),
@@ -410,6 +574,10 @@ class APIBridge:
                 custom_traits=params.get('custom_traits', ''),
                 series_id=params.get('series_id')
             )
+            # Trigger background summary update for world_elements
+            if result and project_id:
+                self._trigger_bg_summary(project_id=int(project_id), content_type='world_elements')
+            return result
         
         elif method == 'get_world_elements':
             return self.db.get_world_elements(
@@ -422,10 +590,12 @@ class APIBridge:
             return self.db.get_world_element(params.get('element_id'))
         
         elif method == 'update_world_element':
-            return self.db.update_world_element(
-                params.get('element_id'),
-                params.get('data', {})
-            )
+            element_id = params.get('element_id')
+            result = self.db.update_world_element(element_id, params.get('data', {}))
+            # Trigger background summary update (need to look up project_id from element)
+            if result and element_id:
+                self._trigger_bg_summary(element_id=element_id, content_type='world_elements')
+            return result
         
         elif method == 'delete_world_element':
             return self.db.delete_world_element(params.get('element_id'))
@@ -512,6 +682,15 @@ class APIBridge:
                 chapter_id=params.get('chapter_id'),
                 scene_ids=params.get('scene_ids', [])
             )
+        
+        elif method == 'get_scene_context':
+            return self.db.get_scene_context(params.get('chapter_id'))
+        
+        elif method == 'get_project_series_id':
+            return self.db.get_project_series_id(params.get('project_id'))
+        
+        elif method == 'get_series_context_for_project':
+            return self.db.get_series_context_for_project(params.get('project_id'))
         
         # ==================== CHARACTER VERSION METHODS ====================
         elif method == 'create_character_version':
@@ -702,11 +881,48 @@ class APIBridge:
         else:
             raise ValueError(f"Unknown method: {method}")
     
+    # Methods that involve AI model inference and can block for minutes.
+    # These are dispatched to a thread pool so the main loop stays responsive.
+    _LONG_RUNNING_METHODS = frozenset({
+        'generate_outline_from_synopsis',
+        'generate_characters_from_synopsis',
+        'generate_single_character',
+        'generate_world_from_synopsis',
+        'generate_single_world_element',
+        'generate_synopsis',
+        'generate_beat_summary',
+        'generate_beats_from_prose',
+        'suggest_next_beats',
+        'check_continuity',
+        'generate_plugin_response',
+        'expand_scene',
+        'expand_scene_from_summary',
+        'update_chapter_summary_ai',
+        'ask_lore_assistant',
+        'generate_summary',
+        'parse_manuscript',
+        'extract_synopsis',
+        'extract_characters',
+        'extract_world_elements',
+        'detect_genre_style',
+        'import_manuscript_to_project',
+    })
+
     def run(self):
         """
         Main loop - reads JSON-RPC requests from stdin, writes responses to stdout.
+        Long-running AI operations are dispatched to a thread pool so that quick
+        operations (list_models, get_characters, etc.) aren't blocked.
         """
+        from concurrent.futures import ThreadPoolExecutor
+        
         logging.info("API Bridge running, waiting for requests...")
+        
+        # Lock to prevent interleaved writes to stdout
+        self._stdout_lock = threading.Lock()
+        
+        # Thread pool for long-running operations (max 2: 1 AI + 1 import/parse)
+        self._executor = ThreadPoolExecutor(max_workers=2, thread_name_prefix='api-worker')
         
         # Send ready signal
         self._send_response({'jsonrpc': '2.0', 'result': 'ready', 'id': 'init'})
@@ -718,8 +934,15 @@ class APIBridge:
             
             try:
                 request = json.loads(line)
-                response = self.handle_request(request)
-                self._send_response(response)
+                method = request.get('method', '')
+                
+                # Dispatch long-running AI operations to thread pool
+                if method in self._LONG_RUNNING_METHODS:
+                    self._executor.submit(self._handle_and_respond, request)
+                else:
+                    # Handle quick operations synchronously to avoid thread overhead
+                    response = self.handle_request(request)
+                    self._send_response(response)
             except json.JSONDecodeError as e:
                 logging.error(f"Invalid JSON: {e}")
                 self._send_response({
@@ -728,9 +951,27 @@ class APIBridge:
                     'id': None
                 })
     
+    def _handle_and_respond(self, request: Dict):
+        """Handle a request in a worker thread and send the response."""
+        try:
+            response = self.handle_request(request)
+            self._send_response(response)
+        except Exception as e:
+            logging.error(f"Worker thread error: {e}")
+            self._send_response({
+                'jsonrpc': '2.0',
+                'error': {'code': -32000, 'message': str(e)},
+                'id': request.get('id')
+            })
+    
     def _send_response(self, response: Dict):
-        """Send JSON response to stdout."""
-        print(json.dumps(response), flush=True)
+        """Send JSON response to stdout (thread-safe)."""
+        line = json.dumps(response)
+        if hasattr(self, '_stdout_lock'):
+            with self._stdout_lock:
+                print(line, flush=True)
+        else:
+            print(line, flush=True)
 
 
 def main():

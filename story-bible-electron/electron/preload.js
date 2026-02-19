@@ -57,10 +57,15 @@ contextBridge.exposeInMainWorld('api', {
   
   getContextWindow: (projectId, chapterId, charLimit) => ipcRenderer.invoke('python-call', 'get_context_window', { project_id: projectId, chapter_id: chapterId, char_limit: charLimit }),
   getDeepMemory: (projectId, query) => ipcRenderer.invoke('python-call', 'get_deep_memory', { project_id: projectId, query }),
+  getSummarizedMemory: (projectId, tokenTier) => ipcRenderer.invoke('python-call', 'get_summarized_memory', { project_id: projectId, token_tier: tokenTier }),
+  getContextHealth: (projectId) => ipcRenderer.invoke('python-call', 'get_context_health', { project_id: projectId }),
   
   // ==================== AI METHODS ====================
   
   getAiStatus: () => ipcRenderer.invoke('python-call', 'get_ai_status'),
+  getAiConfig: () => ipcRenderer.invoke('python-call', 'get_ai_config'),
+  listModels: () => ipcRenderer.invoke('python-call', 'list_models'),
+  selectModel: (modelPath) => ipcRenderer.invoke('python-call', 'select_model', { model_path: modelPath }),
   
   aiStreamStart: (instruction, options) => ipcRenderer.invoke('python-call', 'ai_stream_start', {
     instruction,
@@ -80,7 +85,8 @@ contextBridge.exposeInMainWorld('api', {
   
   generatePluginResponse: (text, pluginType, contextData) => ipcRenderer.invoke('python-call', 'generate_plugin_response', { text, plugin_type: pluginType, context_data: contextData }),
   
-  askLoreAssistant: (query, projectMemory, projectName) => ipcRenderer.invoke('python-call', 'ask_lore_assistant', { query, project_memory: projectMemory, project_name: projectName }),
+  askLoreAssistant: (query, projectMemory, projectName, structuredContext) => ipcRenderer.invoke('python-call', 'ask_lore_assistant', { query, project_memory: projectMemory, project_name: projectName, structured_context: structuredContext }),
+  loreStreamStart: (query, projectMemory, projectName, structuredContext) => ipcRenderer.invoke('python-call', 'lore_stream_start', { query, project_memory: projectMemory, project_name: projectName, structured_context: structuredContext }),
   
   getGenreContext: (genre) => ipcRenderer.invoke('python-call', 'get_genre_context', { genre }),
   
@@ -155,6 +161,9 @@ contextBridge.exposeInMainWorld('api', {
     chapter_id: chapterId, 
     scene_ids: sceneIds 
   }),
+  getSceneContext: (chapterId) => ipcRenderer.invoke('python-call', 'get_scene_context', { chapter_id: chapterId }),
+  getProjectSeriesId: (projectId) => ipcRenderer.invoke('python-call', 'get_project_series_id', { project_id: projectId }),
+  getSeriesContextForProject: (projectId) => ipcRenderer.invoke('python-call', 'get_series_context_for_project', { project_id: projectId }),
   
   // ==================== CHARACTER VERSION METHODS ====================
   
