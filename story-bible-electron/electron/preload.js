@@ -66,6 +66,7 @@ contextBridge.exposeInMainWorld('api', {
   getAiConfig: () => ipcRenderer.invoke('python-call', 'get_ai_config'),
   listModels: () => ipcRenderer.invoke('python-call', 'list_models'),
   selectModel: (modelPath) => ipcRenderer.invoke('python-call', 'select_model', { model_path: modelPath }),
+  copyModelToDirectory: (sourcePath) => ipcRenderer.invoke('python-call', 'copy_model_to_directory', { source_path: sourcePath }),
 
   aiStreamStart: (instruction, options) => ipcRenderer.invoke('python-call', 'ai_stream_start', {
     instruction,

@@ -8,6 +8,7 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
 import useStore from './hooks/useStore'
 import { usePythonBridge } from './hooks/usePythonBridge'
+import { LuBrain, LuDownload, LuFolderOpen } from 'react-icons/lu'
 
 // Components
 import Dashboard from './components/Dashboard'
@@ -113,14 +114,19 @@ function App() {
   
   const {
     isApiAvailable,
+    isElectronApi,
     getProjectsWithChapters,
     getAiStatus,
     getCharacters,
     getStoryBible,
     getTtsVoices,
+    browseAndCopyModel,
+    listModels,
   } = usePythonBridge()
   
   const [isLoading, setIsLoading] = useState(true)
+  const [showModelSetup, setShowModelSetup] = useState(false)
+  const [isSettingUpModel, setIsSettingUpModel] = useState(false)
   
   // Initialize app
   useEffect(() => {
@@ -134,6 +140,16 @@ function App() {
         const aiStatus = await getAiStatus()
         console.log('AI Status:', aiStatus)
         
+        // Check if we need to show model setup (only in Electron mode)
+        if (isElectronApi && !aiStatus.is_loaded) {
+          // Check if there are any models available
+          const models = await listModels()
+          if (!models || models.length === 0) {
+            // No models found, show setup dialog
+            setShowModelSetup(true)
+          }
+        }
+        
         // Load TTS voices
         const voices = await getTtsVoices()
         setTtsVoices(voices || [])
@@ -146,7 +162,7 @@ function App() {
     }
     
     init()
-  }, [isApiAvailable])
+  }, [isApiAvailable, isElectronApi, getAiStatus, listModels])
   
   // Load project data when project changes
   useEffect(() => {
@@ -176,6 +192,93 @@ function App() {
       setCurrentView('dashboard')
     }
   }, [currentProjectId, currentView])
+  
+  // Handle model setup
+  const handleBrowseForModel = async () => {
+    setIsSettingUpModel(true)
+    try {
+      const result = await browseAndCopyModel()
+      if (result && result.is_loaded) {
+        setShowModelSetup(false)
+      }
+    } catch (error) {
+      console.error('Failed to setup model:', error)
+    } finally {
+      setIsSettingUpModel(false)
+    }
+  }
+  
+  const handleSkipModelSetup = () => {
+    setShowModelSetup(false)
+  }
+  
+  // Render model setup dialog
+  if (showModelSetup && !isLoading) {
+    return (
+      <div className="h-screen w-screen flex items-center justify-center relative overflow-hidden">
+        <AnimatedBackground />
+        <div className="relative z-10 max-w-2xl mx-auto p-8">
+          <div className="glass-panel rounded-2xl p-8 shadow-2xl">
+            <div className="flex items-center gap-3 mb-6">
+              <LuBrain className="w-12 h-12 text-gold-rich" />
+              <div>
+                <h1 className="text-3xl font-bold text-text-primary">Welcome to Exelsias</h1>
+                <p className="text-text-muted">AI-Powered Story Bible</p>
+              </div>
+            </div>
+            
+            <div className="space-y-4 mb-8">
+              <p className="text-text-secondary text-lg">
+                No AI model detected. To use AI features, you need to select a GGUF model file.
+              </p>
+              
+              <div className="bg-dark-700/50 rounded-lg p-4 border border-gold-rich/20">
+                <h3 className="text-sm font-semibold text-gold-rich mb-2">What you need:</h3>
+                <ul className="text-sm text-text-muted space-y-1 list-disc list-inside">
+                  <li>A GGUF format language model (e.g., LLaMA, Mistral, etc.)</li>
+                  <li>The model will be copied to the application directory</li>
+                  <li>Recommended: 4GB+ models for better quality</li>
+                </ul>
+              </div>
+            </div>
+            
+            <div className="flex gap-4">
+              <button
+                onClick={handleBrowseForModel}
+                disabled={isSettingUpModel}
+                className="flex-1 flex items-center justify-center gap-2 px-6 py-3 bg-gold-rich hover:bg-gold-rich/90 text-dark-900 font-semibold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isSettingUpModel ? (
+                  <>
+                    <div className="spinner-small" />
+                    <span>Setting up model...</span>
+                  </>
+                ) : (
+                  <>
+                    <LuFolderOpen className="w-5 h-5" />
+                    <span>Browse for Model</span>
+                  </>
+                )}
+              </button>
+              
+              <button
+                onClick={handleSkipModelSetup}
+                disabled={isSettingUpModel}
+                className="px-6 py-3 bg-dark-700 hover:bg-dark-600 text-text-secondary font-semibold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Skip for Now
+              </button>
+            </div>
+            
+            <p className="text-xs text-text-muted mt-4 text-center">
+              You can always add a model later from the toolbar
+            </p>
+          </div>
+        </div>
+        <Notifications />
+      </div>
+    )
+  }
   
   // Render loading screen
   if (isLoading) {

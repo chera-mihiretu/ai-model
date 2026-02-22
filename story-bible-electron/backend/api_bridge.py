@@ -574,6 +574,49 @@ class APIBridge:
                 self._summary_running = False
             return result
         
+        elif method == 'copy_model_to_directory':
+            source_path = params.get('source_path')
+            if not source_path:
+                return {'success': False, 'error': 'No source path provided'}
+            
+            import shutil
+            try:
+                # Validate source file exists and is a .gguf file
+                if not os.path.exists(source_path):
+                    return {'success': False, 'error': f'Source file not found: {source_path}'}
+                
+                if not source_path.lower().endswith('.gguf'):
+                    return {'success': False, 'error': 'File must be a .gguf model'}
+                
+                # Get destination path in models/llama directory
+                filename = os.path.basename(source_path)
+                dest_path = os.path.join(self.config.models_dir, filename)
+                
+                # Check if file already exists in destination
+                if os.path.exists(dest_path):
+                    # File already exists, just use it
+                    logging.info(f"Model already exists at {dest_path}, skipping copy")
+                    return {
+                        'success': True, 
+                        'destination_path': dest_path,
+                        'message': f'Model already exists: {filename}'
+                    }
+                
+                # Copy the file
+                logging.info(f"Copying model from {source_path} to {dest_path}")
+                shutil.copy2(source_path, dest_path)
+                logging.info(f"Model copied successfully to {dest_path}")
+                
+                return {
+                    'success': True, 
+                    'destination_path': dest_path,
+                    'message': f'Model copied successfully: {filename}'
+                }
+                
+            except Exception as e:
+                logging.error(f"Failed to copy model: {e}", exc_info=True)
+                return {'success': False, 'error': str(e)}
+        
         # ==================== WORLD ELEMENTS METHODS ====================
         elif method == 'create_world_element':
             project_id = params.get('project_id')

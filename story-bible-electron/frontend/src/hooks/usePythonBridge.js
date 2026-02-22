@@ -443,6 +443,65 @@ export function usePythonBridge() {
     }
   }, [isElectronApi, api, selectModel, addNotification])
 
+  const copyModelToDirectory = useCallback(async (sourcePath) => {
+    if (!isElectronApi) {
+      addNotification({ type: 'warning', message: 'Model copying requires the desktop app' })
+      return { success: false, error: 'Desktop app required' }
+    }
+
+    try {
+      addNotification({ type: 'info', message: 'Copying model to application directory...' })
+      const result = await api.copyModelToDirectory(sourcePath)
+
+      if (result?.success) {
+        addNotification({ type: 'success', message: result.message || 'Model copied successfully' })
+      } else {
+        addNotification({ type: 'error', message: result?.error || 'Failed to copy model' })
+      }
+
+      return result
+    } catch (error) {
+      console.error('Failed to copy model:', error)
+      addNotification({ type: 'error', message: `Copy failed: ${error.message}` })
+      return { success: false, error: error.message }
+    }
+  }, [isElectronApi, api, addNotification])
+
+  const browseAndCopyModel = useCallback(async () => {
+    if (!isElectronApi) {
+      addNotification({ type: 'warning', message: 'Model browsing requires the desktop app' })
+      return null
+    }
+
+    try {
+      const result = await api.openFileDialog({
+        title: 'Select a GGUF Model File',
+        filters: [
+          { name: 'GGUF Models', extensions: ['gguf'] },
+          { name: 'All Files', extensions: ['*'] },
+        ],
+        properties: ['openFile'],
+      })
+
+      if (result.canceled || !result.filePaths || result.filePaths.length === 0) {
+        return null
+      }
+
+      const selectedPath = result.filePaths[0]
+      
+      const copyResult = await copyModelToDirectory(selectedPath)
+      if (!copyResult?.success) {
+        return null
+      }
+
+      return await selectModel(copyResult.destination_path)
+    } catch (error) {
+      console.error('Failed to browse and copy model:', error)
+      addNotification({ type: 'error', message: `Operation failed: ${error.message}` })
+      return null
+    }
+  }, [isElectronApi, api, copyModelToDirectory, selectModel, addNotification])
+
   const startAiStream = useCallback(async (instruction, options = {}) => {
     // In offline mode, show message instead of trying to stream
     if (!isElectronApi) {
@@ -1128,6 +1187,8 @@ export function usePythonBridge() {
     listModels,
     selectModel,
     browseForModel,
+    copyModelToDirectory,
+    browseAndCopyModel,
     startAiStream,
     startLoreStream,
     stopAiStream,
