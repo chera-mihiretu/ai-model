@@ -71,7 +71,7 @@ function getDataPath() {
 }
 
 /**
- * Get the models directory path
+ * Get the models directory path (for TTS - bundled with app)
  */
 function getModelsPath() {
   if (app.isPackaged) {
@@ -81,15 +81,29 @@ function getModelsPath() {
 }
 
 /**
+ * Get the LLM models directory path (user-provided, not bundled)
+ */
+function getLLMModelsPath() {
+  if (app.isPackaged) {
+    // LLM models go in user's app data directory
+    return path.join(app.getPath('userData'), 'models', 'llama');
+  }
+  return path.join(__dirname, '..', '..', 'models', 'llama');
+}
+
+/**
  * Ensure data directories exist
  */
 function ensureDataDirectories() {
   const dataPath = getDataPath();
+  const llmModelsPath = getLLMModelsPath();
   const dirs = [
     dataPath,
     path.join(dataPath, 'database'),
     path.join(dataPath, 'voices'),
-    path.join(dataPath, 'voices', 'paragraphs')
+    path.join(dataPath, 'voices', 'paragraphs'),
+    // Ensure LLM models directory exists for user to place their models
+    llmModelsPath
   ];
   
   for (const dir of dirs) {
@@ -110,6 +124,7 @@ function startPythonBackend() {
     const projectRoot = getProjectRoot();
     const dataPath = getDataPath();
     const modelsPath = getModelsPath();
+    const llmModelsPath = getLLMModelsPath();
     
     // Ensure data directories exist
     ensureDataDirectories();
@@ -119,7 +134,8 @@ function startPythonBackend() {
     console.log('Script path:', scriptPath);
     console.log('Project root:', projectRoot);
     console.log('Data path:', dataPath);
-    console.log('Models path:', modelsPath);
+    console.log('TTS Models path:', modelsPath);
+    console.log('LLM Models path:', llmModelsPath);
     console.log('Is packaged:', app.isPackaged);
     
     // Check if backend exists
@@ -138,6 +154,7 @@ function startPythonBackend() {
       // Pass paths to the backend
       EXELSIAS_DATA_PATH: dataPath,
       EXELSIAS_MODELS_PATH: modelsPath,
+      EXELSIAS_LLM_MODELS_PATH: llmModelsPath,
       EXELSIAS_PROJECT_ROOT: projectRoot
     };
     
@@ -275,9 +292,30 @@ function sendToPython(method, params = {}) {
 }
 
 /**
+ * Get the path to the app icon
+ */
+function getAppIconPath() {
+  if (app.isPackaged) {
+    // Production: use bundled icon
+    const platform = process.platform;
+    const iconName = platform === 'win32' ? 'logo.ico' : 'logo.png';
+    return path.join(process.resourcesPath, 'frontend', 'assets', iconName);
+  } else {
+    // Development: use source icon
+    const platform = process.platform;
+    const iconName = platform === 'win32' ? 'logo.ico' : 'logo.png';
+    return path.join(__dirname, '..', 'frontend', 'public', 'assets', iconName);
+  }
+}
+
+/**
  * Create the main application window
  */
 function createWindow() {
+  const iconPath = getAppIconPath();
+  console.log('App icon path:', iconPath);
+  console.log('Icon exists:', fs.existsSync(iconPath));
+  
   mainWindow = new BrowserWindow({
     width: 1600,
     height: 1000,
@@ -286,6 +324,7 @@ function createWindow() {
     backgroundColor: '#0A0A0C',
     titleBarStyle: 'hiddenInset',
     frame: process.platform === 'darwin' ? true : false,
+    icon: iconPath,
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
