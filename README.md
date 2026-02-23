@@ -214,12 +214,23 @@ Get-Process -Id (Get-NetTCPConnection -LocalPort 5173).OwningProcess | Stop-Proc
 
 ## Building for Production
 
-### Build Windows Executable (from Windows or Linux with Wine)
+### Build Windows NSIS Installer
 
-```bash
-cd story-bible-electron/electron
-npm run build:win
+**See [WINDOWS_BUILD_GUIDE.md](WINDOWS_BUILD_GUIDE.md) for complete instructions.**
+
+Quick build:
+```powershell
+# Setup (first time)
+python -m venv venv
+.\venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+pip install pyinstaller
+
+# Build
+.\build-windows.ps1
 ```
+
+⚠️ **Important**: Use Python 3.10 or 3.11 (NOT 3.14). See [BUILD_README.md](BUILD_README.md) for details.
 
 ### Build Linux AppImage
 
