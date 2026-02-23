@@ -70,6 +70,9 @@ story-bible-electron/frontend/dist/
 !DEPLOYMENT.md
 !DEPLOYMENT_LINUX.md
 !story-bible-electron/README.md
+!START_HERE.md
+!YOUR_IMMEDIATE_FIX.md
+!FIX_PYTHON_314_ERROR.md 
 
 # Debug files
 debug_*.py
