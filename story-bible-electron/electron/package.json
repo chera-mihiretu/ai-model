@@ -57,11 +57,11 @@
     "win": {
       "target": [
         {
-          "target": "zip",
+          "target": "nsis",
           "arch": ["x64"]
         }
       ],
-      "icon": "icon.png",
+      "icon": "icon.ico",
       "signAndEditExecutable": false
     },
     "nsis": {

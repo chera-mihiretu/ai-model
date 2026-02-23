@@ -13,7 +13,15 @@ from pathlib import Path
 project_root = Path(SPECPATH).parent.parent
 
 # Get the virtual environment site-packages path
-venv_site_packages = project_root / 'deskapp' / 'Lib' / 'site-packages'
+# Try common venv locations
+if (project_root / 'venv' / 'Lib' / 'site-packages').exists():
+    venv_site_packages = project_root / 'venv' / 'Lib' / 'site-packages'
+elif (project_root / 'deskapp' / 'Lib' / 'site-packages').exists():
+    venv_site_packages = project_root / 'deskapp' / 'Lib' / 'site-packages'
+else:
+    # Fallback to system Python
+    import site
+    venv_site_packages = Path(site.getsitepackages()[0])
 
 # Find llama_cpp lib directory with DLLs
 llama_cpp_lib = venv_site_packages / 'llama_cpp' / 'lib'
