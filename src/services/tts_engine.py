@@ -264,8 +264,8 @@ class EdgeTTSEngine:
             except:
                 pass
 
-    def tts_generate_mp3(self, text: str, voice: str, output_path: str) -> str:
-        """Generate MP3 file from text."""
+    def tts_generate_mp3(self, text: str, voice: str, output_path: str, progress_callback=None) -> str:
+        """Generate MP3 file from text with progress tracking."""
         if not EDGE_TTS_AVAILABLE:
             return ""
             
@@ -274,7 +274,36 @@ class EdgeTTSEngine:
         try:
             async def _generate():
                 communicate = edge_tts.Communicate(text, self.current_voice)
-                await communicate.save(output_path)
+                
+                # Use streaming to track progress
+                total_bytes = 0
+                chunks_received = 0
+                last_reported_progress = 0
+                
+                # Estimate total size based on text length (rough estimate)
+                # Average: ~1000 bytes per 100 characters of text
+                estimated_total = max(len(text) * 10, 10000)
+                
+                with open(output_path, "wb") as f:
+                    async for chunk in communicate.stream():
+                        if chunk["type"] == "audio":
+                            f.write(chunk["data"])
+                            total_bytes += len(chunk["data"])
+                            chunks_received += 1
+                            
+                            # Report progress more frequently (every 3 chunks)
+                            if progress_callback and chunks_received % 3 == 0:
+                                # Calculate progress with better estimation
+                                progress = min(95, int((total_bytes / estimated_total) * 100))
+                                
+                                # Only report if progress changed significantly (at least 5%)
+                                if progress >= last_reported_progress + 5:
+                                    progress_callback(progress)
+                                    last_reported_progress = progress
+                
+                # Final progress update
+                if progress_callback:
+                    progress_callback(100)
             
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
@@ -316,7 +345,7 @@ class DummyTTSEngine:
     def stop(self):
         self.is_playing = False
     
-    def tts_generate_mp3(self, text: str, voice: str, output_path: str) -> str:
+    def tts_generate_mp3(self, text: str, voice: str, output_path: str, progress_callback=None) -> str:
         return ""
     
     def add_paragraph_voice(self, name: str, wav_path: str):
@@ -403,12 +432,16 @@ class OfflineTTSEngine:
             except:
                 pass
     
-    def tts_generate_mp3(self, text: str, voice: str, output_path: str) -> str:
+    def tts_generate_mp3(self, text: str, voice: str, output_path: str, progress_callback=None) -> str:
         if not self.is_loaded:
             return ""
         try:
+            if progress_callback:
+                progress_callback(50)
             self.engine.save_to_file(text, output_path)
             self.engine.runAndWait()
+            if progress_callback:
+                progress_callback(100)
             return output_path
         except:
             return ""

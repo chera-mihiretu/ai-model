@@ -198,6 +198,7 @@ function ImportNovel({ isOpen, onClose, onImportComplete }) {
   const [fileContent, setFileContent] = useState('')
   const [projectName, setProjectName] = useState('')
   const [extractAll, setExtractAll] = useState(true)
+  const [useCombinedExtraction, setUseCombinedExtraction] = useState(true)
   const [isProcessing, setIsProcessing] = useState(false)
   const [processingProgress, setProcessingProgress] = useState(0)
   const [processingMessage, setProcessingMessage] = useState('')
@@ -409,7 +410,7 @@ function ImportNovel({ isOpen, onClose, onImportComplete }) {
       
       // Race between the actual extraction and timeout
       const result = await Promise.race([
-        parseManuscript(fileContent, true),
+        parseManuscript(fileContent, true, useCombinedExtraction),
         timeoutPromise
       ])
       
@@ -475,7 +476,7 @@ function ImportNovel({ isOpen, onClose, onImportComplete }) {
       }, isLargeManuscript ? 2000 : 800)
       
       // Perform the actual import
-      const result = await importManuscriptToProject(fileContent, projectName, extractAll)
+      const result = await importManuscriptToProject(fileContent, projectName, extractAll, useCombinedExtraction)
       
       // Clear progress interval
       clearInterval(progressInterval)
@@ -798,6 +799,28 @@ function ImportNovel({ isOpen, onClose, onImportComplete }) {
                   </p>
                 </div>
               </div>
+              
+              {isElectronApi && (
+                <div className="p-4 rounded-xl bg-dark-700/30 border border-gold-rich/10">
+                  <label className="flex items-start gap-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={useCombinedExtraction}
+                      onChange={(e) => setUseCombinedExtraction(e.target.checked)}
+                      className="mt-1 w-4 h-4 rounded border-gold-rich/30 bg-dark-700 text-gold-rich focus:ring-gold-rich focus:ring-offset-dark-800"
+                    />
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className="text-text-primary font-medium">Fast Mode</span>
+                        <span className="text-xs px-2 py-0.5 rounded-full bg-gold-rich/20 text-gold-rich border border-gold-rich/30">Recommended</span>
+                      </div>
+                      <p className="text-xs text-text-muted mt-1">
+                        Extract characters and world elements in one AI pass (40-50% faster). Uncheck for separate extraction passes (more detailed but slower).
+                      </p>
+                    </div>
+                  </label>
+                </div>
+              )}
               
               {!isElectronApi && (
                 <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-start gap-3">

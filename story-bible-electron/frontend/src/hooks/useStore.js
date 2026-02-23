@@ -129,6 +129,18 @@ export const useStore = create((set, get) => ({
   
   clearAiStream: () => set({ aiStreamedText: '' }),
   
+  // Model dialog state
+  showModelDialog: false,
+  modelDialogContext: '',
+  showModelBanner: false,
+  
+  setShowModelDialog: (show, context = '') => set({ 
+    showModelDialog: show, 
+    modelDialogContext: context 
+  }),
+  
+  setShowModelBanner: (show) => set({ showModelBanner: show }),
+  
   // Set pending AI request
   setPendingAiRequest: (request) => set({ pendingAiRequest: request }),
   

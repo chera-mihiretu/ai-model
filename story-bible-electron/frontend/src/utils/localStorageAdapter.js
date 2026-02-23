@@ -1069,6 +1069,11 @@ export function ttsGenerateMp3() {
   return null
 }
 
+export function ttsGetDownloadProgress() {
+  // Not available in browser mode
+  return { progress: 0 }
+}
+
 export function saveFileDialog() {
   // Not available in browser mode
   return { canceled: true }
@@ -1133,6 +1138,7 @@ const localStorageAdapter = {
   ttsStop,
   ttsIsPlaying,
   ttsGenerateMp3,
+  ttsGetDownloadProgress,
   saveFileDialog,
   
   // World Elements

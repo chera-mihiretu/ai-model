@@ -616,6 +616,7 @@ function Toolbar() {
   // Handle TTS
   const { setTtsPlaying } = useStore()
   const [isDownloading, setIsDownloading] = useState(false)
+  const [downloadProgress, setDownloadProgress] = useState(0)
   
   // Model picker state
   const [modelPickerOpen, setModelPickerOpen] = useState(false)
@@ -688,10 +689,27 @@ function Toolbar() {
   const handleTtsDownload = async () => {
     if (isDownloading) return
     setIsDownloading(true)
+    setDownloadProgress(0)
+    
+    // Simulate smooth progress for better UX
+    let simulatedProgress = 0
+    const progressSimulator = setInterval(() => {
+      simulatedProgress = Math.min(simulatedProgress + 2, 90)
+      setDownloadProgress(prev => Math.max(prev, simulatedProgress))
+    }, 100)
+    
     try {
-      await ttsDownload(editorContent, selectedVoice)
+      await ttsDownload(editorContent, selectedVoice, (progress) => {
+        setDownloadProgress(Math.max(progress, simulatedProgress))
+      })
+      setDownloadProgress(100)
     } finally {
-      setIsDownloading(false)
+      clearInterval(progressSimulator)
+      // Keep progress visible briefly before resetting
+      setTimeout(() => {
+        setIsDownloading(false)
+        setDownloadProgress(0)
+      }, 500)
     }
   }
   
@@ -860,20 +878,32 @@ function Toolbar() {
           {/* Download Speech Button */}
           <button
             className={clsx(
-              'p-1.5 flex items-center justify-center',
+              'relative flex items-center justify-center overflow-hidden',
               'transition-all duration-200 rounded-r-lg',
               isDownloading
-                ? 'bg-gold-rich/60 text-dark-950 cursor-wait'
-                : 'bg-dark-700 text-text-secondary border border-gold-rich/20 hover:bg-gold-rich/10 hover:text-gold-rich'
+                ? 'bg-gold-rich/60 text-dark-950 cursor-wait px-8'
+                : 'bg-dark-700 text-text-secondary border border-gold-rich/20 hover:bg-gold-rich/10 hover:text-gold-rich p-1.5'
             )}
             onClick={handleTtsDownload}
             disabled={isDownloading}
-            title="Download chapter as MP3 audio"
+            title={isDownloading ? `Downloading: ${downloadProgress}%` : 'Download chapter as MP3 audio'}
           >
-            {isDownloading
-              ? <CgSpinner className={`${ic} animate-spin`} />
-              : <LuDownload className={ic} />
-            }
+            {isDownloading ? (
+              <>
+                {/* Progress bar background */}
+                <div 
+                  className="absolute left-0 top-0 bottom-0 bg-gold-rich/30 transition-all duration-300"
+                  style={{ width: `${downloadProgress}%` }}
+                />
+                {/* Content */}
+                <div className="relative flex items-center gap-1.5">
+                  <CgSpinner className={`${ic} animate-spin`} />
+                  <span className="text-xs font-medium">{downloadProgress}%</span>
+                </div>
+              </>
+            ) : (
+              <LuDownload className={ic} />
+            )}
           </button>
         </div>
         

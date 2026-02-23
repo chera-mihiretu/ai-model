@@ -272,6 +272,7 @@ contextBridge.exposeInMainWorld('api', {
   ttsReadText: (text, voice, characterName) => ipcRenderer.invoke('python-call', 'tts_read_text', { text, voice, character_name: characterName }),
   ttsStop: () => ipcRenderer.invoke('python-call', 'tts_stop'),
   ttsGenerateMp3: (text, voice, outputPath) => ipcRenderer.invoke('python-call', 'tts_generate_mp3', { text, voice, output_path: outputPath }),
+  ttsGetDownloadProgress: () => ipcRenderer.invoke('python-call', 'tts_get_download_progress'),
   ttsIsPlaying: () => ipcRenderer.invoke('python-call', 'tts_is_playing'),
 
   // ==================== EVENT LISTENERS ====================

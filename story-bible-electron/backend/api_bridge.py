@@ -76,6 +76,10 @@ class APIBridge:
         self._summary_running = False  # prevent overlapping summarizations
         self._SUMMARY_COOLDOWN_SECS = 120  # minimum seconds between summarizations per type
         
+        # TTS download progress tracking
+        self._tts_download_progress = 0
+        self._tts_download_lock = threading.Lock()
+        
         logging.info("API Bridge initialized successfully")
     
     def _trigger_bg_summary(self, project_id: int = None, content_type: str = '', chapter_id: int = None, element_id: int = None):
@@ -539,7 +543,37 @@ class APIBridge:
             text = params.get('text')
             voice = params.get('voice')
             output_path = params.get('output_path')
-            return self.tts.tts_generate_mp3(text, voice, output_path)
+            
+            # Reset progress
+            with self._tts_download_lock:
+                self._tts_download_progress = 0
+            
+            # Progress callback to update shared state (thread-safe)
+            def progress_callback(progress):
+                try:
+                    with self._tts_download_lock:
+                        self._tts_download_progress = progress
+                        logging.debug(f"TTS progress: {progress}%")
+                except Exception as e:
+                    logging.error(f"Progress callback error: {e}")
+            
+            # Run TTS generation
+            result = self.tts.tts_generate_mp3(text, voice, output_path, progress_callback)
+            
+            # Reset progress when done
+            with self._tts_download_lock:
+                self._tts_download_progress = 0
+            
+            return result
+        
+        elif method == 'tts_get_download_progress':
+            try:
+                with self._tts_download_lock:
+                    progress = self._tts_download_progress
+                return {'progress': progress}
+            except Exception as e:
+                logging.error(f"Error getting download progress: {e}")
+                return {'progress': 0}
         
         elif method == 'tts_is_playing':
             return {'is_playing': self.tts.is_playing}
@@ -816,7 +850,8 @@ class APIBridge:
         elif method == 'parse_manuscript':
             content = params.get('content')
             extract_all = params.get('extract_all', True)
-            return self.import_parser.parse_manuscript(content, extract_all)
+            combined_mode = params.get('combined_mode', True)  # Default to combined mode for speed
+            return self.import_parser.parse_manuscript(content, extract_all, combined_mode)
         
         elif method == 'detect_chapters':
             content = params.get('content')
@@ -890,9 +925,10 @@ class APIBridge:
             content = params.get('content')
             project_name = params.get('project_name', 'Imported Novel')
             extract_all = params.get('extract_all', True)
+            combined_mode = params.get('combined_mode', True)  # Default to combined mode for speed
             
-            # Parse manuscript
-            parsed = self.import_parser.parse_manuscript(content, extract_all)
+            # Parse manuscript with combined mode option
+            parsed = self.import_parser.parse_manuscript(content, extract_all, combined_mode)
             
             # Create project
             project_id = self.db.create_project(project_name, parsed.get('genre_style', ''))
@@ -930,7 +966,8 @@ class APIBridge:
                 'project_id': project_id,
                 'chapters_imported': len(parsed.get('chapters', [])),
                 'characters_imported': len(parsed.get('characters', [])),
-                'world_elements_imported': len(parsed.get('world_elements', []))
+                'world_elements_imported': len(parsed.get('world_elements', [])),
+                'word_count': parsed.get('word_count', 0)
             }
         
         # ==================== UNKNOWN METHOD ====================

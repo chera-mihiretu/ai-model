@@ -8,7 +8,6 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
 import useStore from './hooks/useStore'
 import { usePythonBridge } from './hooks/usePythonBridge'
-import { LuBrain, LuDownload, LuFolderOpen } from 'react-icons/lu'
 
 // Components
 import Dashboard from './components/Dashboard'
@@ -22,6 +21,8 @@ import Notifications from './components/Notifications'
 import WorldBuilding from './components/WorldBuilding'
 import SceneEditor from './components/SceneEditor'
 import AnimatedBackground from './components/AnimatedBackground'
+import ModelSetupDialog from './components/ModelSetupDialog'
+import ModelWarningBanner from './components/ModelWarningBanner'
 
 /**
  * ResizeHandle Component
@@ -110,6 +111,12 @@ function App() {
     setStoryBibleData,
     setTtsVoices,
     setCurrentView,
+    showModelDialog,
+    modelDialogContext,
+    showModelBanner,
+    setShowModelDialog,
+    setShowModelBanner,
+    setAiStatus,
   } = useStore()
   
   const {
@@ -122,11 +129,12 @@ function App() {
     getTtsVoices,
     browseAndCopyModel,
     listModels,
+    saveAppState,
+    getAppState,
   } = usePythonBridge()
   
   const [isLoading, setIsLoading] = useState(true)
-  const [showModelSetup, setShowModelSetup] = useState(false)
-  const [isSettingUpModel, setIsSettingUpModel] = useState(false)
+  const [showFirstLaunchSetup, setShowFirstLaunchSetup] = useState(false)
   
   // Initialize app
   useEffect(() => {
@@ -138,15 +146,26 @@ function App() {
         
         // Check AI status
         const aiStatus = await getAiStatus()
-        console.log('AI Status:', aiStatus)
         
-        // Check if we need to show model setup (only in Electron mode)
-        if (isElectronApi && !aiStatus.is_loaded) {
-          // Check if there are any models available
-          const models = await listModels()
-          if (!models || models.length === 0) {
-            // No models found, show setup dialog
-            setShowModelSetup(true)
+        if (isElectronApi) {
+          // Check first launch status
+          const firstLaunchComplete = await getAppState('first_launch_completed')
+          
+          if (!firstLaunchComplete) {
+            // First launch - check for models
+            const models = await listModels()
+            if (!models || models.length === 0) {
+              // No models found, show first launch setup dialog
+              setShowFirstLaunchSetup(true)
+            } else {
+              // Models exist, mark first launch complete
+              await saveAppState('first_launch_completed', true)
+            }
+          } else {
+            // Not first launch - show banner if model not loaded
+            if (!aiStatus.is_loaded) {
+              setShowModelBanner(true)
+            }
           }
         }
         
@@ -162,7 +181,7 @@ function App() {
     }
     
     init()
-  }, [isApiAvailable, isElectronApi, getAiStatus, listModels])
+  }, [isApiAvailable, isElectronApi, getAiStatus, listModels, getAppState, saveAppState, setShowModelBanner])
   
   // Load project data when project changes
   useEffect(() => {
@@ -191,93 +210,43 @@ function App() {
     if (!currentProjectId && currentView !== 'dashboard') {
       setCurrentView('dashboard')
     }
-  }, [currentProjectId, currentView])
+  }, [currentProjectId, currentView, setCurrentView])
   
-  // Handle model setup
-  const handleBrowseForModel = async () => {
-    setIsSettingUpModel(true)
-    try {
-      const result = await browseAndCopyModel()
-      if (result && result.is_loaded) {
-        setShowModelSetup(false)
-      }
-    } catch (error) {
-      console.error('Failed to setup model:', error)
-    } finally {
-      setIsSettingUpModel(false)
+  // Handle first launch model setup completion
+  const handleFirstLaunchModelLoaded = async () => {
+    // Mark first launch complete
+    await saveAppState('first_launch_completed', true)
+    setShowFirstLaunchSetup(false)
+    setShowModelBanner(false)
+    
+    // Refresh AI status
+    const aiStatus = await getAiStatus()
+    if (aiStatus.is_loaded) {
+      setAiStatus('ready', aiStatus.status, aiStatus.context_size || 0)
     }
   }
   
-  const handleSkipModelSetup = () => {
-    setShowModelSetup(false)
+  const handleFirstLaunchSkip = async () => {
+    // Mark first launch complete and show banner
+    await saveAppState('first_launch_completed', true)
+    setShowFirstLaunchSetup(false)
+    setShowModelBanner(true)
   }
   
-  // Render model setup dialog
-  if (showModelSetup && !isLoading) {
-    return (
-      <div className="h-screen w-screen flex items-center justify-center relative overflow-hidden">
-        <AnimatedBackground />
-        <div className="relative z-10 max-w-2xl mx-auto p-8">
-          <div className="glass-panel rounded-2xl p-8 shadow-2xl">
-            <div className="flex items-center gap-3 mb-6">
-              <LuBrain className="w-12 h-12 text-gold-rich" />
-              <div>
-                <h1 className="text-3xl font-bold text-text-primary">Welcome to Exelsias</h1>
-                <p className="text-text-muted">AI-Powered Story Bible</p>
-              </div>
-            </div>
-            
-            <div className="space-y-4 mb-8">
-              <p className="text-text-secondary text-lg">
-                No AI model detected. To use AI features, you need to select a GGUF model file.
-              </p>
-              
-              <div className="bg-dark-700/50 rounded-lg p-4 border border-gold-rich/20">
-                <h3 className="text-sm font-semibold text-gold-rich mb-2">What you need:</h3>
-                <ul className="text-sm text-text-muted space-y-1 list-disc list-inside">
-                  <li>A GGUF format language model (e.g., LLaMA, Mistral, etc.)</li>
-                  <li>The model will be copied to the application directory</li>
-                  <li>Recommended: 4GB+ models for better quality</li>
-                </ul>
-              </div>
-            </div>
-            
-            <div className="flex gap-4">
-              <button
-                onClick={handleBrowseForModel}
-                disabled={isSettingUpModel}
-                className="flex-1 flex items-center justify-center gap-2 px-6 py-3 bg-gold-rich hover:bg-gold-rich/90 text-dark-900 font-semibold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {isSettingUpModel ? (
-                  <>
-                    <div className="spinner-small" />
-                    <span>Setting up model...</span>
-                  </>
-                ) : (
-                  <>
-                    <LuFolderOpen className="w-5 h-5" />
-                    <span>Browse for Model</span>
-                  </>
-                )}
-              </button>
-              
-              <button
-                onClick={handleSkipModelSetup}
-                disabled={isSettingUpModel}
-                className="px-6 py-3 bg-dark-700 hover:bg-dark-600 text-text-secondary font-semibold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                Skip for Now
-              </button>
-            </div>
-            
-            <p className="text-xs text-text-muted mt-4 text-center">
-              You can always add a model later from the toolbar
-            </p>
-          </div>
-        </div>
-        <Notifications />
-      </div>
-    )
+  // Handle inline model dialog (triggered from AI features)
+  const handleInlineModelLoaded = async () => {
+    setShowModelDialog(false)
+    setShowModelBanner(false)
+    
+    // Refresh AI status
+    const aiStatus = await getAiStatus()
+    if (aiStatus.is_loaded) {
+      setAiStatus('ready', aiStatus.status, aiStatus.context_size || 0)
+    }
+  }
+  
+  const handleInlineModelClose = () => {
+    setShowModelDialog(false)
   }
   
   // Render loading screen
@@ -290,6 +259,24 @@ function App() {
           <p className="text-gray-600">Loading Exelsias...</p>
         </div>
       </div>
+    )
+  }
+  
+  // Render first launch setup (fullscreen, before main app)
+  if (showFirstLaunchSetup) {
+    return (
+      <>
+        <div className="h-screen w-screen relative">
+          <AnimatedBackground />
+          <ModelSetupDialog
+            isOpen={showFirstLaunchSetup}
+            onClose={handleFirstLaunchSkip}
+            onModelLoaded={handleFirstLaunchModelLoaded}
+            mode="first-launch"
+          />
+        </div>
+        <Notifications />
+      </>
     )
   }
   
@@ -313,27 +300,46 @@ function App() {
   // Show Dashboard when no project is selected
   if (!currentProjectId || currentView === 'dashboard') {
     return (
-      <div className="h-screen w-screen overflow-hidden relative">
-        <AnimatedBackground />
-        <div className="relative z-10 h-full">
-          <Dashboard />
+      <>
+        <div className="h-screen w-screen overflow-hidden relative flex flex-col">
+          <AnimatedBackground />
+          
+          {/* Model Warning Banner */}
+          <ModelWarningBanner />
+          
+          <div className="relative z-10 flex-1 overflow-hidden">
+            <Dashboard />
+          </div>
+          <Notifications />
         </div>
-        <Notifications />
-      </div>
+        
+        {/* Inline Model Setup Dialog (from AI features) */}
+        <ModelSetupDialog
+          isOpen={showModelDialog}
+          onClose={handleInlineModelClose}
+          onModelLoaded={handleInlineModelLoaded}
+          mode="inline"
+          context={modelDialogContext}
+        />
+      </>
     )
   }
   
   // Show Editor layout when project is selected
   return (
-    <div className="h-screen w-screen flex flex-col overflow-hidden relative">
-      <AnimatedBackground />
-      
-      {/* Content Layer */}
-      <div className="relative z-10 h-full flex flex-col">
-        {/* Toolbar - higher z-index so dropdowns appear above content */}
-        <div className="relative z-50">
-          <Toolbar />
-        </div>
+    <>
+      <div className="h-screen w-screen flex flex-col overflow-hidden relative">
+        <AnimatedBackground />
+        
+        {/* Content Layer */}
+        <div className="relative z-10 h-full flex flex-col">
+          {/* Model Warning Banner */}
+          <ModelWarningBanner />
+          
+          {/* Toolbar - higher z-index so dropdowns appear above content */}
+          <div className="relative z-50">
+            <Toolbar />
+          </div>
         
         {/* Main Content Area */}
         <div className="flex-1 flex overflow-hidden relative z-0">
@@ -391,6 +397,16 @@ function App() {
       {/* Notifications */}
       <Notifications />
     </div>
+    
+    {/* Inline Model Setup Dialog (from AI features) */}
+    <ModelSetupDialog
+      isOpen={showModelDialog}
+      onClose={handleInlineModelClose}
+      onModelLoaded={handleInlineModelLoaded}
+      mode="inline"
+      context={modelDialogContext}
+    />
+  </>
   )
 }
 

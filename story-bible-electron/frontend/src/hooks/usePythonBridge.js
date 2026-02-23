@@ -502,8 +502,8 @@ export function usePythonBridge() {
     }
   }, [isElectronApi, api, copyModelToDirectory, selectModel, addNotification])
 
-  const startAiStream = useCallback(async (instruction, options = {}) => {
-    // In offline mode, show message instead of trying to stream
+  // Helper function to check if model is loaded before executing AI functions
+  const checkModelLoaded = useCallback(async (functionName) => {
     if (!isElectronApi) {
       addNotification({
         type: 'warning',
@@ -512,10 +512,28 @@ export function usePythonBridge() {
       return false
     }
 
+    const { aiStatus, setShowModelDialog } = useStore.getState()
+    
+    if (aiStatus !== 'ready') {
+      // Show model setup dialog
+      setShowModelDialog(true, functionName)
+      return false
+    }
+    
+    return true
+  }, [isElectronApi, addNotification])
+
+  const startAiStream = useCallback(async (instruction, options = {}) => {
+    // Check if model is loaded
+    const canProceed = await checkModelLoaded('AI Generation')
+    if (!canProceed) {
+      return false
+    }
+
     try {
       setAiGenerating(true)
 
-      // Check AI status first
+      // Double-check AI status
       const status = await api.getAiStatus()
       if (!status.is_loaded) {
         addNotification({ type: 'error', message: 'AI model not loaded. Check if the model file exists.' })
@@ -564,7 +582,7 @@ export function usePythonBridge() {
       addNotification({ type: 'error', message: `AI generation failed: ${error.message}` })
       return false
     }
-  }, [isElectronApi, api, setAiGenerating, appendAiToken, addNotification])
+  }, [checkModelLoaded, api, setAiGenerating, appendAiToken, addNotification])
 
   const startLoreStream = useCallback(async (query, projectMemory = '', projectName = 'Current Project', structuredContext = null) => {
     if (!isElectronApi) {
@@ -656,8 +674,10 @@ export function usePythonBridge() {
   }, [isElectronApi, api, setAiGenerating])
 
   const generatePluginResponse = useCallback(async (text, pluginType, contextData) => {
-    if (!isElectronApi) {
-      return 'AI features require the full Electron app with Python backend'
+    // Check if model is loaded
+    const canProceed = await checkModelLoaded('AI Plugin')
+    if (!canProceed) {
+      return ''
     }
 
     try {
@@ -667,11 +687,13 @@ export function usePythonBridge() {
       addNotification({ type: 'error', message: 'AI generation failed' })
       return ''
     }
-  }, [isElectronApi, api, addNotification])
+  }, [checkModelLoaded, api, addNotification])
 
   const askLoreAssistant = useCallback(async (query, projectMemory, projectName, structuredContext = null) => {
-    if (!isElectronApi) {
-      return 'AI features require the full Electron app with Python backend'
+    // Check if model is loaded
+    const canProceed = await checkModelLoaded('Lore Assistant')
+    if (!canProceed) {
+      return ''
     }
 
     try {
@@ -680,11 +702,13 @@ export function usePythonBridge() {
       console.error('Lore assistant failed:', error)
       return ''
     }
-  }, [isElectronApi, api])
+  }, [checkModelLoaded, api])
 
   const generateSingleCharacter = useCallback(async (description, genre) => {
-    if (!isElectronApi) {
-      return { error: 'AI features require the full Electron app with Python backend' }
+    // Check if model is loaded
+    const canProceed = await checkModelLoaded('Generate Character')
+    if (!canProceed) {
+      return { error: 'AI model not loaded' }
     }
 
     try {
@@ -693,11 +717,13 @@ export function usePythonBridge() {
       console.error('Failed to generate single character:', error)
       return { error: error.message || 'Failed to generate character' }
     }
-  }, [isElectronApi, api])
+  }, [checkModelLoaded, api])
 
   const generateSingleWorldElement = useCallback(async (description, elementType, genre) => {
-    if (!isElectronApi) {
-      return { error: 'AI features require the full Electron app with Python backend' }
+    // Check if model is loaded
+    const canProceed = await checkModelLoaded('Generate World Element')
+    if (!canProceed) {
+      return { error: 'AI model not loaded' }
     }
 
     try {
@@ -706,7 +732,7 @@ export function usePythonBridge() {
       console.error('Failed to generate single world element:', error)
       return { error: error.message || 'Failed to generate world element' }
     }
-  }, [isElectronApi, api])
+  }, [checkModelLoaded, api])
 
   // ==================== WORLD ELEMENTS METHODS ====================
 
@@ -1091,7 +1117,7 @@ export function usePythonBridge() {
     }
   }, [isElectronApi, api])
 
-  const ttsDownload = useCallback(async (text, voice) => {
+  const ttsDownload = useCallback(async (text, voice, onProgress) => {
     if (!text || !text.trim()) {
       addNotification({ type: 'warning', message: 'No text to convert to speech' })
       return false
@@ -1102,6 +1128,8 @@ export function usePythonBridge() {
       return false
     }
 
+    let progressInterval = null
+    
     try {
       // Open save dialog
       const result = await api.saveFileDialog({
@@ -1118,8 +1146,42 @@ export function usePythonBridge() {
 
       addNotification({ type: 'info', message: 'Generating speech audio...' })
 
+      // Start progress polling (less frequent to avoid timeout issues)
+      if (onProgress) {
+        onProgress(0) // Start at 0%
+        let pollAttempts = 0
+        const maxPollAttempts = 30 // Stop polling after 30 attempts (15 seconds)
+        
+        progressInterval = setInterval(async () => {
+          pollAttempts++
+          if (pollAttempts > maxPollAttempts) {
+            clearInterval(progressInterval)
+            progressInterval = null
+            return
+          }
+          
+          try {
+            const progressData = await api.ttsGetDownloadProgress()
+            if (progressData && progressData.progress !== undefined) {
+              onProgress(progressData.progress)
+            }
+          } catch (err) {
+            // Silently ignore errors during polling
+          }
+        }, 500) // Poll every 500ms
+      }
+
       // Generate MP3 to the chosen path
       const filePath = await api.ttsGenerateMp3(text, voice, result.filePath)
+
+      // Stop progress polling
+      if (progressInterval) {
+        clearInterval(progressInterval)
+        progressInterval = null
+        if (onProgress) {
+          onProgress(100) // Ensure we show 100% at the end
+        }
+      }
 
       if (filePath) {
         addNotification({ type: 'success', message: 'Speech audio saved successfully!' })
@@ -1132,6 +1194,11 @@ export function usePythonBridge() {
       console.error('TTS download failed:', error)
       addNotification({ type: 'error', message: `Speech download failed: ${error.message}` })
       return false
+    } finally {
+      // Ensure we always clean up the interval
+      if (progressInterval) {
+        clearInterval(progressInterval)
+      }
     }
   }, [isElectronApi, api, addNotification])
 
@@ -1143,6 +1210,32 @@ export function usePythonBridge() {
       }
     }
   }, [])
+
+  // ==================== APP STATE METHODS ====================
+  
+  const saveAppState = useCallback(async (key, value) => {
+    try {
+      const result = isElectronApi
+        ? await api.saveAppState(key, value)
+        : localStorageAdapter.saveAppState(key, value)
+      return result
+    } catch (error) {
+      console.error('Failed to save app state:', error)
+      return false
+    }
+  }, [isElectronApi, api])
+
+  const getAppState = useCallback(async (key) => {
+    try {
+      const result = isElectronApi
+        ? await api.getAppState(key)
+        : localStorageAdapter.getAppState(key)
+      return result
+    } catch (error) {
+      console.error('Failed to get app state:', error)
+      return null
+    }
+  }, [isElectronApi, api])
 
   return {
     // Connection info
@@ -1240,15 +1333,19 @@ export function usePythonBridge() {
     exportWorldElementsCsv,
     importWorldElementsCsv,
 
+    // App State
+    saveAppState,
+    getAppState,
+
     // Import Novel
-    parseManuscript: async (content, extractAll = true) => {
+    parseManuscript: async (content, extractAll = true, combinedMode = true) => {
       if (!isElectronApi) {
         // Use localStorageAdapter's parse function
         return localStorageAdapter.parseManuscript(content, extractAll)
       }
 
       try {
-        return await api.parseManuscript(content, extractAll)
+        return await api.parseManuscript(content, extractAll, combinedMode)
       } catch (error) {
         console.error('Parse manuscript failed:', error)
         // Fallback to local parsing
@@ -1271,7 +1368,7 @@ export function usePythonBridge() {
       }
     },
 
-    importManuscriptToProject: async (content, projectName, extractAll = true) => {
+    importManuscriptToProject: async (content, projectName, extractAll = true, combinedMode = true) => {
       if (!isElectronApi) {
         // Use localStorageAdapter's import function for offline mode
         const result = localStorageAdapter.importManuscriptToProject(content, projectName, extractAll)
@@ -1282,7 +1379,7 @@ export function usePythonBridge() {
       }
 
       try {
-        return await api.importManuscriptToProject(content, projectName, extractAll)
+        return await api.importManuscriptToProject(content, projectName, extractAll, combinedMode)
       } catch (error) {
         console.error('Import manuscript failed:', error)
         // Fallback to local import
