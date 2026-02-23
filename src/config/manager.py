@@ -26,9 +26,14 @@ class ConfigManager:
         
         # Check for environment variable paths first (set by Electron)
         models_path = os.environ.get('EXELSIAS_MODELS_PATH')
+        llm_models_path = os.environ.get('EXELSIAS_LLM_MODELS_PATH')
         
-        if models_path:
-            # Production: use path provided by Electron
+        if llm_models_path:
+            # Production: use LLM path provided by Electron (user's app data)
+            self.base_dir = os.path.dirname(os.path.dirname(llm_models_path))
+            self.models_dir = llm_models_path
+        elif models_path:
+            # Fallback: use general models path with llama subfolder
             self.base_dir = os.path.dirname(models_path)
             self.models_dir = os.path.join(models_path, "llama")
         elif getattr(sys, 'frozen', False):

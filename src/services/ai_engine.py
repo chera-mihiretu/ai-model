@@ -234,6 +234,16 @@ class AIEngine:
             model_name = os.path.basename(config.model_path).replace('.gguf', '')
             self.status_message = f"Model Loaded: {model_name} ({self.context_size} ctx)"
             logging.info(f"Model loaded successfully. Context size: {self.context_size}")
+        except OSError as e:
+            # Check for CPU compatibility issues (illegal instruction)
+            error_str = str(e)
+            if "0xc000001d" in error_str or "illegal instruction" in error_str.lower():
+                self.status_message = "Error: CPU incompatible (AVX2 not supported). Rebuild with basic CPU."
+                logging.error(f"CPU compatibility error: {e}. This CPU may not support AVX2 instructions.")
+            else:
+                self.status_message = f"Error: Failed to load model ({e})"
+                logging.error(f"Failed to load model: {e}")
+            self.llm = None
         except Exception as e:
             self.status_message = f"Error: Failed to load model ({e})"
             logging.error(f"Failed to load model: {e}")

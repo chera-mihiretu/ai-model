@@ -10,6 +10,9 @@ import { useCallback, useMemo, useState, useEffect, useRef } from 'react';
 import Particles, { initParticlesEngine } from '@tsparticles/react';
 import { loadSlim } from '@tsparticles/slim';
 
+// Import the logo SVG directly - Vite handles this properly for both dev and production
+import logoSvgUrl from '/assets/logo.svg?url';
+
 // Custom hook to create logo particles from SVG
 function useLogoParticles(svgUrl, particleCount = 800, scale = 1) {
   const [points, setPoints] = useState([]);
@@ -17,7 +20,9 @@ function useLogoParticles(svgUrl, particleCount = 800, scale = 1) {
   useEffect(() => {
     const extractPointsFromSVG = async () => {
       try {
-        const response = await fetch(svgUrl);
+        // Use imported URL for proper bundling, with fallback for dynamic URLs
+        const urlToFetch = svgUrl === 'assets/logo.svg' ? logoSvgUrl : svgUrl;
+        const response = await fetch(urlToFetch);
         const svgText = await response.text();
         
         // Create a temporary canvas to render the SVG at high resolution
@@ -300,7 +305,8 @@ function AnimatedBackground() {
   const containerRef = useRef(null);
   
   // Extract logo particle positions - reduced from 8000 to 2000 for lower memory usage
-  const logoPoints = useLogoParticles('/assets/logo.svg', 2000, 1.5);
+  // Use imported logo URL for proper production support
+  const logoPoints = useLogoParticles(logoSvgUrl, 2000, 1.5);
 
   // Initialize tsParticles engine
   useEffect(() => {

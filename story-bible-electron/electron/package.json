@@ -44,8 +44,8 @@
         "filter": ["**/*"]
       },
       {
-        "from": "../../models/",
-        "to": "models/",
+        "from": "../../models/tts/",
+        "to": "models/tts/",
         "filter": ["**/*"]
       },
       {
@@ -71,15 +71,17 @@
       "createStartMenuShortcut": true,
       "shortcutName": "Exelsias",
       "perMachine": true,
-      "allowElevation": true
+      "allowElevation": true,
+      "installerIcon": "../frontend/public/assets/logo.ico",
+      "uninstallerIcon": "../frontend/public/assets/logo.ico"
     },
     "mac": {
       "target": "dmg",
-      "icon": "icon.png"
+      "icon": "../frontend/public/assets/logo.png"
     },
     "linux": {
       "target": ["AppImage"],
-      "icon": "icon.png",
+      "icon": "../frontend/public/assets/logo.png",
       "category": "Office"
     }
   }
