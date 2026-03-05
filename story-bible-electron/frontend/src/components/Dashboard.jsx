@@ -867,6 +867,50 @@ const HeaderIcons = {
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
     </svg>
   ),
+  MINIMIZE: (
+    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
+    </svg>
+  ),
+  MAXIMIZE: (
+    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
+    </svg>
+  ),
+  CLOSE: (
+    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+    </svg>
+  ),
+}
+
+// Window Controls Component
+function WindowControls() {
+  return (
+    <div className="flex items-center ml-2">
+      <button
+        className="w-7 h-7 flex items-center justify-center rounded text-text-muted hover:bg-white/10 hover:text-text-primary transition-colors"
+        onClick={() => window.api?.windowMinimize?.()}
+        title="Minimize"
+      >
+        {HeaderIcons.MINIMIZE}
+      </button>
+      <button
+        className="w-7 h-7 flex items-center justify-center rounded text-text-muted hover:bg-white/10 hover:text-text-primary transition-colors"
+        onClick={() => window.api?.windowMaximize?.()}
+        title="Maximize"
+      >
+        {HeaderIcons.MAXIMIZE}
+      </button>
+      <button
+        className="w-7 h-7 flex items-center justify-center rounded text-text-muted hover:bg-red-500/80 hover:text-white transition-colors"
+        onClick={() => window.api?.windowClose?.()}
+        title="Close"
+      >
+        {HeaderIcons.CLOSE}
+      </button>
+    </div>
+  )
 }
 
 // New Button Dropdown
@@ -1131,6 +1175,203 @@ function RenameModal({ isOpen, onClose, onRename, currentName, type = 'project' 
             </button>
           </div>
         </form>
+      </div>
+    </div>
+  )
+}
+
+// Recycle Bin Modal
+function RecycleBinModal({ 
+  isOpen, 
+  onClose, 
+  items, 
+  loading, 
+  onRestore, 
+  onPermanentDelete, 
+  onEmptyBin 
+}) {
+  if (!isOpen) return null
+  
+  const formatDate = (dateStr) => {
+    if (!dateStr) return 'Unknown'
+    const date = new Date(dateStr)
+    return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+  }
+  
+  const getItemIcon = (itemType) => {
+    switch (itemType) {
+      case 'folder':
+        return (
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+          </svg>
+        )
+      case 'series':
+        return (
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+          </svg>
+        )
+      default:
+        return (
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+          </svg>
+        )
+    }
+  }
+  
+  const getItemName = (item) => {
+    return item.item_data?.name || 'Unknown'
+  }
+  
+  const getProjectCount = (item) => {
+    if (item.item_type === 'project') return 0
+    return item.item_data?.projects?.length || 0
+  }
+  
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center">
+      {/* Backdrop */}
+      <div 
+        className="absolute inset-0 bg-black/70 backdrop-blur-sm"
+        onClick={onClose}
+      />
+      
+      {/* Modal */}
+      <div className="relative z-10 w-full max-w-2xl mx-4 glass-card p-6 animate-slide-up max-h-[80vh] flex flex-col">
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-3">
+            <svg className="w-6 h-6 text-gold-rich" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+            </svg>
+            <h2 className="text-xl font-semibold text-text-primary">
+              Recycle Bin
+            </h2>
+          </div>
+          
+          {items.length > 0 && (
+            <button
+              className="text-sm text-red-400 hover:text-red-300 transition-colors"
+              onClick={() => {
+                if (confirm('Permanently delete all items in the recycle bin? This cannot be undone.')) {
+                  onEmptyBin()
+                }
+              }}
+            >
+              Empty Recycle Bin
+            </button>
+          )}
+        </div>
+        
+        {/* Content */}
+        <div className="flex-1 overflow-y-auto">
+          {loading ? (
+            <div className="flex items-center justify-center py-12">
+              <div className="spinner" />
+            </div>
+          ) : items.length === 0 ? (
+            <div className="text-center py-12">
+              <svg className="w-16 h-16 mx-auto text-gray-500 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              </svg>
+              <p className="text-gray-400">Recycle bin is empty</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {items.map(item => (
+                <div 
+                  key={item.id}
+                  className="glass p-4 rounded-lg border border-white/5 hover:border-gold-rich/30 transition-colors"
+                >
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex items-start gap-3 flex-1 min-w-0">
+                      <div className="text-gold-rich/70 mt-0.5">
+                        {getItemIcon(item.item_type)}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium text-text-primary truncate">
+                            {getItemName(item)}
+                          </span>
+                          <span className="text-xs px-2 py-0.5 rounded bg-white/5 text-text-muted capitalize">
+                            {item.item_type}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-3 mt-1 text-sm text-text-muted">
+                          <span>Deleted: {formatDate(item.deleted_at)}</span>
+                          {getProjectCount(item) > 0 && (
+                            <span className="text-gold-pale">
+                              {getProjectCount(item)} project{getProjectCount(item) !== 1 ? 's' : ''} inside
+                            </span>
+                          )}
+                        </div>
+                        
+                        {/* Show nested projects for folders/series */}
+                        {(item.item_type === 'folder' || item.item_type === 'series') && 
+                          item.item_data?.projects?.length > 0 && (
+                          <div className="mt-2 pl-2 border-l border-white/10">
+                            <div className="text-xs text-text-muted mb-1">Contains:</div>
+                            <div className="flex flex-wrap gap-1">
+                              {item.item_data.projects.slice(0, 5).map((proj, idx) => (
+                                <span 
+                                  key={idx}
+                                  className="text-xs px-2 py-0.5 rounded bg-white/5 text-text-secondary"
+                                >
+                                  {proj.name}
+                                </span>
+                              ))}
+                              {item.item_data.projects.length > 5 && (
+                                <span className="text-xs text-text-muted">
+                                  +{item.item_data.projects.length - 5} more
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-center gap-2 shrink-0">
+                      <button
+                        className="px-3 py-1.5 text-sm rounded bg-gold-rich/20 text-gold-rich hover:bg-gold-rich/30 transition-colors"
+                        onClick={() => onRestore(item)}
+                        title="Restore"
+                      >
+                        Restore
+                      </button>
+                      <button
+                        className="px-3 py-1.5 text-sm rounded bg-red-500/20 text-red-400 hover:bg-red-500/30 transition-colors"
+                        onClick={() => {
+                          const projectCount = getProjectCount(item)
+                          const msg = projectCount > 0 
+                            ? `Permanently delete "${getItemName(item)}" and its ${projectCount} project(s)? This cannot be undone.`
+                            : `Permanently delete "${getItemName(item)}"? This cannot be undone.`
+                          if (confirm(msg)) {
+                            onPermanentDelete(item)
+                          }
+                        }}
+                        title="Delete Permanently"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+        
+        {/* Footer */}
+        <div className="flex items-center justify-end gap-3 mt-6 pt-4 border-t border-white/10">
+          <button
+            className="btn btn-ghost"
+            onClick={onClose}
+          >
+            Close
+          </button>
+        </div>
       </div>
     </div>
   )
@@ -1566,7 +1807,9 @@ function Dashboard() {
   const {
     projects,
     setProjects,
+    currentProjectId,
     setCurrentProject,
+    clearCurrentProject,
     setCurrentView,
     addNotification,
     storageMode,
@@ -1581,6 +1824,13 @@ function Dashboard() {
     renameProject,
     getChapterContent,
     storageMode: bridgeStorageMode,
+    moveProjectToRecycleBin,
+    moveToRecycleBin,
+    getRecycleBinItems,
+    restoreFromRecycleBin,
+    permanentDeleteFromRecycleBin,
+    emptyRecycleBin,
+    getFullProjectData,
   } = usePythonBridge()
   
   const [isLoading, setIsLoading] = useState(true)
@@ -1596,6 +1846,11 @@ function Dashboard() {
   const [series, setSeries] = useState([])
   const [currentFolder, setCurrentFolder] = useState(null)
   const [currentSeries, setCurrentSeries] = useState(null)
+  
+  // Recycle Bin state
+  const [showRecycleBin, setShowRecycleBin] = useState(false)
+  const [recycleBinItems, setRecycleBinItems] = useState([])
+  const [recycleBinLoading, setRecycleBinLoading] = useState(false)
   
   // Load projects on mount
   useEffect(() => {
@@ -1775,17 +2030,24 @@ function Dashboard() {
   
   // Handle delete project
   const handleDeleteProject = async (project) => {
-    if (!confirm(`Are you sure you want to delete "${project.name}"? This cannot be undone.`)) {
+    if (!confirm(`Are you sure you want to move "${project.name}" to the recycle bin?`)) {
       return
     }
     
     try {
-      await deleteProject(project.id)
+      // Move to recycle bin instead of hard delete
+      await moveProjectToRecycleBin(project.id)
       
-      // Immediately remove from local state (Zustand setProjects takes direct value, not callback)
-      setProjects(projects.filter(p => p.id !== project.id))
+      // If we're deleting the currently open project, clear it first
+      if (currentProjectId === project.id) {
+        clearCurrentProject()
+      }
       
-      // Remove from folder if in one
+      // Reload projects from backend to ensure consistent state (avoids stale closure issues)
+      const freshProjects = await getProjectsWithChapters()
+      setProjects(freshProjects || [])
+      
+      // Update folders - filter out the deleted project
       const updatedFolders = folders.map(f => ({
         ...f,
         projects: f.projects?.filter(p => p.id !== project.id) || []
@@ -1793,7 +2055,7 @@ function Dashboard() {
       setFolders(updatedFolders)
       localStorage.setItem('exelsias_folders', JSON.stringify(updatedFolders))
       
-      // Remove from series if in one
+      // Update series - filter out the deleted project
       const updatedSeries = series.map(s => ({
         ...s,
         projects: s.projects?.filter(p => p.id !== project.id) || []
@@ -1815,7 +2077,7 @@ function Dashboard() {
         })
       }
       
-      addNotification({ type: 'success', message: `Project "${project.name}" deleted` })
+      addNotification({ type: 'success', message: `Project "${project.name}" moved to recycle bin` })
     } catch (error) {
       console.error('Failed to delete project:', error)
       addNotification({ type: 'error', message: 'Failed to delete project' })
@@ -2021,15 +2283,68 @@ function Dashboard() {
     }
   }
   
-  // Handle delete folder
-  const handleDeleteFolder = (folder) => {
-    if (!confirm(`Delete folder "${folder.name}"? Projects inside will become standalone.`)) {
+  // Handle delete folder (moves folder + all projects inside to recycle bin)
+  const handleDeleteFolder = async (folder) => {
+    const projectCount = folder.projects?.length || 0
+    const message = projectCount > 0 
+      ? `Move folder "${folder.name}" and its ${projectCount} project(s) to recycle bin?`
+      : `Move folder "${folder.name}" to recycle bin?`
+    
+    if (!confirm(message)) {
       return
     }
-    const updated = folders.filter(f => f.id !== folder.id)
-    setFolders(updated)
-    localStorage.setItem('exelsias_folders', JSON.stringify(updated))
-    addNotification({ type: 'success', message: 'Folder deleted' })
+    
+    try {
+      // Get full data for all projects in the folder
+      const projectsWithData = []
+      for (const proj of (folder.projects || [])) {
+        const fullData = await getFullProjectData(proj.id)
+        if (fullData) {
+          projectsWithData.push(fullData)
+        }
+      }
+      
+      // Create folder data with full project data for recycle bin
+      const folderData = {
+        id: folder.id,
+        name: folder.name,
+        created_at: folder.created_at,
+        updated_at: folder.updated_at,
+        projects: projectsWithData
+      }
+      
+      // Move to recycle bin
+      await moveToRecycleBin('folder', folder.id, folderData)
+      
+      // Hard delete all projects in the folder (they're backed up in recycle bin)
+      for (const proj of (folder.projects || [])) {
+        await deleteProject(proj.id)
+        
+        // Clear current project if it's being deleted
+        if (currentProjectId === proj.id) {
+          clearCurrentProject()
+        }
+      }
+      
+      // Remove folder from state
+      const updated = folders.filter(f => f.id !== folder.id)
+      setFolders(updated)
+      localStorage.setItem('exelsias_folders', JSON.stringify(updated))
+      
+      // Reload projects
+      const freshProjects = await getProjectsWithChapters()
+      setProjects(freshProjects || [])
+      
+      // Clear current folder view if we just deleted it
+      if (currentFolder?.id === folder.id) {
+        setCurrentFolder(null)
+      }
+      
+      addNotification({ type: 'success', message: `Folder "${folder.name}" moved to recycle bin` })
+    } catch (error) {
+      console.error('Failed to delete folder:', error)
+      addNotification({ type: 'error', message: 'Failed to delete folder' })
+    }
   }
   
   // Handle rename folder
@@ -2052,15 +2367,155 @@ function Dashboard() {
     addNotification({ type: 'success', message: 'Folder renamed' })
   }
   
-  // Handle delete series
-  const handleDeleteSeries = (s) => {
-    if (!confirm(`Delete series "${s.name}"? Projects inside will become standalone.`)) {
+  // Handle delete series (moves series + all projects inside to recycle bin)
+  const handleDeleteSeries = async (s) => {
+    const projectCount = s.projects?.length || 0
+    const message = projectCount > 0 
+      ? `Move series "${s.name}" and its ${projectCount} project(s) to recycle bin?`
+      : `Move series "${s.name}" to recycle bin?`
+    
+    if (!confirm(message)) {
       return
     }
-    const updated = series.filter(ser => ser.id !== s.id)
-    setSeries(updated)
-    localStorage.setItem('exelsias_series', JSON.stringify(updated))
-    addNotification({ type: 'success', message: 'Series deleted' })
+    
+    try {
+      // Get full data for all projects in the series
+      const projectsWithData = []
+      for (const proj of (s.projects || [])) {
+        const fullData = await getFullProjectData(proj.id)
+        if (fullData) {
+          projectsWithData.push(fullData)
+        }
+      }
+      
+      // Create series data with full project data for recycle bin
+      const seriesData = {
+        id: s.id,
+        name: s.name,
+        created_at: s.created_at,
+        updated_at: s.updated_at,
+        projects: projectsWithData
+      }
+      
+      // Move to recycle bin
+      await moveToRecycleBin('series', s.id, seriesData)
+      
+      // Hard delete all projects in the series (they're backed up in recycle bin)
+      for (const proj of (s.projects || [])) {
+        await deleteProject(proj.id)
+        
+        // Clear current project if it's being deleted
+        if (currentProjectId === proj.id) {
+          clearCurrentProject()
+        }
+      }
+      
+      // Remove series from state
+      const updated = series.filter(ser => ser.id !== s.id)
+      setSeries(updated)
+      localStorage.setItem('exelsias_series', JSON.stringify(updated))
+      
+      // Reload projects
+      const freshProjects = await getProjectsWithChapters()
+      setProjects(freshProjects || [])
+      
+      // Clear current series view if we just deleted it
+      if (currentSeries?.id === s.id) {
+        setCurrentSeries(null)
+      }
+      
+      addNotification({ type: 'success', message: `Series "${s.name}" moved to recycle bin` })
+    } catch (error) {
+      console.error('Failed to delete series:', error)
+      addNotification({ type: 'error', message: 'Failed to delete series' })
+    }
+  }
+  
+  // ==================== RECYCLE BIN HANDLERS ====================
+  
+  // Open recycle bin and load items
+  const handleOpenRecycleBin = async () => {
+    setShowRecycleBin(true)
+    setRecycleBinLoading(true)
+    try {
+      const items = await getRecycleBinItems()
+      setRecycleBinItems(items || [])
+    } catch (error) {
+      console.error('Failed to load recycle bin:', error)
+      addNotification({ type: 'error', message: 'Failed to load recycle bin' })
+    } finally {
+      setRecycleBinLoading(false)
+    }
+  }
+  
+  // Restore an item from recycle bin
+  const handleRestoreFromRecycleBin = async (item) => {
+    try {
+      const result = await restoreFromRecycleBin(item.id)
+      if (!result) {
+        addNotification({ type: 'error', message: 'Failed to restore item' })
+        return
+      }
+      
+      // If it's a folder, add it back to folders
+      if (item.item_type === 'folder' && result.folder_data) {
+        setFolders(prev => {
+          const updated = [...prev, result.folder_data]
+          localStorage.setItem('exelsias_folders', JSON.stringify(updated))
+          return updated
+        })
+      }
+      
+      // If it's a series, add it back to series
+      if (item.item_type === 'series' && result.series_data) {
+        setSeries(prev => {
+          const updated = [...prev, result.series_data]
+          localStorage.setItem('exelsias_series', JSON.stringify(updated))
+          return updated
+        })
+      }
+      
+      // Reload projects to get any restored projects
+      const freshProjects = await getProjectsWithChapters()
+      setProjects(freshProjects || [])
+      
+      // Remove from recycle bin list
+      setRecycleBinItems(prev => prev.filter(i => i.id !== item.id))
+      
+      const itemName = item.item_data?.name || 'Item'
+      addNotification({ type: 'success', message: `"${itemName}" restored successfully` })
+    } catch (error) {
+      console.error('Failed to restore from recycle bin:', error)
+      addNotification({ type: 'error', message: 'Failed to restore item' })
+    }
+  }
+  
+  // Permanently delete an item from recycle bin
+  const handlePermanentDelete = async (item) => {
+    try {
+      await permanentDeleteFromRecycleBin(item.id)
+      
+      // Remove from recycle bin list
+      setRecycleBinItems(prev => prev.filter(i => i.id !== item.id))
+      
+      const itemName = item.item_data?.name || 'Item'
+      addNotification({ type: 'success', message: `"${itemName}" permanently deleted` })
+    } catch (error) {
+      console.error('Failed to permanently delete:', error)
+      addNotification({ type: 'error', message: 'Failed to permanently delete' })
+    }
+  }
+  
+  // Empty the entire recycle bin
+  const handleEmptyRecycleBin = async () => {
+    try {
+      await emptyRecycleBin()
+      setRecycleBinItems([])
+      addNotification({ type: 'success', message: 'Recycle bin emptied' })
+    } catch (error) {
+      console.error('Failed to empty recycle bin:', error)
+      addNotification({ type: 'error', message: 'Failed to empty recycle bin' })
+    }
   }
   
   // Handle rename series
@@ -2180,11 +2635,23 @@ function Dashboard() {
             
             <div className="flex items-center gap-2">
               <span className="text-2xl font-serif tracking-tight gold-gradient-text">
-                exel<span className="relative top-[1px]">s</span>ias
+                exelsias
               </span>
             </div>
             
-            <StorageModeIndicator mode={bridgeStorageMode || storageMode} />
+            <div className="flex items-center gap-2">
+              <button
+                className="p-2 rounded-lg text-text-muted hover:text-gold-rich hover:bg-gold-rich/10 transition-colors"
+                onClick={handleOpenRecycleBin}
+                title="Recycle Bin"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+              </button>
+              <StorageModeIndicator mode={bridgeStorageMode || storageMode} />
+              <WindowControls />
+            </div>
           </div>
         </header>
         
@@ -2236,11 +2703,23 @@ function Dashboard() {
             
             <div className="flex items-center gap-2">
               <span className="text-2xl font-serif tracking-tight gold-gradient-text">
-                exel<span className="relative top-[1px]">s</span>ias
+                exelsias
               </span>
             </div>
             
-            <StorageModeIndicator mode={bridgeStorageMode || storageMode} />
+            <div className="flex items-center gap-2">
+              <button
+                className="p-2 rounded-lg text-text-muted hover:text-gold-rich hover:bg-gold-rich/10 transition-colors"
+                onClick={handleOpenRecycleBin}
+                title="Recycle Bin"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+              </button>
+              <StorageModeIndicator mode={bridgeStorageMode || storageMode} />
+              <WindowControls />
+            </div>
           </div>
         </header>
         
@@ -2308,13 +2787,23 @@ function Dashboard() {
           {/* Center - Logo */}
           <div className="flex items-center gap-2">
             <span className="text-2xl font-serif tracking-tight gold-gradient-text">
-              exel<span className="relative top-[1px]">s</span>ias
+              exelsias
             </span>
           </div>
           
-          {/* Right side - Status */}
+          {/* Right side - Status, Recycle Bin & Window Controls */}
           <div className="flex items-center gap-4">
+            <button
+              className="p-2 rounded-lg text-text-muted hover:text-gold-rich hover:bg-gold-rich/10 transition-colors"
+              onClick={handleOpenRecycleBin}
+              title="Recycle Bin"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              </svg>
+            </button>
             <StorageModeIndicator mode={bridgeStorageMode || storageMode} />
+            <WindowControls />
           </div>
         </div>
       </header>
@@ -2458,6 +2947,17 @@ function Dashboard() {
             setProjects(updatedProjects)
           }
         }}
+      />
+      
+      {/* Recycle Bin Modal */}
+      <RecycleBinModal
+        isOpen={showRecycleBin}
+        onClose={() => setShowRecycleBin(false)}
+        items={recycleBinItems}
+        loading={recycleBinLoading}
+        onRestore={handleRestoreFromRecycleBin}
+        onPermanentDelete={handlePermanentDelete}
+        onEmptyBin={handleEmptyRecycleBin}
       />
     </div>
   )

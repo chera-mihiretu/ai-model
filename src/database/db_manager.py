@@ -351,6 +351,26 @@ class DatabaseManager:
                     conn.execute("UPDATE schema_version SET version = 5")
                     current_version = 5
                 
+                # Version 6: Recycle Bin
+                if current_version < 6:
+                    logging.info("Running migration: Version 6 (Recycle Bin)")
+                    
+                    conn.execute("""
+                        CREATE TABLE IF NOT EXISTS recycle_bin (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            item_type TEXT NOT NULL,
+                            item_id TEXT NOT NULL,
+                            item_data TEXT NOT NULL,
+                            deleted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                        )
+                    """)
+                    
+                    conn.execute("CREATE INDEX IF NOT EXISTS idx_recycle_bin_type ON recycle_bin (item_type)")
+                    conn.execute("CREATE INDEX IF NOT EXISTS idx_recycle_bin_deleted ON recycle_bin (deleted_at)")
+                    
+                    conn.execute("UPDATE schema_version SET version = 6")
+                    current_version = 6
+                
                 conn.commit()
                 logging.info(f"Database setup complete at version {current_version}")
                 
@@ -813,20 +833,379 @@ class DatabaseManager:
             return False
 
     def delete_project(self, project_id: int):
-        """Delete a project and all its chapters."""
+        """Delete a project and all its related data (full cascade)."""
         try:
             with self.get_connection() as conn:
-                # Delete all chapters first
+                # Get all chapter IDs for this project (needed for scene/chunk deletion)
+                cursor = conn.cursor()
+                cursor.execute("SELECT id FROM chapters WHERE project_id = ?", (project_id,))
+                chapter_ids = [row[0] for row in cursor.fetchall()]
+                
+                # Delete scenes for all chapters in this project
+                if chapter_ids:
+                    placeholders = ','.join('?' * len(chapter_ids))
+                    conn.execute(f"DELETE FROM scenes WHERE chapter_id IN ({placeholders})", chapter_ids)
+                    # Delete generation chunks for all chapters
+                    conn.execute(f"DELETE FROM generation_chunks WHERE chapter_id IN ({placeholders})", chapter_ids)
+                    # Delete chapter outline links
+                    conn.execute(f"DELETE FROM chapter_outline_links WHERE chapter_id IN ({placeholders})", chapter_ids)
+                
+                # Delete story beats (references project_id and chapter_id)
+                conn.execute("DELETE FROM story_beats WHERE project_id = ?", (project_id,))
+                
+                # Delete all chapters
                 conn.execute("DELETE FROM chapters WHERE project_id = ?", (project_id,))
+                
+                # Delete characters for this project
+                conn.execute("DELETE FROM characters WHERE project_id = ?", (project_id,))
+                
+                # Delete character versions for this project
+                conn.execute("DELETE FROM character_versions WHERE project_id = ?", (project_id,))
+                
+                # Delete world elements for this project
+                conn.execute("DELETE FROM world_elements WHERE project_id = ?", (project_id,))
+                
                 # Delete story bible data
                 conn.execute("DELETE FROM story_bible WHERE project_id = ?", (project_id,))
-                # Delete the project
+                
+                # Delete project summaries
+                conn.execute("DELETE FROM project_summaries WHERE project_id = ?", (project_id,))
+                
+                # Delete content versions
+                conn.execute("DELETE FROM content_versions WHERE project_id = ?", (project_id,))
+                
+                # Remove from series_projects junction table
+                conn.execute("DELETE FROM series_projects WHERE project_id = ?", (project_id,))
+                
+                # Finally delete the project itself
                 conn.execute("DELETE FROM projects WHERE id = ?", (project_id,))
+                
                 conn.commit()
                 return True
         except sqlite3.Error as e:
             logging.error(f"Delete project error: {e}")
             return False
+
+    # ==================== RECYCLE BIN METHODS ====================
+    
+    def get_full_project_data(self, project_id: int):
+        """Get complete project data for recycle bin storage."""
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                
+                # Get project
+                cursor.execute("SELECT id, name, genre, created_at FROM projects WHERE id = ?", (project_id,))
+                row = cursor.fetchone()
+                if not row:
+                    return None
+                
+                project = {
+                    'id': row[0],
+                    'name': row[1],
+                    'genre': row[2],
+                    'created_at': row[3],
+                    'chapters': [],
+                    'characters': [],
+                    'story_bible': None,
+                    'world_elements': []
+                }
+                
+                # Get chapters
+                cursor.execute("""
+                    SELECT id, title, content, chapter_order, beats, summary_text, 
+                           recent_chapter_summary, last_summarized_char_count 
+                    FROM chapters WHERE project_id = ? ORDER BY chapter_order
+                """, (project_id,))
+                project['chapters'] = [
+                    {
+                        'id': r[0], 'title': r[1], 'content': r[2], 'chapter_order': r[3],
+                        'beats': r[4], 'summary_text': r[5], 'recent_chapter_summary': r[6],
+                        'last_summarized_char_count': r[7]
+                    }
+                    for r in cursor.fetchall()
+                ]
+                
+                # Get characters
+                cursor.execute("""
+                    SELECT id, name, role, personality_traits, speech_pattern, backstory,
+                           physical_description, pronouns, groups, other_names, motivations,
+                           internal_conflicts, strengths, weaknesses, character_arc, is_visible
+                    FROM characters WHERE project_id = ?
+                """, (project_id,))
+                project['characters'] = [
+                    {
+                        'id': r[0], 'name': r[1], 'role': r[2], 'personality_traits': r[3],
+                        'speech_pattern': r[4], 'backstory': r[5], 'physical_description': r[6],
+                        'pronouns': r[7], 'groups': r[8], 'other_names': r[9], 'motivations': r[10],
+                        'internal_conflicts': r[11], 'strengths': r[12], 'weaknesses': r[13],
+                        'character_arc': r[14], 'is_visible': r[15]
+                    }
+                    for r in cursor.fetchall()
+                ]
+                
+                # Get story bible
+                cursor.execute("""
+                    SELECT braindump, genre, style, synopsis, worldbuilding, outline
+                    FROM story_bible WHERE project_id = ?
+                """, (project_id,))
+                sb_row = cursor.fetchone()
+                if sb_row:
+                    project['story_bible'] = {
+                        'braindump': sb_row[0], 'genre': sb_row[1], 'style': sb_row[2],
+                        'synopsis': sb_row[3], 'worldbuilding': sb_row[4], 'outline': sb_row[5]
+                    }
+                
+                # Get world elements
+                cursor.execute("""
+                    SELECT id, name, element_type, description, sensory_details, significance, is_visible
+                    FROM world_elements WHERE project_id = ?
+                """, (project_id,))
+                project['world_elements'] = [
+                    {
+                        'id': r[0], 'name': r[1], 'element_type': r[2], 'description': r[3],
+                        'sensory_details': r[4], 'significance': r[5], 'is_visible': r[6]
+                    }
+                    for r in cursor.fetchall()
+                ]
+                
+                return project
+        except sqlite3.Error as e:
+            logging.error(f"Get full project data error: {e}")
+            return None
+
+    def move_to_recycle_bin(self, item_type: str, item_id: str, item_data: str):
+        """Move an item to the recycle bin."""
+        try:
+            with self.get_connection() as conn:
+                conn.execute("""
+                    INSERT INTO recycle_bin (item_type, item_id, item_data)
+                    VALUES (?, ?, ?)
+                """, (item_type, str(item_id), item_data))
+                conn.commit()
+                return True
+        except sqlite3.Error as e:
+            logging.error(f"Move to recycle bin error: {e}")
+            return False
+
+    def move_project_to_recycle_bin(self, project_id: int):
+        """Soft delete a project by moving it to recycle bin."""
+        try:
+            # Get full project data first
+            project_data = self.get_full_project_data(project_id)
+            if not project_data:
+                return False
+            
+            # Store in recycle bin
+            import json
+            if not self.move_to_recycle_bin('project', str(project_id), json.dumps(project_data)):
+                return False
+            
+            # Now hard delete the project (it's backed up in recycle bin)
+            return self.delete_project(project_id)
+        except Exception as e:
+            logging.error(f"Move project to recycle bin error: {e}")
+            return False
+
+    def get_recycle_bin_items(self):
+        """Get all items in the recycle bin."""
+        try:
+            import json
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                    SELECT id, item_type, item_id, item_data, deleted_at 
+                    FROM recycle_bin ORDER BY deleted_at DESC
+                """)
+                items = []
+                for row in cursor.fetchall():
+                    try:
+                        item_data = json.loads(row[3])
+                    except json.JSONDecodeError:
+                        item_data = {}
+                    items.append({
+                        'id': row[0],
+                        'item_type': row[1],
+                        'item_id': row[2],
+                        'item_data': item_data,
+                        'deleted_at': row[4]
+                    })
+                return items
+        except sqlite3.Error as e:
+            logging.error(f"Get recycle bin items error: {e}")
+            return []
+
+    def restore_project_from_data(self, project_data: dict):
+        """Restore a project from its saved data."""
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                
+                # Recreate project
+                cursor.execute("""
+                    INSERT INTO projects (name, genre) VALUES (?, ?)
+                """, (project_data.get('name', 'Restored Project'), project_data.get('genre', '')))
+                new_project_id = cursor.lastrowid
+                
+                # Map old chapter IDs to new ones for relationship restoration
+                chapter_id_map = {}
+                
+                # Restore chapters
+                for ch in project_data.get('chapters', []):
+                    cursor.execute("""
+                        INSERT INTO chapters (project_id, title, content, chapter_order, beats, 
+                                            summary_text, recent_chapter_summary, last_summarized_char_count)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    """, (
+                        new_project_id, ch.get('title', 'Untitled'), ch.get('content', ''),
+                        ch.get('chapter_order', 0), ch.get('beats'), ch.get('summary_text'),
+                        ch.get('recent_chapter_summary'), ch.get('last_summarized_char_count', 0)
+                    ))
+                    chapter_id_map[ch.get('id')] = cursor.lastrowid
+                
+                # Restore characters
+                for char in project_data.get('characters', []):
+                    cursor.execute("""
+                        INSERT INTO characters (project_id, name, role, personality_traits, speech_pattern,
+                                              backstory, physical_description, pronouns, groups, other_names,
+                                              motivations, internal_conflicts, strengths, weaknesses, 
+                                              character_arc, is_visible)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """, (
+                        new_project_id, char.get('name', ''), char.get('role', ''),
+                        char.get('personality_traits', ''), char.get('speech_pattern', ''),
+                        char.get('backstory', ''), char.get('physical_description', ''),
+                        char.get('pronouns', ''), char.get('groups', ''), char.get('other_names', ''),
+                        char.get('motivations', ''), char.get('internal_conflicts', ''),
+                        char.get('strengths', ''), char.get('weaknesses', ''),
+                        char.get('character_arc', ''), char.get('is_visible', 1)
+                    ))
+                
+                # Restore story bible
+                sb = project_data.get('story_bible')
+                if sb:
+                    cursor.execute("""
+                        INSERT INTO story_bible (project_id, braindump, genre, style, synopsis, worldbuilding, outline)
+                        VALUES (?, ?, ?, ?, ?, ?, ?)
+                    """, (
+                        new_project_id, sb.get('braindump', ''), sb.get('genre', ''),
+                        sb.get('style', ''), sb.get('synopsis', ''), sb.get('worldbuilding', ''),
+                        sb.get('outline', '')
+                    ))
+                
+                # Restore world elements
+                for we in project_data.get('world_elements', []):
+                    cursor.execute("""
+                        INSERT INTO world_elements (project_id, name, element_type, description,
+                                                   sensory_details, significance, is_visible)
+                        VALUES (?, ?, ?, ?, ?, ?, ?)
+                    """, (
+                        new_project_id, we.get('name', ''), we.get('element_type', 'other'),
+                        we.get('description', ''), we.get('sensory_details', ''),
+                        we.get('significance', ''), we.get('is_visible', 1)
+                    ))
+                
+                conn.commit()
+                return new_project_id
+        except sqlite3.Error as e:
+            logging.error(f"Restore project from data error: {e}")
+            return None
+
+    def restore_from_recycle_bin(self, recycle_id: int):
+        """Restore an item from the recycle bin."""
+        try:
+            import json
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                
+                # Get the item
+                cursor.execute("""
+                    SELECT item_type, item_id, item_data FROM recycle_bin WHERE id = ?
+                """, (recycle_id,))
+                row = cursor.fetchone()
+                if not row:
+                    return None
+                
+                item_type, item_id, item_data_str = row
+                item_data = json.loads(item_data_str)
+                
+                result = {'item_type': item_type, 'restored_items': []}
+                
+                if item_type == 'project':
+                    new_id = self.restore_project_from_data(item_data)
+                    if new_id:
+                        result['restored_items'].append({'type': 'project', 'id': new_id, 'name': item_data.get('name')})
+                
+                elif item_type == 'folder':
+                    # Restore folder structure and all projects inside
+                    folder_data = {
+                        'id': item_data.get('id'),
+                        'name': item_data.get('name'),
+                        'created_at': item_data.get('created_at'),
+                        'updated_at': item_data.get('updated_at'),
+                        'projects': []
+                    }
+                    
+                    # Restore each project in the folder
+                    for proj in item_data.get('projects', []):
+                        new_id = self.restore_project_from_data(proj)
+                        if new_id:
+                            folder_data['projects'].append({'id': new_id, 'name': proj.get('name')})
+                            result['restored_items'].append({'type': 'project', 'id': new_id, 'name': proj.get('name')})
+                    
+                    result['folder_data'] = folder_data
+                
+                elif item_type == 'series':
+                    # Restore series structure and all projects inside
+                    series_data = {
+                        'id': item_data.get('id'),
+                        'name': item_data.get('name'),
+                        'created_at': item_data.get('created_at'),
+                        'updated_at': item_data.get('updated_at'),
+                        'projects': []
+                    }
+                    
+                    # Restore each project in the series
+                    for proj in item_data.get('projects', []):
+                        new_id = self.restore_project_from_data(proj)
+                        if new_id:
+                            series_data['projects'].append({'id': new_id, 'name': proj.get('name')})
+                            result['restored_items'].append({'type': 'project', 'id': new_id, 'name': proj.get('name')})
+                    
+                    result['series_data'] = series_data
+                
+                # Remove from recycle bin
+                conn.execute("DELETE FROM recycle_bin WHERE id = ?", (recycle_id,))
+                conn.commit()
+                
+                return result
+        except Exception as e:
+            logging.error(f"Restore from recycle bin error: {e}")
+            return None
+
+    def permanent_delete_from_recycle_bin(self, recycle_id: int):
+        """Permanently delete an item from the recycle bin."""
+        try:
+            with self.get_connection() as conn:
+                conn.execute("DELETE FROM recycle_bin WHERE id = ?", (recycle_id,))
+                conn.commit()
+                return True
+        except sqlite3.Error as e:
+            logging.error(f"Permanent delete from recycle bin error: {e}")
+            return False
+
+    def empty_recycle_bin(self):
+        """Empty the entire recycle bin."""
+        try:
+            with self.get_connection() as conn:
+                conn.execute("DELETE FROM recycle_bin")
+                conn.commit()
+                return True
+        except sqlite3.Error as e:
+            logging.error(f"Empty recycle bin error: {e}")
+            return False
+
+    # ==================== END RECYCLE BIN METHODS ====================
 
     def get_projects_with_chapters(self):
         """Returns a list of projects, each with a 'chapters' list."""

@@ -121,6 +121,93 @@ export function usePythonBridge() {
     }
   }, [isElectronApi, api])
 
+  // ==================== RECYCLE BIN METHODS ====================
+
+  const moveProjectToRecycleBin = useCallback(async (projectId) => {
+    try {
+      const result = isElectronApi
+        ? await api.moveProjectToRecycleBin(projectId)
+        : localStorageAdapter.moveProjectToRecycleBin(projectId)
+      return result
+    } catch (error) {
+      console.error('Failed to move project to recycle bin:', error)
+      return false
+    }
+  }, [isElectronApi, api])
+
+  const moveToRecycleBin = useCallback(async (itemType, itemId, itemData) => {
+    try {
+      const dataStr = typeof itemData === 'string' ? itemData : JSON.stringify(itemData)
+      const result = isElectronApi
+        ? await api.moveToRecycleBin(itemType, itemId, dataStr)
+        : localStorageAdapter.moveToRecycleBin(itemType, itemId, dataStr)
+      return result
+    } catch (error) {
+      console.error('Failed to move to recycle bin:', error)
+      return false
+    }
+  }, [isElectronApi, api])
+
+  const getRecycleBinItems = useCallback(async () => {
+    try {
+      const result = isElectronApi
+        ? await api.getRecycleBinItems()
+        : localStorageAdapter.getRecycleBinItems()
+      return result || []
+    } catch (error) {
+      console.error('Failed to get recycle bin items:', error)
+      return []
+    }
+  }, [isElectronApi, api])
+
+  const restoreFromRecycleBin = useCallback(async (recycleId) => {
+    try {
+      const result = isElectronApi
+        ? await api.restoreFromRecycleBin(recycleId)
+        : localStorageAdapter.restoreFromRecycleBin(recycleId)
+      return result
+    } catch (error) {
+      console.error('Failed to restore from recycle bin:', error)
+      return null
+    }
+  }, [isElectronApi, api])
+
+  const permanentDeleteFromRecycleBin = useCallback(async (recycleId) => {
+    try {
+      const result = isElectronApi
+        ? await api.permanentDeleteFromRecycleBin(recycleId)
+        : localStorageAdapter.permanentDeleteFromRecycleBin(recycleId)
+      return result
+    } catch (error) {
+      console.error('Failed to permanently delete from recycle bin:', error)
+      return false
+    }
+  }, [isElectronApi, api])
+
+  const emptyRecycleBin = useCallback(async () => {
+    try {
+      const result = isElectronApi
+        ? await api.emptyRecycleBin()
+        : localStorageAdapter.emptyRecycleBin()
+      return result
+    } catch (error) {
+      console.error('Failed to empty recycle bin:', error)
+      return false
+    }
+  }, [isElectronApi, api])
+
+  const getFullProjectData = useCallback(async (projectId) => {
+    try {
+      const result = isElectronApi
+        ? await api.getFullProjectData(projectId)
+        : localStorageAdapter.getFullProjectData(projectId)
+      return result
+    } catch (error) {
+      console.error('Failed to get full project data:', error)
+      return null
+    }
+  }, [isElectronApi, api])
+
   // ==================== CHAPTER METHODS ====================
 
   const createChapter = useCallback(async (projectId, title, content = '') => {
@@ -1249,6 +1336,15 @@ export function usePythonBridge() {
     createProject,
     deleteProject,
     renameProject,
+
+    // Recycle Bin
+    moveProjectToRecycleBin,
+    moveToRecycleBin,
+    getRecycleBinItems,
+    restoreFromRecycleBin,
+    permanentDeleteFromRecycleBin,
+    emptyRecycleBin,
+    getFullProjectData,
 
     // Chapters
     createChapter,

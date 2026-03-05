@@ -21,6 +21,7 @@
     "@tsparticles/slim": "^3.9.1",
     "clsx": "^2.1.0",
     "docx": "^9.5.1",
+    "dompurify": "^3.3.2",
     "file-saver": "^2.0.5",
     "framer-motion": "^12.29.0",
     "jszip": "^3.10.1",

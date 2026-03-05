@@ -14,12 +14,20 @@ const STORAGE_KEYS = {
   WORLD_ELEMENTS: 'storybible_world_elements',
   SERIES: 'storybible_series',
   SCENES: 'storybible_scenes',
+  RECYCLE_BIN: 'exelsias_recycle_bin',
 }
 
 // ==================== HELPERS ====================
 
 function generateId() {
-  return Date.now().toString(36) + Math.random().toString(36).substr(2, 9)
+  // Use crypto.randomUUID if available (modern browsers), otherwise fallback
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    return crypto.randomUUID()
+  }
+  // Fallback for older environments: timestamp + multiple random components
+  return Date.now().toString(36) + '-' + 
+    Math.random().toString(36).substr(2, 9) + '-' + 
+    Math.random().toString(36).substr(2, 9)
 }
 
 function getStorage(key) {
@@ -91,14 +99,19 @@ export function createProject(name, genre = '') {
 }
 
 export function deleteProject(projectId) {
+  // Get chapter IDs for this project (needed for scene deletion)
+  const allChapters = getStorage(STORAGE_KEYS.CHAPTERS) || []
+  const projectChapterIds = allChapters
+    .filter(ch => ch.project_id === projectId)
+    .map(ch => ch.id)
+  
   // Delete project
   let projects = getStorage(STORAGE_KEYS.PROJECTS) || []
   projects = projects.filter(p => p.id !== projectId)
   setStorage(STORAGE_KEYS.PROJECTS, projects)
   
   // Delete associated chapters
-  let chapters = getStorage(STORAGE_KEYS.CHAPTERS) || []
-  chapters = chapters.filter(ch => ch.project_id !== projectId)
+  const chapters = allChapters.filter(ch => ch.project_id !== projectId)
   setStorage(STORAGE_KEYS.CHAPTERS, chapters)
   
   // Delete associated characters
@@ -110,6 +123,48 @@ export function deleteProject(projectId) {
   const bibles = getStorage(STORAGE_KEYS.STORY_BIBLE) || {}
   delete bibles[projectId]
   setStorage(STORAGE_KEYS.STORY_BIBLE, bibles)
+  
+  // Delete world elements for this project
+  let worldElements = getStorage(STORAGE_KEYS.WORLD_ELEMENTS) || []
+  worldElements = worldElements.filter(we => we.project_id !== projectId)
+  setStorage(STORAGE_KEYS.WORLD_ELEMENTS, worldElements)
+  
+  // Delete scenes for all chapters in this project
+  if (projectChapterIds.length > 0) {
+    let scenes = getStorage(STORAGE_KEYS.SCENES) || []
+    scenes = scenes.filter(s => !projectChapterIds.includes(s.chapter_id))
+    setStorage(STORAGE_KEYS.SCENES, scenes)
+  }
+  
+  // Clean up series references (exelsias_series stored separately)
+  try {
+    const seriesData = localStorage.getItem('exelsias_series')
+    if (seriesData) {
+      const seriesList = JSON.parse(seriesData)
+      const updatedSeries = seriesList.map(s => ({
+        ...s,
+        projects: (s.projects || []).filter(p => p.id !== projectId)
+      }))
+      localStorage.setItem('exelsias_series', JSON.stringify(updatedSeries))
+    }
+  } catch (e) {
+    console.error('Failed to clean series references:', e)
+  }
+  
+  // Clean up folder references (exelsias_folders stored separately)
+  try {
+    const foldersData = localStorage.getItem('exelsias_folders')
+    if (foldersData) {
+      const foldersList = JSON.parse(foldersData)
+      const updatedFolders = foldersList.map(f => ({
+        ...f,
+        projects: (f.projects || []).filter(p => p.id !== projectId)
+      }))
+      localStorage.setItem('exelsias_folders', JSON.stringify(updatedFolders))
+    }
+  } catch (e) {
+    console.error('Failed to clean folder references:', e)
+  }
   
   return true
 }
@@ -130,6 +185,228 @@ export function renameProject(projectId, newName) {
 export function getProjectSettings(projectId) {
   const projects = getStorage(STORAGE_KEYS.PROJECTS) || []
   return projects.find(p => p.id === projectId) || null
+}
+
+// ==================== RECYCLE BIN METHODS ====================
+
+export function getFullProjectData(projectId) {
+  const projects = getStorage(STORAGE_KEYS.PROJECTS) || []
+  const project = projects.find(p => p.id === projectId)
+  if (!project) return null
+  
+  const chapters = getStorage(STORAGE_KEYS.CHAPTERS) || []
+  const characters = getStorage(STORAGE_KEYS.CHARACTERS) || []
+  const bibles = getStorage(STORAGE_KEYS.STORY_BIBLE) || {}
+  const worldElements = getStorage(STORAGE_KEYS.WORLD_ELEMENTS) || []
+  const scenes = getStorage(STORAGE_KEYS.SCENES) || []
+  
+  const projectChapters = chapters.filter(ch => ch.project_id === projectId)
+  const chapterIds = projectChapters.map(ch => ch.id)
+  
+  return {
+    ...project,
+    chapters: projectChapters,
+    characters: characters.filter(c => c.project_id === projectId),
+    story_bible: bibles[projectId] || null,
+    world_elements: worldElements.filter(we => we.project_id === projectId),
+    scenes: scenes.filter(s => chapterIds.includes(s.chapter_id))
+  }
+}
+
+export function moveToRecycleBin(itemType, itemId, itemData) {
+  const recycleBin = getStorage(STORAGE_KEYS.RECYCLE_BIN) || []
+  
+  const recycleItem = {
+    id: generateId(),
+    item_type: itemType,
+    item_id: itemId,
+    item_data: typeof itemData === 'string' ? JSON.parse(itemData) : itemData,
+    deleted_at: new Date().toISOString()
+  }
+  
+  recycleBin.push(recycleItem)
+  setStorage(STORAGE_KEYS.RECYCLE_BIN, recycleBin)
+  return true
+}
+
+export function moveProjectToRecycleBin(projectId) {
+  // Get full project data first
+  const projectData = getFullProjectData(projectId)
+  if (!projectData) return false
+  
+  // Store in recycle bin
+  if (!moveToRecycleBin('project', projectId, projectData)) {
+    return false
+  }
+  
+  // Now hard delete the project (it's backed up in recycle bin)
+  return deleteProject(projectId)
+}
+
+export function getRecycleBinItems() {
+  return getStorage(STORAGE_KEYS.RECYCLE_BIN) || []
+}
+
+function restoreProjectFromData(projectData) {
+  // Recreate project
+  const projects = getStorage(STORAGE_KEYS.PROJECTS) || []
+  const newProjectId = generateId()
+  
+  const newProject = {
+    id: newProjectId,
+    name: projectData.name || 'Restored Project',
+    genre: projectData.genre || '',
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString()
+  }
+  projects.push(newProject)
+  setStorage(STORAGE_KEYS.PROJECTS, projects)
+  
+  // Restore chapters with new IDs
+  const chapters = getStorage(STORAGE_KEYS.CHAPTERS) || []
+  const chapterIdMap = {}
+  
+  for (const ch of (projectData.chapters || [])) {
+    const newChapterId = generateId()
+    chapterIdMap[ch.id] = newChapterId
+    
+    chapters.push({
+      ...ch,
+      id: newChapterId,
+      project_id: newProjectId
+    })
+  }
+  setStorage(STORAGE_KEYS.CHAPTERS, chapters)
+  
+  // Restore characters
+  const characters = getStorage(STORAGE_KEYS.CHARACTERS) || []
+  for (const char of (projectData.characters || [])) {
+    characters.push({
+      ...char,
+      id: generateId(),
+      project_id: newProjectId
+    })
+  }
+  setStorage(STORAGE_KEYS.CHARACTERS, characters)
+  
+  // Restore story bible
+  if (projectData.story_bible) {
+    const bibles = getStorage(STORAGE_KEYS.STORY_BIBLE) || {}
+    bibles[newProjectId] = projectData.story_bible
+    setStorage(STORAGE_KEYS.STORY_BIBLE, bibles)
+  }
+  
+  // Restore world elements
+  const worldElements = getStorage(STORAGE_KEYS.WORLD_ELEMENTS) || []
+  for (const we of (projectData.world_elements || [])) {
+    worldElements.push({
+      ...we,
+      id: generateId(),
+      project_id: newProjectId
+    })
+  }
+  setStorage(STORAGE_KEYS.WORLD_ELEMENTS, worldElements)
+  
+  // Restore scenes with mapped chapter IDs
+  const scenes = getStorage(STORAGE_KEYS.SCENES) || []
+  for (const scene of (projectData.scenes || [])) {
+    const newChapterId = chapterIdMap[scene.chapter_id]
+    if (newChapterId) {
+      scenes.push({
+        ...scene,
+        id: generateId(),
+        chapter_id: newChapterId
+      })
+    }
+  }
+  setStorage(STORAGE_KEYS.SCENES, scenes)
+  
+  return newProjectId
+}
+
+export function restoreFromRecycleBin(recycleId) {
+  const recycleBin = getStorage(STORAGE_KEYS.RECYCLE_BIN) || []
+  const itemIndex = recycleBin.findIndex(item => item.id === recycleId)
+  
+  if (itemIndex === -1) return null
+  
+  const item = recycleBin[itemIndex]
+  const result = { item_type: item.item_type, restored_items: [] }
+  
+  if (item.item_type === 'project') {
+    const newId = restoreProjectFromData(item.item_data)
+    if (newId) {
+      result.restored_items.push({ type: 'project', id: newId, name: item.item_data.name })
+    }
+  } else if (item.item_type === 'folder') {
+    // Restore folder structure and all projects inside
+    const folderData = {
+      id: generateId(),
+      name: item.item_data.name,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      projects: []
+    }
+    
+    // Restore each project in the folder
+    for (const proj of (item.item_data.projects || [])) {
+      const newId = restoreProjectFromData(proj)
+      if (newId) {
+        // Get the restored project to add to folder
+        const projects = getStorage(STORAGE_KEYS.PROJECTS) || []
+        const restoredProject = projects.find(p => p.id === newId)
+        if (restoredProject) {
+          folderData.projects.push(restoredProject)
+        }
+        result.restored_items.push({ type: 'project', id: newId, name: proj.name })
+      }
+    }
+    
+    result.folder_data = folderData
+  } else if (item.item_type === 'series') {
+    // Restore series structure and all projects inside
+    const seriesData = {
+      id: generateId(),
+      name: item.item_data.name,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      projects: []
+    }
+    
+    // Restore each project in the series
+    for (const proj of (item.item_data.projects || [])) {
+      const newId = restoreProjectFromData(proj)
+      if (newId) {
+        // Get the restored project to add to series
+        const projects = getStorage(STORAGE_KEYS.PROJECTS) || []
+        const restoredProject = projects.find(p => p.id === newId)
+        if (restoredProject) {
+          seriesData.projects.push(restoredProject)
+        }
+        result.restored_items.push({ type: 'project', id: newId, name: proj.name })
+      }
+    }
+    
+    result.series_data = seriesData
+  }
+  
+  // Remove from recycle bin
+  recycleBin.splice(itemIndex, 1)
+  setStorage(STORAGE_KEYS.RECYCLE_BIN, recycleBin)
+  
+  return result
+}
+
+export function permanentDeleteFromRecycleBin(recycleId) {
+  const recycleBin = getStorage(STORAGE_KEYS.RECYCLE_BIN) || []
+  const filteredBin = recycleBin.filter(item => item.id !== recycleId)
+  setStorage(STORAGE_KEYS.RECYCLE_BIN, filteredBin)
+  return true
+}
+
+export function emptyRecycleBin() {
+  setStorage(STORAGE_KEYS.RECYCLE_BIN, [])
+  return true
 }
 
 // ==================== CHAPTER METHODS ====================

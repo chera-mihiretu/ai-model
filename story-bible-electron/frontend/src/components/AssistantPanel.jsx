@@ -7,6 +7,7 @@
  */
 
 import { useState, useRef, useEffect } from 'react'
+import DOMPurify from 'dompurify'
 import useStore from '../hooks/useStore'
 import { usePythonBridge } from '../hooks/usePythonBridge'
 import { clsx } from 'clsx'
@@ -101,7 +102,7 @@ function MarkdownContent({ content }) {
   return (
     <div
       className="prose max-w-none text-sm text-gray-300"
-      dangerouslySetInnerHTML={{ __html: parseMarkdown(content) }}
+      dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(parseMarkdown(content)) }}
     />
   )
 }

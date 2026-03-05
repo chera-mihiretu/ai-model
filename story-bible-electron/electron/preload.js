@@ -23,6 +23,16 @@ contextBridge.exposeInMainWorld('api', {
   renameProject: (projectId, newName) => ipcRenderer.invoke('python-call', 'rename_project', { project_id: projectId, new_name: newName }),
   getProjectSettings: (projectId) => ipcRenderer.invoke('python-call', 'get_project_settings', { project_id: projectId }),
 
+  // ==================== RECYCLE BIN METHODS ====================
+
+  moveProjectToRecycleBin: (projectId) => ipcRenderer.invoke('python-call', 'move_project_to_recycle_bin', { project_id: projectId }),
+  moveToRecycleBin: (itemType, itemId, itemData) => ipcRenderer.invoke('python-call', 'move_to_recycle_bin', { item_type: itemType, item_id: itemId, item_data: itemData }),
+  getRecycleBinItems: () => ipcRenderer.invoke('python-call', 'get_recycle_bin_items'),
+  restoreFromRecycleBin: (recycleId) => ipcRenderer.invoke('python-call', 'restore_from_recycle_bin', { recycle_id: recycleId }),
+  permanentDeleteFromRecycleBin: (recycleId) => ipcRenderer.invoke('python-call', 'permanent_delete_from_recycle_bin', { recycle_id: recycleId }),
+  emptyRecycleBin: () => ipcRenderer.invoke('python-call', 'empty_recycle_bin'),
+  getFullProjectData: (projectId) => ipcRenderer.invoke('python-call', 'get_full_project_data', { project_id: projectId }),
+
   // ==================== CHAPTER METHODS ====================
 
   createChapter: (projectId, title, content) => ipcRenderer.invoke('python-call', 'create_chapter', { project_id: projectId, title, content }),

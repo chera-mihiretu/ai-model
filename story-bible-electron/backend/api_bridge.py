@@ -174,6 +174,29 @@ class APIBridge:
                 'id': request_id
             }
     
+    def _validate_string(self, value: Any, field_name: str, max_length: int = 1000, required: bool = False) -> str:
+        """Validate and sanitize string input."""
+        if value is None:
+            if required:
+                raise ValueError(f"{field_name} is required")
+            return ''
+        if not isinstance(value, str):
+            value = str(value)
+        if len(value) > max_length:
+            raise ValueError(f"{field_name} exceeds maximum length of {max_length} characters")
+        return value
+    
+    def _validate_int(self, value: Any, field_name: str, required: bool = False) -> Optional[int]:
+        """Validate integer input."""
+        if value is None:
+            if required:
+                raise ValueError(f"{field_name} is required")
+            return None
+        try:
+            return int(value)
+        except (TypeError, ValueError):
+            raise ValueError(f"{field_name} must be a valid integer")
+    
     def _dispatch(self, method: str, params: Dict) -> Any:
         """
         Dispatch method call to appropriate service.
@@ -186,28 +209,57 @@ class APIBridge:
             return self.db.get_projects_with_chapters()
         
         elif method == 'create_project':
-            name = params.get('name', 'New Project')
-            genre = params.get('genre', '')
+            name = self._validate_string(params.get('name', 'New Project'), 'name', max_length=500)
+            genre = self._validate_string(params.get('genre', ''), 'genre', max_length=5000)
             return self.db.create_project(name, genre)
         
         elif method == 'delete_project':
-            project_id = params.get('project_id')
+            project_id = self._validate_int(params.get('project_id'), 'project_id', required=True)
             return self.db.delete_project(project_id)
         
         elif method == 'rename_project':
-            project_id = params.get('project_id')
-            new_name = params.get('new_name')
+            project_id = self._validate_int(params.get('project_id'), 'project_id', required=True)
+            new_name = self._validate_string(params.get('new_name'), 'new_name', max_length=500, required=True)
             return self.db.rename_project(project_id, new_name)
         
         elif method == 'get_project_settings':
             project_id = params.get('project_id')
             return self.db.get_project_settings(project_id)
         
+        # ==================== RECYCLE BIN METHODS ====================
+        elif method == 'move_project_to_recycle_bin':
+            project_id = params.get('project_id')
+            return self.db.move_project_to_recycle_bin(project_id)
+        
+        elif method == 'move_to_recycle_bin':
+            item_type = params.get('item_type')
+            item_id = params.get('item_id')
+            item_data = params.get('item_data')
+            return self.db.move_to_recycle_bin(item_type, item_id, item_data)
+        
+        elif method == 'get_recycle_bin_items':
+            return self.db.get_recycle_bin_items()
+        
+        elif method == 'restore_from_recycle_bin':
+            recycle_id = params.get('recycle_id')
+            return self.db.restore_from_recycle_bin(recycle_id)
+        
+        elif method == 'permanent_delete_from_recycle_bin':
+            recycle_id = params.get('recycle_id')
+            return self.db.permanent_delete_from_recycle_bin(recycle_id)
+        
+        elif method == 'empty_recycle_bin':
+            return self.db.empty_recycle_bin()
+        
+        elif method == 'get_full_project_data':
+            project_id = params.get('project_id')
+            return self.db.get_full_project_data(project_id)
+        
         # ==================== CHAPTER METHODS ====================
         elif method == 'create_chapter':
-            project_id = params.get('project_id')
-            title = params.get('title', 'New Chapter')
-            content = params.get('content', '')
+            project_id = self._validate_int(params.get('project_id'), 'project_id', required=True)
+            title = self._validate_string(params.get('title', 'New Chapter'), 'title', max_length=500)
+            content = params.get('content', '')  # Content can be very large, no limit
             return self.db.create_chapter(project_id, title, content)
         
         elif method == 'get_chapters':

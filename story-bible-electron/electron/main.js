@@ -166,21 +166,84 @@ function startPythonBackend() {
       stdio: ['pipe', 'pipe', 'pipe']
     });
     
+    // Buffer for accumulating JSON responses (handles multi-line JSON)
+    let jsonBuffer = '';
+    
     // Handle stdout (JSON-RPC responses)
     pythonProcess.stdout.on('data', (data) => {
-      const lines = data.toString().split('\n');
-      for (const line of lines) {
-        if (!line.trim()) continue;
+      jsonBuffer += data.toString();
+      
+      // Try to extract complete JSON objects from the buffer
+      // JSON-RPC responses are separated by newlines, but the JSON itself may contain newlines
+      let startIdx = 0;
+      
+      while (startIdx < jsonBuffer.length) {
+        // Find the start of a JSON object
+        const objStart = jsonBuffer.indexOf('{', startIdx);
+        if (objStart === -1) {
+          // No more JSON objects, clear processed part
+          jsonBuffer = '';
+          break;
+        }
+        
+        // Try to find a complete JSON object by tracking braces
+        let braceCount = 0;
+        let inString = false;
+        let escapeNext = false;
+        let objEnd = -1;
+        
+        for (let i = objStart; i < jsonBuffer.length; i++) {
+          const char = jsonBuffer[i];
+          
+          if (escapeNext) {
+            escapeNext = false;
+            continue;
+          }
+          
+          if (char === '\\' && inString) {
+            escapeNext = true;
+            continue;
+          }
+          
+          if (char === '"' && !escapeNext) {
+            inString = !inString;
+            continue;
+          }
+          
+          if (!inString) {
+            if (char === '{') braceCount++;
+            else if (char === '}') {
+              braceCount--;
+              if (braceCount === 0) {
+                objEnd = i;
+                break;
+              }
+            }
+          }
+        }
+        
+        if (objEnd === -1) {
+          // Incomplete JSON, keep buffer for next data chunk
+          jsonBuffer = jsonBuffer.substring(objStart);
+          break;
+        }
+        
+        // Extract the complete JSON string
+        const jsonStr = jsonBuffer.substring(objStart, objEnd + 1);
+        startIdx = objEnd + 1;
         
         try {
-          const response = JSON.parse(line);
+          const response = JSON.parse(jsonStr);
           
           // Check for init/ready response
           if (response.id === 'init' && response.result === 'ready') {
             console.log('Python backend ready!');
             pythonReady = true;
             resolve();
-            return;
+            // Continue processing in case there are more responses
+            jsonBuffer = jsonBuffer.substring(startIdx);
+            startIdx = 0;
+            continue;
           }
           
           // Handle normal responses
@@ -201,8 +264,12 @@ function startPythonBackend() {
             mainWindow.webContents.send('ai-token', response.token);
           }
         } catch (e) {
-          console.error('Failed to parse Python response:', line);
+          console.error('Failed to parse Python response:', jsonStr.substring(0, 200) + '...');
         }
+        
+        // Update buffer to remove processed JSON
+        jsonBuffer = jsonBuffer.substring(startIdx);
+        startIdx = 0;
       }
     });
     
