@@ -657,9 +657,12 @@ function Toolbar() {
       try {
         // Try to restore saved TTS mode preference
         const savedMode = await getAppState('tts_mode')
+        const savedVoice = await getAppState('selected_voice')
         
         const availability = await fetchTtsAvailability()
         setTtsAvailability(availability)
+        
+        let currentMode = 'cloud'
         
         // Apply saved mode if valid, otherwise get current mode from backend
         if (savedMode && (savedMode === 'cloud' || savedMode === 'local')) {
@@ -667,17 +670,21 @@ function Toolbar() {
           if (savedMode === 'local' && availability?.local) {
             await applyTtsMode(savedMode)
             setTtsMode(savedMode)
+            currentMode = savedMode
           } else if (savedMode === 'cloud' && availability?.cloud) {
             await applyTtsMode(savedMode)
             setTtsMode(savedMode)
+            currentMode = savedMode
           } else {
             // Fallback to current backend mode
             const mode = await fetchTtsMode()
             setTtsMode(mode)
+            currentMode = mode
           }
         } else {
           const mode = await fetchTtsMode()
           setTtsMode(mode)
+          currentMode = mode
         }
         
         const voices = await fetchLocalVoices()
@@ -688,12 +695,29 @@ function Toolbar() {
         if (cloudVoices && cloudVoices.length > 0) {
           setTtsVoices(cloudVoices)
         }
+        
+        // Set selected voice based on current mode
+        if (currentMode === 'local') {
+          const downloadedVoices = voices.filter(v => v.downloaded)
+          if (savedVoice && downloadedVoices.some(v => v.name === savedVoice)) {
+            setSelectedVoice(savedVoice)
+          } else if (downloadedVoices.length > 0) {
+            setSelectedVoice(downloadedVoices[0].name)
+          }
+        } else {
+          // Cloud mode
+          if (savedVoice && cloudVoices && cloudVoices.includes(savedVoice)) {
+            setSelectedVoice(savedVoice)
+          } else if (cloudVoices && cloudVoices.length > 0) {
+            setSelectedVoice(cloudVoices[0])
+          }
+        }
       } catch (e) {
         console.log('Could not initialize TTS mode:', e)
       }
     }
     initTtsMode()
-  }, [fetchTtsMode, fetchTtsAvailability, fetchLocalVoices, getTtsVoices, setTtsMode, setTtsAvailability, setLocalVoices, setTtsVoices, getAppState, applyTtsMode])
+  }, [fetchTtsMode, fetchTtsAvailability, fetchLocalVoices, getTtsVoices, setTtsMode, setTtsAvailability, setLocalVoices, setTtsVoices, getAppState, applyTtsMode, setSelectedVoice])
   
   // Close model picker on outside click
   useEffect(() => {
@@ -814,6 +838,18 @@ function Toolbar() {
           type: 'info', 
           message: 'Download a voice to use Local TTS. Click on any voice below to download.' 
         })
+      }
+      
+      // Update selected voice to first available local voice
+      if (downloadedVoices.length > 0) {
+        setSelectedVoice(downloadedVoices[0].name)
+        await saveAppState('selected_voice', downloadedVoices[0].name)
+      }
+    } else {
+      // Switching to cloud mode - set to first cloud voice if available
+      if (ttsVoices && ttsVoices.length > 0) {
+        setSelectedVoice(ttsVoices[0])
+        await saveAppState('selected_voice', ttsVoices[0])
       }
     }
     
@@ -1149,7 +1185,10 @@ function Toolbar() {
             <select
               className="px-2 py-1.5 bg-dark-700 text-text-secondary text-sm border border-gold-rich/20 focus:outline-none focus:ring-1 focus:ring-gold-rich cursor-pointer max-w-[100px]"
               value={selectedVoice}
-              onChange={(e) => setSelectedVoice(e.target.value)}
+              onChange={(e) => {
+                setSelectedVoice(e.target.value)
+                saveAppState('selected_voice', e.target.value)
+              }}
               title="Select Voice"
             >
               {currentModeVoices.map(voice => (

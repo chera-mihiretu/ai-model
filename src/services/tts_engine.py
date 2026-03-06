@@ -454,14 +454,6 @@ class PiperTTSEngine:
         self._playback_thread = None
         self._temp_files = []
         
-        # #region agent log H5
-        try:
-            with open("/home/chera/Public/my_stuffs/work/fiverr/ricardoo/.cursor/debug-e223a1.log", "a") as f:
-                import json as _json
-                f.write(_json.dumps({"sessionId": "e223a1", "hypothesisId": "H5", "location": "tts_engine.py:PiperTTSEngine.__init__", "timestamp": int(time.time() * 1000), "message": "piper_engine_init", "data": {"model_dir": str(self.model_dir), "PIPER_TTS_AVAILABLE": PIPER_TTS_AVAILABLE, "PYGAME_AVAILABLE": PYGAME_AVAILABLE, "is_loaded": self.is_loaded}}) + "\n")
-        except: pass
-        # #endregion
-        
         if self.is_loaded:
             logging.info(f"Piper TTS Engine initialized - Models dir: {self.model_dir}")
             # Try to load a default voice if available
@@ -496,46 +488,14 @@ class PiperTTSEngine:
     
     def _load_voice(self, voice_name: str):
         """Load a Piper voice model."""
-        # #region agent log H2
-        _debug_log = {"sessionId": "e223a1", "hypothesisId": "H2", "location": "tts_engine.py:_load_voice", "timestamp": int(time.time() * 1000)}
-        try:
-            with open("/home/chera/Public/my_stuffs/work/fiverr/ricardoo/.cursor/debug-e223a1.log", "a") as f:
-                import json as _json
-                f.write(_json.dumps({**_debug_log, "message": "load_voice_start", "data": {"voice_name": voice_name, "PIPER_TTS_AVAILABLE": PIPER_TTS_AVAILABLE}}) + "\n")
-        except: pass
-        # #endregion
         if not PIPER_TTS_AVAILABLE:
             raise RuntimeError("Piper TTS not available")
         
         model_path, config_path = self._get_voice_paths(voice_name)
-        # #region agent log H1
-        try:
-            with open("/home/chera/Public/my_stuffs/work/fiverr/ricardoo/.cursor/debug-e223a1.log", "a") as f:
-                import json as _json
-                f.write(_json.dumps({**_debug_log, "hypothesisId": "H1", "message": "voice_paths", "data": {"model_path": str(model_path), "config_path": str(config_path), "model_exists": model_path.exists() if model_path else False, "config_exists": config_path.exists() if config_path else False}}) + "\n")
-        except: pass
-        # #endregion
         if not model_path or not model_path.exists():
             raise FileNotFoundError(f"Voice model not downloaded: {voice_name}")
         
-        try:
-            self.current_piper_voice = PiperVoice.load(str(model_path), str(config_path))
-            # #region agent log H2
-            try:
-                with open("/home/chera/Public/my_stuffs/work/fiverr/ricardoo/.cursor/debug-e223a1.log", "a") as f:
-                    import json as _json
-                    f.write(_json.dumps({**_debug_log, "message": "voice_loaded_success", "data": {"voice_name": voice_name, "piper_voice_type": str(type(self.current_piper_voice))}}) + "\n")
-            except: pass
-            # #endregion
-        except Exception as e:
-            # #region agent log H2
-            try:
-                with open("/home/chera/Public/my_stuffs/work/fiverr/ricardoo/.cursor/debug-e223a1.log", "a") as f:
-                    import json as _json
-                    f.write(_json.dumps({**_debug_log, "message": "voice_load_error", "data": {"voice_name": voice_name, "error": str(e), "error_type": str(type(e).__name__)}}) + "\n")
-            except: pass
-            # #endregion
-            raise
+        self.current_piper_voice = PiperVoice.load(str(model_path), str(config_path))
         self.current_voice = voice_name
         logging.info(f"Loaded Piper voice: {voice_name}")
     
@@ -661,23 +621,8 @@ class PiperTTSEngine:
     
     def tts_read_text(self, text: str, voice: str = None, character_name: Optional[str] = None):
         """Speak text using Piper TTS."""
-        # #region agent log H4,H5
-        _debug_log = {"sessionId": "e223a1", "hypothesisId": "H4", "location": "tts_engine.py:tts_read_text", "timestamp": int(time.time() * 1000)}
-        try:
-            with open("/home/chera/Public/my_stuffs/work/fiverr/ricardoo/.cursor/debug-e223a1.log", "a") as f:
-                import json as _json
-                f.write(_json.dumps({**_debug_log, "message": "tts_read_text_start", "data": {"is_loaded": self.is_loaded, "voice": voice, "text_len": len(text) if text else 0, "PIPER_TTS_AVAILABLE": PIPER_TTS_AVAILABLE, "PYGAME_AVAILABLE": PYGAME_AVAILABLE}}) + "\n")
-        except: pass
-        # #endregion
         if not self.is_loaded:
             logging.warning("Piper TTS not available")
-            # #region agent log H5
-            try:
-                with open("/home/chera/Public/my_stuffs/work/fiverr/ricardoo/.cursor/debug-e223a1.log", "a") as f:
-                    import json as _json
-                    f.write(_json.dumps({**_debug_log, "hypothesisId": "H5", "message": "tts_not_loaded_exit", "data": {"is_loaded": self.is_loaded}}) + "\n")
-            except: pass
-            # #endregion
             return
         
         if not text or not text.strip():
@@ -693,37 +638,14 @@ class PiperTTSEngine:
         if voice:
             self.set_voice(voice)
         
-        # #region agent log H4
-        try:
-            with open("/home/chera/Public/my_stuffs/work/fiverr/ricardoo/.cursor/debug-e223a1.log", "a") as f:
-                import json as _json
-                f.write(_json.dumps({**_debug_log, "message": "after_set_voice", "data": {"current_voice": self.current_voice, "current_piper_voice_is_none": self.current_piper_voice is None}}) + "\n")
-        except: pass
-        # #endregion
-        
         if not self.current_piper_voice:
             downloaded = self.list_downloaded_voices()
-            # #region agent log H4
-            try:
-                with open("/home/chera/Public/my_stuffs/work/fiverr/ricardoo/.cursor/debug-e223a1.log", "a") as f:
-                    import json as _json
-                    f.write(_json.dumps({**_debug_log, "message": "no_voice_trying_download", "data": {"downloaded_voices": downloaded}}) + "\n")
-            except: pass
-            # #endregion
             if downloaded:
                 self.set_voice(downloaded[0])
             else:
                 logging.error("No Piper voice downloaded. Please download a voice first.")
                 self.is_playing = False
                 return
-        
-        # #region agent log H4
-        try:
-            with open("/home/chera/Public/my_stuffs/work/fiverr/ricardoo/.cursor/debug-e223a1.log", "a") as f:
-                import json as _json
-                f.write(_json.dumps({**_debug_log, "message": "starting_playback_thread", "data": {"current_voice": self.current_voice, "has_piper_voice": self.current_piper_voice is not None}}) + "\n")
-        except: pass
-        # #endregion
         
         # Run in background thread
         self._playback_thread = threading.Thread(
@@ -735,24 +657,9 @@ class PiperTTSEngine:
     
     def _speak_threaded(self, text: str):
         """Generate and play speech in a thread."""
-        # #region agent log H3
-        _debug_log = {"sessionId": "e223a1", "hypothesisId": "H3", "location": "tts_engine.py:_speak_threaded", "timestamp": int(time.time() * 1000)}
-        try:
-            with open("/home/chera/Public/my_stuffs/work/fiverr/ricardoo/.cursor/debug-e223a1.log", "a") as f:
-                import json as _json
-                f.write(_json.dumps({**_debug_log, "message": "speak_threaded_start", "data": {"text_len": len(text), "has_piper_voice": self.current_piper_voice is not None}}) + "\n")
-        except: pass
-        # #endregion
         try:
             # Split text into manageable chunks
             chunks = self._split_text(text)
-            # #region agent log H3
-            try:
-                with open("/home/chera/Public/my_stuffs/work/fiverr/ricardoo/.cursor/debug-e223a1.log", "a") as f:
-                    import json as _json
-                    f.write(_json.dumps({**_debug_log, "message": "chunks_created", "data": {"num_chunks": len(chunks)}}) + "\n")
-            except: pass
-            # #endregion
             
             for i, chunk in enumerate(chunks):
                 if self.stop_flag:
@@ -767,33 +674,8 @@ class PiperTTSEngine:
                 temp_file.close()
                 
                 # Synthesize with Piper
-                # #region agent log H3
-                try:
-                    with open("/home/chera/Public/my_stuffs/work/fiverr/ricardoo/.cursor/debug-e223a1.log", "a") as f:
-                        import json as _json
-                        f.write(_json.dumps({**_debug_log, "message": "synthesizing_chunk", "data": {"chunk_index": i, "chunk_len": len(chunk), "temp_file": temp_file.name}}) + "\n")
-                except: pass
-                # #endregion
-                try:
-                    with wave.open(temp_file.name, 'wb') as wav_file:
-                        self.current_piper_voice.synthesize(chunk, wav_file)
-                    # #region agent log H3
-                    try:
-                        import os as _os
-                        with open("/home/chera/Public/my_stuffs/work/fiverr/ricardoo/.cursor/debug-e223a1.log", "a") as f:
-                            import json as _json
-                            f.write(_json.dumps({**_debug_log, "message": "synthesize_success", "data": {"chunk_index": i, "wav_file_size": _os.path.getsize(temp_file.name) if _os.path.exists(temp_file.name) else 0}}) + "\n")
-                    except: pass
-                    # #endregion
-                except Exception as synth_err:
-                    # #region agent log H3
-                    try:
-                        with open("/home/chera/Public/my_stuffs/work/fiverr/ricardoo/.cursor/debug-e223a1.log", "a") as f:
-                            import json as _json
-                            f.write(_json.dumps({**_debug_log, "message": "synthesize_error", "data": {"chunk_index": i, "error": str(synth_err), "error_type": type(synth_err).__name__}}) + "\n")
-                    except: pass
-                    # #endregion
-                    raise
+                with wave.open(temp_file.name, 'wb') as wav_file:
+                    self.current_piper_voice.synthesize_wav(chunk, wav_file)
                 
                 if self.stop_flag:
                     break
@@ -803,65 +685,27 @@ class PiperTTSEngine:
                 
         except Exception as e:
             logging.error(f"Piper TTS error: {e}")
-            # #region agent log H3
-            try:
-                with open("/home/chera/Public/my_stuffs/work/fiverr/ricardoo/.cursor/debug-e223a1.log", "a") as f:
-                    import json as _json
-                    f.write(_json.dumps({**_debug_log, "message": "speak_threaded_error", "data": {"error": str(e), "error_type": type(e).__name__}}) + "\n")
-            except: pass
-            # #endregion
         finally:
             self.is_playing = False
             self._cleanup_temp_files()
     
     def _play_audio_file(self, file_path: str):
         """Play an audio file using pygame."""
-        # #region agent log H3
-        _debug_log = {"sessionId": "e223a1", "hypothesisId": "H3", "location": "tts_engine.py:_play_audio_file", "timestamp": int(time.time() * 1000)}
-        try:
-            import os as _os
-            with open("/home/chera/Public/my_stuffs/work/fiverr/ricardoo/.cursor/debug-e223a1.log", "a") as f:
-                import json as _json
-                f.write(_json.dumps({**_debug_log, "message": "play_audio_start", "data": {"file_path": file_path, "file_exists": _os.path.exists(file_path), "pygame_available": pygame is not None}}) + "\n")
-        except: pass
-        # #endregion
         if not pygame or self.stop_flag:
             return
         
         try:
             pygame.mixer.music.load(file_path)
             pygame.mixer.music.play()
-            # #region agent log H3
-            try:
-                with open("/home/chera/Public/my_stuffs/work/fiverr/ricardoo/.cursor/debug-e223a1.log", "a") as f:
-                    import json as _json
-                    f.write(_json.dumps({**_debug_log, "message": "play_started", "data": {"file_path": file_path}}) + "\n")
-            except: pass
-            # #endregion
             
             while pygame.mixer.music.get_busy():
                 if self.stop_flag:
                     pygame.mixer.music.stop()
                     break
                 time.sleep(0.1)
-            
-            # #region agent log H3
-            try:
-                with open("/home/chera/Public/my_stuffs/work/fiverr/ricardoo/.cursor/debug-e223a1.log", "a") as f:
-                    import json as _json
-                    f.write(_json.dumps({**_debug_log, "message": "play_finished", "data": {"file_path": file_path}}) + "\n")
-            except: pass
-            # #endregion
                 
         except Exception as e:
             logging.error(f"Playback error: {e}")
-            # #region agent log H3
-            try:
-                with open("/home/chera/Public/my_stuffs/work/fiverr/ricardoo/.cursor/debug-e223a1.log", "a") as f:
-                    import json as _json
-                    f.write(_json.dumps({**_debug_log, "message": "play_error", "data": {"file_path": file_path, "error": str(e), "error_type": type(e).__name__}}) + "\n")
-            except: pass
-            # #endregion
     
     def _split_text(self, text: str) -> List[str]:
         """Split text into chunks for processing."""
@@ -936,7 +780,7 @@ class PiperTTSEngine:
                 progress_callback(10)
             
             with wave.open(wav_path, 'wb') as wav_file:
-                self.current_piper_voice.synthesize(text, wav_file)
+                self.current_piper_voice.synthesize_wav(text, wav_file)
             
             if progress_callback:
                 progress_callback(90)
