@@ -104,6 +104,52 @@ After building, you must verify the folder structure before zipping potential re
 - **DLL Missing (Windows)**: Ensure you have the Visual C++ Redistributable installed.
 - **Permission Denied (Linux/macOS)**: Ensure the binary is executable: `chmod +x StoryBibleApp`.
 
+### CPU Compatibility Issues (AVX2 Error)
+
+If you see an error like:
+> "Error: CPU incompatible (AVX2 not supported)" or "Your CPU does not support AVX2 instructions"
+
+This means the `llama-cpp-python` library was compiled with AVX2 optimizations, but your CPU doesn't support them. This is common on older gaming PCs and some budget processors.
+
+**Solution: Rebuild with basic CPU support**
+
+1. **Uninstall the existing llama-cpp-python**:
+   ```bash
+   pip uninstall llama-cpp-python -y
+   ```
+
+2. **Reinstall without AVX2 (basic CPU build)**:
+   
+   For **Windows** (no AVX2):
+   ```bash
+   # Option 1: Use the pre-built noavx wheel
+   pip install llama-cpp-python --extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cpu
+   
+   # Option 2: Build from source with basic CPU
+   set CMAKE_ARGS=-DGGML_AVX2=OFF -DGGML_AVX=OFF -DGGML_F16C=OFF -DGGML_FMA=OFF
+   pip install llama-cpp-python --force-reinstall --no-cache-dir
+   ```
+   
+   For **Linux**:
+   ```bash
+   CMAKE_ARGS="-DGGML_AVX2=OFF -DGGML_AVX=OFF -DGGML_F16C=OFF -DGGML_FMA=OFF" pip install llama-cpp-python --force-reinstall --no-cache-dir
+   ```
+   
+   For **macOS**:
+   ```bash
+   CMAKE_ARGS="-DGGML_AVX2=OFF -DGGML_AVX=OFF" pip install llama-cpp-python --force-reinstall --no-cache-dir
+   ```
+
+3. **Rebuild the application** using `pyinstaller`:
+   ```bash
+   cd story-bible-electron/backend
+   pyinstaller backend.spec
+   ```
+
+4. **Package the new build** and distribute to users with older CPUs.
+
+**Note**: The noavx build will be slower than AVX2-optimized builds, but will work on all x86_64 CPUs.
+
 ## 5. Persistent Data
 
 When running the portable `.exe`, the application will create a `data` folder next to the executable to store:

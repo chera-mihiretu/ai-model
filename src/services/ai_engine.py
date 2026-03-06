@@ -3,6 +3,7 @@ import os
 import sys
 import queue
 import threading
+import platform
 from typing import Optional
 
 try:
@@ -11,6 +12,35 @@ except ImportError:
     Llama = None
 
 from ..config.manager import ConfigManager
+
+
+def check_cpu_features():
+    """Check CPU capabilities for AVX2 support."""
+    try:
+        if platform.system() == 'Windows':
+            import subprocess
+            result = subprocess.run(
+                ['wmic', 'cpu', 'get', 'caption'],
+                capture_output=True, text=True, timeout=5
+            )
+            cpu_info = result.stdout.lower()
+        elif platform.system() == 'Linux':
+            with open('/proc/cpuinfo', 'r') as f:
+                cpu_info = f.read().lower()
+            return 'avx2' in cpu_info
+        elif platform.system() == 'Darwin':
+            import subprocess
+            result = subprocess.run(
+                ['sysctl', '-n', 'machdep.cpu.features'],
+                capture_output=True, text=True, timeout=5
+            )
+            cpu_info = result.stdout.lower()
+            return 'avx2' in cpu_info
+        else:
+            return None  # Unknown, assume supported
+    except Exception as e:
+        logging.warning(f"Could not check CPU features: {e}")
+        return None  # Unknown, proceed anyway
 
 MIMIC_SYSTEM_PROMPT = """<|begin_of_text|><|start_header_id|>system<|end_header_id|>
 You are now roleplaying as {name}.
@@ -236,17 +266,38 @@ class AIEngine:
             logging.info(f"Model loaded successfully. Context size: {self.context_size}")
         except OSError as e:
             # Check for CPU compatibility issues (illegal instruction)
-            error_str = str(e)
-            if "0xc000001d" in error_str or "illegal instruction" in error_str.lower():
-                self.status_message = "Error: CPU incompatible (AVX2 not supported). Rebuild with basic CPU."
-                logging.error(f"CPU compatibility error: {e}. This CPU may not support AVX2 instructions.")
+            error_str = str(e).lower()
+            is_cpu_error = (
+                "0xc000001d" in error_str or 
+                "illegal instruction" in error_str or
+                "illegal hardware instruction" in error_str or
+                "sigill" in error_str
+            )
+            if is_cpu_error:
+                cpu_info = check_cpu_features()
+                if cpu_info is False:
+                    self.status_message = "Error: Your CPU does not support AVX2 instructions required by this build. Please contact support for a compatible version."
+                    logging.error(f"CPU compatibility error: AVX2 not supported. Error: {e}")
+                else:
+                    self.status_message = "Error: CPU instruction error. Your processor may not support the required instruction set (AVX2). Please contact support."
+                    logging.error(f"CPU compatibility error: {e}. This CPU may not support AVX2 instructions.")
             else:
                 self.status_message = f"Error: Failed to load model ({e})"
                 logging.error(f"Failed to load model: {e}")
             self.llm = None
         except Exception as e:
-            self.status_message = f"Error: Failed to load model ({e})"
-            logging.error(f"Failed to load model: {e}")
+            error_str = str(e).lower()
+            is_cpu_error = (
+                "illegal instruction" in error_str or
+                "illegal hardware instruction" in error_str or
+                "sigill" in error_str
+            )
+            if is_cpu_error:
+                self.status_message = "Error: Your CPU does not support the required instruction set (AVX2). Please contact support for a compatible version."
+                logging.error(f"CPU compatibility error during model load: {e}")
+            else:
+                self.status_message = f"Error: Failed to load model ({e})"
+                logging.error(f"Failed to load model: {e}")
             self.llm = None
 
     def count_tokens(self, text: str) -> int:
