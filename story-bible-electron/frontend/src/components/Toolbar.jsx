@@ -17,7 +17,7 @@ import {
   LuDownload, LuCheck, LuMinus, LuMaximize, LuMinimize,
   LuEye, LuWind, LuDroplets, LuFingerprint, LuLightbulb,
   LuClapperboard, LuShuffle, LuScroll,
-  LuCpu, LuFolderSearch, LuBrain,
+  LuCpu, LuFolderSearch, LuBrain, LuCloud, LuHardDrive, LuTrash2,
 } from 'react-icons/lu'
 
 // Icon size classes
@@ -190,6 +190,18 @@ function Toolbar() {
     editorInstance,
     setPendingAiRequest,
     addNotification,
+    // TTS Mode
+    ttsMode,
+    setTtsMode,
+    ttsAvailability,
+    setTtsAvailability,
+    localVoices,
+    setLocalVoices,
+    isDownloadingVoice,
+    setIsDownloadingVoice,
+    voiceDownloadProgress,
+    setVoiceDownloadProgress,
+    setTtsVoices,
   } = useStore()
   
   // Get current project name
@@ -211,6 +223,17 @@ function Toolbar() {
     selectModel,
     browseForModel,
     getAiStatus: refreshAiStatus,
+    // TTS Mode methods
+    getTtsMode: fetchTtsMode,
+    setTtsMode: applyTtsMode,
+    getTtsAvailability: fetchTtsAvailability,
+    getLocalVoices: fetchLocalVoices,
+    downloadLocalVoice,
+    deleteLocalVoice,
+    getTtsVoices,
+    // App state for persistence
+    saveAppState,
+    getAppState,
   } = usePythonBridge()
   
   // Write mode state
@@ -624,11 +647,62 @@ function Toolbar() {
   const [isLoadingModel, setIsLoadingModel] = useState(false)
   const modelPickerRef = useRef(null)
   
+  // TTS Mode picker state
+  const [ttsPickerOpen, setTtsPickerOpen] = useState(false)
+  const ttsPickerRef = useRef(null)
+  
+  // Initialize TTS mode and availability on mount
+  useEffect(() => {
+    const initTtsMode = async () => {
+      try {
+        // Try to restore saved TTS mode preference
+        const savedMode = await getAppState('tts_mode')
+        
+        const availability = await fetchTtsAvailability()
+        setTtsAvailability(availability)
+        
+        // Apply saved mode if valid, otherwise get current mode from backend
+        if (savedMode && (savedMode === 'cloud' || savedMode === 'local')) {
+          // Only apply local mode if it's available
+          if (savedMode === 'local' && availability?.local) {
+            await applyTtsMode(savedMode)
+            setTtsMode(savedMode)
+          } else if (savedMode === 'cloud' && availability?.cloud) {
+            await applyTtsMode(savedMode)
+            setTtsMode(savedMode)
+          } else {
+            // Fallback to current backend mode
+            const mode = await fetchTtsMode()
+            setTtsMode(mode)
+          }
+        } else {
+          const mode = await fetchTtsMode()
+          setTtsMode(mode)
+        }
+        
+        const voices = await fetchLocalVoices()
+        setLocalVoices(voices)
+        
+        // Fetch cloud voices for the dropdown
+        const cloudVoices = await getTtsVoices()
+        if (cloudVoices && cloudVoices.length > 0) {
+          setTtsVoices(cloudVoices)
+        }
+      } catch (e) {
+        console.log('Could not initialize TTS mode:', e)
+      }
+    }
+    initTtsMode()
+  }, [fetchTtsMode, fetchTtsAvailability, fetchLocalVoices, getTtsVoices, setTtsMode, setTtsAvailability, setLocalVoices, setTtsVoices, getAppState, applyTtsMode])
+  
   // Close model picker on outside click
   useEffect(() => {
     function handleClickOutside(event) {
       if (modelPickerRef.current && !modelPickerRef.current.contains(event.target)) {
         setModelPickerOpen(false)
+      }
+      if (ttsPickerRef.current && !ttsPickerRef.current.contains(event.target)) {
+        setTtsPickerOpen(false)
       }
     }
     document.addEventListener('mousedown', handleClickOutside)
@@ -718,6 +792,70 @@ function Toolbar() {
     setCurrentProject(null)
     setCurrentView('dashboard')
   }
+  
+  // Handle TTS mode switch
+  const handleTtsModeSwitch = async (mode) => {
+    const result = await applyTtsMode(mode)
+    
+    // Even if backend returns error (e.g., piper not installed), we still switch UI mode
+    // to allow users to download voices in advance
+    setTtsMode(mode)
+    await saveAppState('tts_mode', mode)
+    
+    // Refresh local voices list if switching to local
+    if (mode === 'local') {
+      const voices = await fetchLocalVoices()
+      setLocalVoices(voices)
+      
+      // Show helpful message if no voices downloaded yet
+      const downloadedVoices = voices.filter(v => v.downloaded)
+      if (downloadedVoices.length === 0) {
+        addNotification({ 
+          type: 'info', 
+          message: 'Download a voice to use Local TTS. Click on any voice below to download.' 
+        })
+      }
+    }
+    
+    if (result?.warning) {
+      addNotification({ type: 'warning', message: result.warning })
+    }
+  }
+  
+  // Handle local voice download
+  const handleDownloadVoice = async (voiceName) => {
+    if (isDownloadingVoice) return
+    
+    setIsDownloadingVoice(true)
+    setVoiceDownloadProgress(0)
+    
+    const success = await downloadLocalVoice(voiceName, (progress) => {
+      setVoiceDownloadProgress(progress)
+    })
+    
+    if (success) {
+      // Refresh local voices list
+      const voices = await fetchLocalVoices()
+      setLocalVoices(voices)
+    }
+    
+    setIsDownloadingVoice(false)
+    setVoiceDownloadProgress(0)
+  }
+  
+  // Handle local voice delete
+  const handleDeleteVoice = async (voiceName) => {
+    const success = await deleteLocalVoice(voiceName)
+    if (success) {
+      const voices = await fetchLocalVoices()
+      setLocalVoices(voices)
+    }
+  }
+  
+  // Get current voices based on mode
+  const currentModeVoices = ttsMode === 'local' 
+    ? localVoices.filter(v => v.downloaded).map(v => v.name)
+    : ttsVoices
   
   return (
     <header className="h-toolbar flex items-center px-4 gap-4 glass drag-region">
@@ -844,16 +982,177 @@ function Toolbar() {
       {/* Right: Status & Controls */}
       <div className="flex items-center gap-3 no-drag shrink-0">
         {/* TTS Controls */}
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1 relative" ref={ttsPickerRef}>
+          {/* TTS Mode Toggle */}
+          <button
+            className={clsx(
+              'px-2 py-1.5 rounded-l-lg flex items-center gap-1.5 text-sm',
+              'bg-dark-700 border border-gold-rich/20',
+              'text-text-secondary hover:bg-gold-rich/10 hover:text-gold-rich',
+              'transition-all duration-200',
+              ttsPickerOpen && 'bg-gold-rich/10 border-gold-rich/40 text-gold-rich'
+            )}
+            onClick={() => setTtsPickerOpen(!ttsPickerOpen)}
+            title={`TTS Mode: ${ttsMode === 'local' ? 'Local (Offline)' : 'Cloud'} - Click to manage`}
+          >
+            {ttsMode === 'local' ? (
+              <LuHardDrive className="w-3.5 h-3.5" />
+            ) : (
+              <LuCloud className="w-3.5 h-3.5" />
+            )}
+            <span className="text-xs">▾</span>
+          </button>
+          
+          {/* TTS Mode Picker Dropdown */}
+          {ttsPickerOpen && (
+            <div className="absolute right-0 top-full mt-1 w-72 rounded-xl bg-dark-800 border border-gold-rich/20 shadow-2xl py-2 z-50">
+              {/* Header */}
+              <div className="px-4 py-2 border-b border-gold-rich/10">
+                <div className="flex items-center gap-2 text-sm font-semibold text-text-primary">
+                  <LuVolume2 className="w-4 h-4 text-gold-rich" />
+                  Text-to-Speech Settings
+                </div>
+              </div>
+              
+              {/* Mode Selection */}
+              <div className="px-4 py-3 border-b border-gold-rich/10">
+                <div className="text-xs text-text-muted mb-2">TTS Mode</div>
+                <div className="flex gap-2">
+                  <button
+                    className={clsx(
+                      'flex-1 px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm',
+                      'border transition-all duration-200',
+                      ttsMode === 'cloud'
+                        ? 'bg-gold-rich/20 border-gold-rich/40 text-gold-rich'
+                        : 'bg-dark-700 border-gold-rich/10 text-text-secondary hover:bg-gold-rich/10'
+                    )}
+                    onClick={() => handleTtsModeSwitch('cloud')}
+                    disabled={!ttsAvailability?.cloud}
+                    title={ttsAvailability?.cloud ? 'Use cloud TTS (requires internet)' : 'Cloud TTS not available'}
+                  >
+                    <LuCloud className="w-4 h-4" />
+                    <span>Cloud</span>
+                    {ttsMode === 'cloud' && <LuCheck className="w-3.5 h-3.5 text-green-400" />}
+                  </button>
+                  <button
+                    className={clsx(
+                      'flex-1 px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm',
+                      'border transition-all duration-200',
+                      ttsMode === 'local'
+                        ? 'bg-gold-rich/20 border-gold-rich/40 text-gold-rich'
+                        : 'bg-dark-700 border-gold-rich/10 text-text-secondary hover:bg-gold-rich/10'
+                    )}
+                    onClick={() => handleTtsModeSwitch('local')}
+                    title="Use local TTS (works offline)"
+                  >
+                    <LuHardDrive className="w-4 h-4" />
+                    <span>Local</span>
+                    {ttsMode === 'local' && <LuCheck className="w-3.5 h-3.5 text-green-400" />}
+                  </button>
+                </div>
+                <p className="text-xs text-text-muted mt-2">
+                  {ttsMode === 'cloud' 
+                    ? 'Cloud: High quality, requires internet' 
+                    : 'Local: Works offline, requires voice download'}
+                </p>
+                
+                {/* Show warning if local TTS engine is not available */}
+                {ttsMode === 'local' && !ttsAvailability?.local && (
+                  <div className="mt-2 p-2 rounded-lg bg-amber-500/10 border border-amber-500/30">
+                    <p className="text-xs text-amber-400">
+                      Local TTS engine (Piper) is not installed. Voice downloads will still work, but playback requires the piper-tts package.
+                    </p>
+                  </div>
+                )}
+              </div>
+              
+              {/* Local Voices Section (show when local mode OR when user wants to download) */}
+              {(ttsMode === 'local' || localVoices.length > 0) && ttsMode === 'local' && (
+                <div className="py-2">
+                  <div className="px-4 py-1.5 text-xs font-medium text-text-muted flex items-center justify-between">
+                    <span>Local Voices</span>
+                    {isDownloadingVoice && (
+                      <span className="flex items-center gap-1 text-gold-rich">
+                        <CgSpinner className="w-3 h-3 animate-spin" />
+                        {voiceDownloadProgress}%
+                      </span>
+                    )}
+                  </div>
+                  
+                  {localVoices.length === 0 ? (
+                    <div className="px-4 py-3 text-center text-text-muted text-sm">
+                      Loading voices...
+                    </div>
+                  ) : (
+                    <div className="max-h-48 overflow-y-auto">
+                      {localVoices.map((voice) => (
+                        <div
+                          key={voice.id}
+                          className="px-4 py-2 flex items-center justify-between hover:bg-gold-rich/5"
+                        >
+                          <div className="flex items-center gap-2 min-w-0">
+                            <LuVolume2 className={clsx(
+                              'w-4 h-4 shrink-0',
+                              voice.downloaded ? 'text-green-400' : 'text-text-muted'
+                            )} />
+                            <div className="min-w-0">
+                              <div className={clsx(
+                                'text-sm truncate',
+                                voice.downloaded ? 'text-text-primary' : 'text-text-secondary'
+                              )}>
+                                {voice.name}
+                              </div>
+                              <div className="text-xs text-text-muted">
+                                {voice.size_mb} MB
+                              </div>
+                            </div>
+                          </div>
+                          
+                          <div className="flex items-center gap-1 shrink-0">
+                            {voice.downloaded ? (
+                              <>
+                                <LuCheck className="w-4 h-4 text-green-400" />
+                                <button
+                                  className="p-1 text-text-muted hover:text-red-400 transition-colors"
+                                  onClick={() => handleDeleteVoice(voice.name)}
+                                  title="Delete voice"
+                                >
+                                  <LuTrash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </>
+                            ) : (
+                              <button
+                                className={clsx(
+                                  'px-2 py-1 text-xs rounded',
+                                  'bg-gold-rich/20 text-gold-rich hover:bg-gold-rich/30',
+                                  'transition-colors',
+                                  isDownloadingVoice && 'opacity-50 cursor-not-allowed'
+                                )}
+                                onClick={() => handleDownloadVoice(voice.name)}
+                                disabled={isDownloadingVoice}
+                              >
+                                Download
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+          
           {/* Voice Selector */}
-          {ttsVoices.length > 0 && (
+          {currentModeVoices.length > 0 && (
             <select
-              className="px-2 py-1.5 rounded-l-lg bg-dark-700 text-text-secondary text-sm border border-gold-rich/20 focus:outline-none focus:ring-1 focus:ring-gold-rich cursor-pointer max-w-[100px]"
+              className="px-2 py-1.5 bg-dark-700 text-text-secondary text-sm border border-gold-rich/20 focus:outline-none focus:ring-1 focus:ring-gold-rich cursor-pointer max-w-[100px]"
               value={selectedVoice}
               onChange={(e) => setSelectedVoice(e.target.value)}
               title="Select Voice"
             >
-              {ttsVoices.map(voice => (
+              {currentModeVoices.map(voice => (
                 <option key={voice} value={voice}>{voice}</option>
               ))}
             </select>

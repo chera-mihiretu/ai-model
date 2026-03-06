@@ -285,6 +285,15 @@ contextBridge.exposeInMainWorld('api', {
   ttsGetDownloadProgress: () => ipcRenderer.invoke('python-call', 'tts_get_download_progress'),
   ttsIsPlaying: () => ipcRenderer.invoke('python-call', 'tts_is_playing'),
 
+  // TTS Mode Methods (Cloud/Local toggle)
+  ttsGetMode: () => ipcRenderer.invoke('python-call', 'tts_get_mode'),
+  ttsSetMode: (mode) => ipcRenderer.invoke('python-call', 'tts_set_mode', { mode }),
+  ttsGetAvailability: () => ipcRenderer.invoke('python-call', 'tts_get_availability'),
+  ttsListLocalVoices: () => ipcRenderer.invoke('python-call', 'tts_list_local_voices'),
+  ttsDownloadLocalVoice: (voiceName) => ipcRenderer.invoke('python-call', 'tts_download_local_voice', { voice_name: voiceName }),
+  ttsGetLocalDownloadProgress: () => ipcRenderer.invoke('python-call', 'tts_get_local_download_progress'),
+  ttsDeleteLocalVoice: (voiceName) => ipcRenderer.invoke('python-call', 'tts_delete_local_voice', { voice_name: voiceName }),
+
   // ==================== EVENT LISTENERS ====================
 
   onAiToken: (callback) => {

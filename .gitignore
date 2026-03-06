@@ -86,3 +86,18 @@ Thumbs.db
 
 # Data files for voices
 data/voices/paragraphs/*.pth
+
+# Build artifacts (clean these before building)
+story-bible-electron/backend/build/
+story-bible-electron/backend/dist/
+story-bible-electron/backend/dist-win/
+
+# Old/unused spec files
+Angelesis.spec
+SudoWriteDesktop.spec
+deployment.spec
+
+# Miscellaneous
+*.pdf
+beat_methods_patch.txt
+convert_icon.py

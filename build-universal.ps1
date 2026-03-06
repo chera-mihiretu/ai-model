@@ -119,6 +119,30 @@ if ($errors.Count -gt 0) {
 }
 
 # ----------------------------------------------------------------------------
+# Step 1.5: Clean up old/unused folders (reduces build size significantly)
+# ----------------------------------------------------------------------------
+Write-Step "1.5" "Cleaning Unused Folders"
+
+# Remove old deskapp venv if it exists (can be 8GB+)
+if (Test-Path "deskapp") {
+    Write-Host "Removing old 'deskapp' folder (old virtual environment)..." -ForegroundColor Yellow
+    Remove-Item -Recurse -Force "deskapp" -ErrorAction SilentlyContinue
+    Write-Success "Removed deskapp folder"
+}
+
+# Remove old build artifacts
+$oldArtifacts = @(
+    "story-bible-electron\backend\build",
+    "story-bible-electron\backend\dist"
+)
+foreach ($artifact in $oldArtifacts) {
+    if (Test-Path $artifact) {
+        Write-Host "  Removing $artifact..." -ForegroundColor Gray
+        Remove-Item -Recurse -Force $artifact -ErrorAction SilentlyContinue
+    }
+}
+
+# ----------------------------------------------------------------------------
 # Step 2: Check/Create Virtual Environment
 # ----------------------------------------------------------------------------
 Write-Step "2" "Checking Virtual Environment"

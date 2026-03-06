@@ -24,7 +24,18 @@ else:
 
 from src.database.db_manager import DatabaseManager
 from src.services.ai_engine import AIEngine
-from src.services.tts_engine import get_engine as get_tts_engine
+from src.services.tts_engine import (
+    get_engine as get_tts_engine,
+    get_tts_mode,
+    set_tts_mode,
+    get_tts_availability,
+    list_local_voices,
+    download_local_voice,
+    delete_local_voice,
+    get_piper_download_progress,
+    get_cloud_engine,
+    get_local_engine,
+)
 from src.config.manager import ConfigManager
 from src.domain.usecases.import_parser import ImportParser
 
@@ -629,6 +640,45 @@ class APIBridge:
         
         elif method == 'tts_is_playing':
             return {'is_playing': self.tts.is_playing}
+        
+        # ==================== TTS MODE METHODS ====================
+        elif method == 'tts_get_mode':
+            return {'mode': get_tts_mode()}
+        
+        elif method == 'tts_set_mode':
+            mode = params.get('mode', 'cloud')
+            result = set_tts_mode(mode)
+            # Update self.tts to use the new engine
+            self.tts = get_tts_engine()
+            return result
+        
+        elif method == 'tts_get_availability':
+            return get_tts_availability()
+        
+        elif method == 'tts_list_local_voices':
+            return {'voices': list_local_voices()}
+        
+        elif method == 'tts_download_local_voice':
+            voice_name = params.get('voice_name')
+            if not voice_name:
+                return {'success': False, 'error': 'No voice name provided'}
+            
+            # Reset progress
+            def progress_callback(progress):
+                pass  # Progress tracked internally by get_piper_download_progress
+            
+            success = download_local_voice(voice_name, progress_callback)
+            return {'success': success}
+        
+        elif method == 'tts_get_local_download_progress':
+            return {'progress': get_piper_download_progress()}
+        
+        elif method == 'tts_delete_local_voice':
+            voice_name = params.get('voice_name')
+            if not voice_name:
+                return {'success': False, 'error': 'No voice name provided'}
+            success = delete_local_voice(voice_name)
+            return {'success': success}
         
         # ==================== CONFIG METHODS ====================
         elif method == 'get_ai_config':

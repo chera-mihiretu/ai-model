@@ -170,11 +170,28 @@ export const useStore = create((set, get) => ({
   selectedVoice: 'Jenny (US Female)',
   isTtsPlaying: false,
   
+  // TTS Mode: 'cloud' (Edge TTS, requires internet) or 'local' (Piper, offline)
+  ttsMode: 'cloud',
+  ttsAvailability: { cloud: true, local: false },
+  localVoices: [], // List of all local voices with download status
+  isDownloadingVoice: false,
+  voiceDownloadProgress: 0,
+  
   setTtsVoices: (voices) => set({ ttsVoices: voices }),
   
   setSelectedVoice: (voice) => set({ selectedVoice: voice }),
   
   setTtsPlaying: (isPlaying) => set({ isTtsPlaying: isPlaying }),
+  
+  setTtsMode: (mode) => set({ ttsMode: mode }),
+  
+  setTtsAvailability: (availability) => set({ ttsAvailability: availability }),
+  
+  setLocalVoices: (voices) => set({ localVoices: voices }),
+  
+  setIsDownloadingVoice: (isDownloading) => set({ isDownloadingVoice: isDownloading }),
+  
+  setVoiceDownloadProgress: (progress) => set({ voiceDownloadProgress: progress }),
   
   // ==================== UI STATE ====================
   currentView: 'dashboard', // 'dashboard' | 'editor' | 'characters' | 'storyBible'

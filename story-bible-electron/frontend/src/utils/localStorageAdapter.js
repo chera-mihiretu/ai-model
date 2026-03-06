@@ -1356,6 +1356,49 @@ export function saveFileDialog() {
   return { canceled: true }
 }
 
+// ==================== TTS MODE METHODS (Browser fallbacks) ====================
+
+export function ttsGetMode() {
+  // Browser mode always uses cloud (browser speech synthesis)
+  return { mode: 'cloud' }
+}
+
+export function ttsSetMode(mode) {
+  // Local TTS not available in browser mode
+  if (mode === 'local') {
+    return { success: false, error: 'Local TTS only available in desktop app' }
+  }
+  return { success: true, mode: 'cloud' }
+}
+
+export function ttsGetAvailability() {
+  // Only browser speech synthesis available
+  return { 
+    cloud: 'speechSynthesis' in window,
+    local: false,
+    edge_tts: false,
+    piper_tts: false,
+    pygame: false
+  }
+}
+
+export function ttsListLocalVoices() {
+  // No local voices in browser mode
+  return { voices: [] }
+}
+
+export function ttsDownloadLocalVoice() {
+  return { success: false, error: 'Local TTS only available in desktop app' }
+}
+
+export function ttsGetLocalDownloadProgress() {
+  return { progress: 0 }
+}
+
+export function ttsDeleteLocalVoice() {
+  return { success: false, error: 'Local TTS only available in desktop app' }
+}
+
 // ==================== EXPORT ALL AS API OBJECT ====================
 
 const localStorageAdapter = {
@@ -1417,6 +1460,15 @@ const localStorageAdapter = {
   ttsGenerateMp3,
   ttsGetDownloadProgress,
   saveFileDialog,
+  
+  // TTS Mode (browser fallback)
+  ttsGetMode,
+  ttsSetMode,
+  ttsGetAvailability,
+  ttsListLocalVoices,
+  ttsDownloadLocalVoice,
+  ttsGetLocalDownloadProgress,
+  ttsDeleteLocalVoice,
   
   // World Elements
   getWorldElements,

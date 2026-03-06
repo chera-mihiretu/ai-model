@@ -1298,6 +1298,145 @@ export function usePythonBridge() {
     }
   }, [])
 
+  // ==================== TTS MODE METHODS (Cloud/Local) ====================
+
+  const getTtsMode = useCallback(async () => {
+    try {
+      if (isElectronApi) {
+        const result = await api.ttsGetMode()
+        return result?.mode || 'cloud'
+      }
+      // Browser fallback - always cloud
+      return 'cloud'
+    } catch (error) {
+      console.error('Failed to get TTS mode:', error)
+      return 'cloud'
+    }
+  }, [isElectronApi, api])
+
+  const setTtsMode = useCallback(async (mode) => {
+    try {
+      if (isElectronApi) {
+        const result = await api.ttsSetMode(mode)
+        if (result?.success) {
+          addNotification({ 
+            type: 'success', 
+            message: `Switched to ${mode === 'local' ? 'Local (Offline)' : 'Cloud'} TTS` 
+          })
+        } else if (result?.error) {
+          addNotification({ type: 'error', message: result.error })
+        }
+        if (result?.warning) {
+          addNotification({ type: 'warning', message: result.warning })
+        }
+        return result
+      }
+      // Browser fallback - only cloud supported
+      addNotification({ type: 'warning', message: 'Local TTS only available in desktop app' })
+      return { success: false, error: 'Local TTS requires desktop app' }
+    } catch (error) {
+      console.error('Failed to set TTS mode:', error)
+      addNotification({ type: 'error', message: `Failed to switch TTS mode: ${error.message}` })
+      return { success: false, error: error.message }
+    }
+  }, [isElectronApi, api, addNotification])
+
+  const getTtsAvailability = useCallback(async () => {
+    try {
+      if (isElectronApi) {
+        const result = await api.ttsGetAvailability()
+        return result || { cloud: true, local: false }
+      }
+      // Browser fallback
+      return { cloud: true, local: false }
+    } catch (error) {
+      console.error('Failed to get TTS availability:', error)
+      return { cloud: true, local: false }
+    }
+  }, [isElectronApi, api])
+
+  const getLocalVoices = useCallback(async () => {
+    try {
+      if (isElectronApi) {
+        const result = await api.ttsListLocalVoices()
+        return result?.voices || []
+      }
+      return []
+    } catch (error) {
+      console.error('Failed to get local voices:', error)
+      return []
+    }
+  }, [isElectronApi, api])
+
+  const downloadLocalVoice = useCallback(async (voiceName, onProgress) => {
+    if (!isElectronApi) {
+      addNotification({ type: 'warning', message: 'Local TTS requires desktop app' })
+      return false
+    }
+
+    let progressInterval = null
+
+    try {
+      addNotification({ type: 'info', message: `Downloading voice: ${voiceName}...` })
+
+      // Start progress polling
+      if (onProgress) {
+        onProgress(0)
+        progressInterval = setInterval(async () => {
+          try {
+            const progressData = await api.ttsGetLocalDownloadProgress()
+            if (progressData && progressData.progress !== undefined) {
+              onProgress(progressData.progress)
+            }
+          } catch (err) {
+            // Silently ignore
+          }
+        }, 500)
+      }
+
+      const result = await api.ttsDownloadLocalVoice(voiceName)
+
+      if (progressInterval) {
+        clearInterval(progressInterval)
+        if (onProgress) onProgress(100)
+      }
+
+      if (result?.success) {
+        addNotification({ type: 'success', message: `Voice "${voiceName}" downloaded successfully!` })
+        return true
+      } else {
+        addNotification({ type: 'error', message: `Failed to download voice: ${result?.error || 'Unknown error'}` })
+        return false
+      }
+    } catch (error) {
+      console.error('Failed to download local voice:', error)
+      addNotification({ type: 'error', message: `Download failed: ${error.message}` })
+      return false
+    } finally {
+      if (progressInterval) {
+        clearInterval(progressInterval)
+      }
+    }
+  }, [isElectronApi, api, addNotification])
+
+  const deleteLocalVoice = useCallback(async (voiceName) => {
+    if (!isElectronApi) {
+      return false
+    }
+
+    try {
+      const result = await api.ttsDeleteLocalVoice(voiceName)
+      if (result?.success) {
+        addNotification({ type: 'success', message: `Voice "${voiceName}" deleted` })
+        return true
+      }
+      return false
+    } catch (error) {
+      console.error('Failed to delete local voice:', error)
+      return false
+    }
+  }, [isElectronApi, api, addNotification])
+
   // ==================== APP STATE METHODS ====================
   
   const saveAppState = useCallback(async (key, value) => {
@@ -1392,6 +1531,14 @@ export function usePythonBridge() {
     ttsStop,
     ttsIsPlaying,
     ttsDownload,
+
+    // TTS Mode (Cloud/Local)
+    getTtsMode,
+    setTtsMode,
+    getTtsAvailability,
+    getLocalVoices,
+    downloadLocalVoice,
+    deleteLocalVoice,
 
     // World Elements
     getWorldElements,

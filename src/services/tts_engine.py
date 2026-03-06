@@ -1,24 +1,29 @@
 """
-Optimized TTS Engine with Realistic Neural Voices
-==================================================
-Uses Microsoft Edge TTS for natural, human-like speech.
-Fast streaming, multiple voices, no model download needed.
+TTS Engine with Cloud and Local Options
+========================================
+Supports two modes:
+- Cloud: Microsoft Edge TTS (requires internet, high quality neural voices)
+- Local: Piper TTS (offline, good quality neural voices)
 """
 
 import os
+import sys
 import time
 import logging
 import threading
 import asyncio
 import tempfile
-from typing import List, Optional
+import wave
+import io
+from typing import List, Optional, Dict, Any, Callable
 from pathlib import Path
 
 # ============================================================
-# EDGE TTS ENGINE - Realistic Neural Voices (Default)
+# AVAILABILITY FLAGS
 # ============================================================
 
 EDGE_TTS_AVAILABLE = False
+PIPER_TTS_AVAILABLE = False
 PYGAME_AVAILABLE = False
 
 try:
@@ -27,6 +32,13 @@ try:
 except ImportError:
     logging.warning("edge-tts not available - install with: pip install edge-tts")
     edge_tts = None
+
+try:
+    from piper import PiperVoice
+    PIPER_TTS_AVAILABLE = True
+except ImportError:
+    logging.warning("piper-tts not available - install with: pip install piper-tts")
+    PiperVoice = None
 
 try:
     import pygame
@@ -359,6 +371,603 @@ class DummyTTSEngine:
 
 
 # ============================================================
+# PIPER TTS ENGINE - Local/Offline Neural Voices
+# ============================================================
+
+def get_piper_models_dir() -> Path:
+    """Get the directory for storing Piper voice models."""
+    if sys.platform == 'win32':
+        base = Path(os.environ.get('APPDATA', os.path.expanduser('~')))
+        return base / 'Exelsias' / 'models' / 'piper'
+    elif sys.platform == 'darwin':
+        return Path.home() / 'Library' / 'Application Support' / 'Exelsias' / 'models' / 'piper'
+    else:
+        return Path.home() / '.config' / 'exelsias' / 'models' / 'piper'
+
+
+# Piper voice models available for download (English voices)
+PIPER_VOICE_MODELS = {
+    "Amy (US Female)": {
+        "id": "en_US-amy-medium",
+        "model_url": "https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/amy/medium/en_US-amy-medium.onnx",
+        "config_url": "https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/amy/medium/en_US-amy-medium.onnx.json",
+        "size_mb": 63
+    },
+    "Ryan (US Male)": {
+        "id": "en_US-ryan-medium",
+        "model_url": "https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/ryan/medium/en_US-ryan-medium.onnx",
+        "config_url": "https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/ryan/medium/en_US-ryan-medium.onnx.json",
+        "size_mb": 63
+    },
+    "Lessac (US Female)": {
+        "id": "en_US-lessac-medium",
+        "model_url": "https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/lessac/medium/en_US-lessac-medium.onnx",
+        "config_url": "https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/lessac/medium/en_US-lessac-medium.onnx.json",
+        "size_mb": 63
+    },
+    "Libritts (US Neutral)": {
+        "id": "en_US-libritts-high",
+        "model_url": "https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/libritts/high/en_US-libritts-high.onnx",
+        "config_url": "https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/libritts/high/en_US-libritts-high.onnx.json",
+        "size_mb": 75
+    },
+    "Jenny (UK Female)": {
+        "id": "en_GB-jenny_dioco-medium",
+        "model_url": "https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_GB/jenny_dioco/medium/en_GB-jenny_dioco-medium.onnx",
+        "config_url": "https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_GB/jenny_dioco/medium/en_GB-jenny_dioco-medium.onnx.json",
+        "size_mb": 63
+    },
+    "Alan (UK Male)": {
+        "id": "en_GB-alan-medium",
+        "model_url": "https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_GB/alan/medium/en_GB-alan-medium.onnx",
+        "config_url": "https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_GB/alan/medium/en_GB-alan-medium.onnx.json",
+        "size_mb": 63
+    },
+}
+
+# Global download progress tracker
+_piper_download_progress = 0
+
+
+class PiperTTSEngine:
+    """
+    Local/Offline TTS using Piper neural voices.
+    
+    Features:
+    - Good quality neural voices
+    - Works completely offline (after model download)
+    - Multiple voice options
+    - No internet required after setup
+    """
+    
+    DEFAULT_VOICE = "Amy (US Female)"
+    
+    def __init__(self, model_dir: str = None):
+        self.model_dir = Path(model_dir) if model_dir else get_piper_models_dir()
+        self.model_dir.mkdir(parents=True, exist_ok=True)
+        
+        self.is_loaded = PIPER_TTS_AVAILABLE and PYGAME_AVAILABLE
+        self.is_playing = False
+        self.stop_flag = False
+        self.current_voice = self.DEFAULT_VOICE
+        self.current_piper_voice = None
+        self._playback_thread = None
+        self._temp_files = []
+        
+        # #region agent log H5
+        try:
+            with open("/home/chera/Public/my_stuffs/work/fiverr/ricardoo/.cursor/debug-e223a1.log", "a") as f:
+                import json as _json
+                f.write(_json.dumps({"sessionId": "e223a1", "hypothesisId": "H5", "location": "tts_engine.py:PiperTTSEngine.__init__", "timestamp": int(time.time() * 1000), "message": "piper_engine_init", "data": {"model_dir": str(self.model_dir), "PIPER_TTS_AVAILABLE": PIPER_TTS_AVAILABLE, "PYGAME_AVAILABLE": PYGAME_AVAILABLE, "is_loaded": self.is_loaded}}) + "\n")
+        except: pass
+        # #endregion
+        
+        if self.is_loaded:
+            logging.info(f"Piper TTS Engine initialized - Models dir: {self.model_dir}")
+            # Try to load a default voice if available
+            self._try_load_default_voice()
+        else:
+            if not PIPER_TTS_AVAILABLE:
+                logging.warning("piper-tts not available")
+            if not PYGAME_AVAILABLE:
+                logging.warning("pygame not available")
+    
+    def _try_load_default_voice(self):
+        """Try to load a default voice if one is downloaded."""
+        downloaded = self.list_downloaded_voices()
+        if downloaded:
+            try:
+                self._load_voice(downloaded[0])
+                self.current_voice = downloaded[0]
+                logging.info(f"Loaded default Piper voice: {downloaded[0]}")
+            except Exception as e:
+                logging.warning(f"Could not load default voice: {e}")
+    
+    def _get_voice_paths(self, voice_name: str) -> tuple:
+        """Get model and config paths for a voice."""
+        if voice_name not in PIPER_VOICE_MODELS:
+            return None, None
+        
+        voice_info = PIPER_VOICE_MODELS[voice_name]
+        voice_id = voice_info["id"]
+        model_path = self.model_dir / f"{voice_id}.onnx"
+        config_path = self.model_dir / f"{voice_id}.onnx.json"
+        return model_path, config_path
+    
+    def _load_voice(self, voice_name: str):
+        """Load a Piper voice model."""
+        # #region agent log H2
+        _debug_log = {"sessionId": "e223a1", "hypothesisId": "H2", "location": "tts_engine.py:_load_voice", "timestamp": int(time.time() * 1000)}
+        try:
+            with open("/home/chera/Public/my_stuffs/work/fiverr/ricardoo/.cursor/debug-e223a1.log", "a") as f:
+                import json as _json
+                f.write(_json.dumps({**_debug_log, "message": "load_voice_start", "data": {"voice_name": voice_name, "PIPER_TTS_AVAILABLE": PIPER_TTS_AVAILABLE}}) + "\n")
+        except: pass
+        # #endregion
+        if not PIPER_TTS_AVAILABLE:
+            raise RuntimeError("Piper TTS not available")
+        
+        model_path, config_path = self._get_voice_paths(voice_name)
+        # #region agent log H1
+        try:
+            with open("/home/chera/Public/my_stuffs/work/fiverr/ricardoo/.cursor/debug-e223a1.log", "a") as f:
+                import json as _json
+                f.write(_json.dumps({**_debug_log, "hypothesisId": "H1", "message": "voice_paths", "data": {"model_path": str(model_path), "config_path": str(config_path), "model_exists": model_path.exists() if model_path else False, "config_exists": config_path.exists() if config_path else False}}) + "\n")
+        except: pass
+        # #endregion
+        if not model_path or not model_path.exists():
+            raise FileNotFoundError(f"Voice model not downloaded: {voice_name}")
+        
+        try:
+            self.current_piper_voice = PiperVoice.load(str(model_path), str(config_path))
+            # #region agent log H2
+            try:
+                with open("/home/chera/Public/my_stuffs/work/fiverr/ricardoo/.cursor/debug-e223a1.log", "a") as f:
+                    import json as _json
+                    f.write(_json.dumps({**_debug_log, "message": "voice_loaded_success", "data": {"voice_name": voice_name, "piper_voice_type": str(type(self.current_piper_voice))}}) + "\n")
+            except: pass
+            # #endregion
+        except Exception as e:
+            # #region agent log H2
+            try:
+                with open("/home/chera/Public/my_stuffs/work/fiverr/ricardoo/.cursor/debug-e223a1.log", "a") as f:
+                    import json as _json
+                    f.write(_json.dumps({**_debug_log, "message": "voice_load_error", "data": {"voice_name": voice_name, "error": str(e), "error_type": str(type(e).__name__)}}) + "\n")
+            except: pass
+            # #endregion
+            raise
+        self.current_voice = voice_name
+        logging.info(f"Loaded Piper voice: {voice_name}")
+    
+    def is_voice_downloaded(self, voice_name: str) -> bool:
+        """Check if a voice model is downloaded."""
+        model_path, config_path = self._get_voice_paths(voice_name)
+        if not model_path:
+            return False
+        return model_path.exists() and config_path.exists()
+    
+    def list_downloaded_voices(self) -> List[str]:
+        """List all downloaded voice models."""
+        downloaded = []
+        for voice_name in PIPER_VOICE_MODELS:
+            if self.is_voice_downloaded(voice_name):
+                downloaded.append(voice_name)
+        return downloaded
+    
+    def list_available_voices(self) -> List[str]:
+        """Returns list of downloaded voices (for compatibility with other engines)."""
+        return self.list_downloaded_voices()
+    
+    def list_all_voices(self) -> List[Dict[str, Any]]:
+        """List all available voices with download status."""
+        voices = []
+        for voice_name, info in PIPER_VOICE_MODELS.items():
+            voices.append({
+                "name": voice_name,
+                "id": info["id"],
+                "size_mb": info["size_mb"],
+                "downloaded": self.is_voice_downloaded(voice_name)
+            })
+        return voices
+    
+    def download_voice(self, voice_name: str, progress_callback: Callable[[int], None] = None) -> bool:
+        """Download a Piper voice model."""
+        global _piper_download_progress
+        
+        if voice_name not in PIPER_VOICE_MODELS:
+            logging.error(f"Unknown voice: {voice_name}")
+            return False
+        
+        voice_info = PIPER_VOICE_MODELS[voice_name]
+        model_path, config_path = self._get_voice_paths(voice_name)
+        
+        try:
+            import requests
+            
+            _piper_download_progress = 0
+            
+            # Download model file
+            logging.info(f"Downloading Piper voice: {voice_name}")
+            
+            response = requests.get(voice_info["model_url"], stream=True)
+            response.raise_for_status()
+            
+            total_size = int(response.headers.get('content-length', 0))
+            downloaded = 0
+            
+            with open(model_path, 'wb') as f:
+                for chunk in response.iter_content(chunk_size=8192):
+                    if chunk:
+                        f.write(chunk)
+                        downloaded += len(chunk)
+                        if total_size > 0:
+                            progress = int((downloaded / total_size) * 90)
+                            _piper_download_progress = progress
+                            if progress_callback:
+                                progress_callback(progress)
+            
+            # Download config file
+            _piper_download_progress = 92
+            if progress_callback:
+                progress_callback(92)
+            
+            config_response = requests.get(voice_info["config_url"])
+            config_response.raise_for_status()
+            
+            with open(config_path, 'wb') as f:
+                f.write(config_response.content)
+            
+            _piper_download_progress = 100
+            if progress_callback:
+                progress_callback(100)
+            
+            logging.info(f"Downloaded Piper voice: {voice_name}")
+            return True
+            
+        except Exception as e:
+            logging.error(f"Failed to download voice {voice_name}: {e}")
+            # Clean up partial downloads
+            if model_path.exists():
+                model_path.unlink()
+            if config_path.exists():
+                config_path.unlink()
+            return False
+    
+    def delete_voice(self, voice_name: str) -> bool:
+        """Delete a downloaded voice model."""
+        model_path, config_path = self._get_voice_paths(voice_name)
+        if not model_path:
+            return False
+        
+        try:
+            if model_path.exists():
+                model_path.unlink()
+            if config_path.exists():
+                config_path.unlink()
+            logging.info(f"Deleted Piper voice: {voice_name}")
+            return True
+        except Exception as e:
+            logging.error(f"Failed to delete voice {voice_name}: {e}")
+            return False
+    
+    def set_voice(self, voice_name: str):
+        """Set the current voice."""
+        if voice_name in PIPER_VOICE_MODELS and self.is_voice_downloaded(voice_name):
+            if voice_name != self.current_voice or self.current_piper_voice is None:
+                try:
+                    self._load_voice(voice_name)
+                except Exception as e:
+                    logging.error(f"Failed to load voice {voice_name}: {e}")
+    
+    def tts_read_text(self, text: str, voice: str = None, character_name: Optional[str] = None):
+        """Speak text using Piper TTS."""
+        # #region agent log H4,H5
+        _debug_log = {"sessionId": "e223a1", "hypothesisId": "H4", "location": "tts_engine.py:tts_read_text", "timestamp": int(time.time() * 1000)}
+        try:
+            with open("/home/chera/Public/my_stuffs/work/fiverr/ricardoo/.cursor/debug-e223a1.log", "a") as f:
+                import json as _json
+                f.write(_json.dumps({**_debug_log, "message": "tts_read_text_start", "data": {"is_loaded": self.is_loaded, "voice": voice, "text_len": len(text) if text else 0, "PIPER_TTS_AVAILABLE": PIPER_TTS_AVAILABLE, "PYGAME_AVAILABLE": PYGAME_AVAILABLE}}) + "\n")
+        except: pass
+        # #endregion
+        if not self.is_loaded:
+            logging.warning("Piper TTS not available")
+            # #region agent log H5
+            try:
+                with open("/home/chera/Public/my_stuffs/work/fiverr/ricardoo/.cursor/debug-e223a1.log", "a") as f:
+                    import json as _json
+                    f.write(_json.dumps({**_debug_log, "hypothesisId": "H5", "message": "tts_not_loaded_exit", "data": {"is_loaded": self.is_loaded}}) + "\n")
+            except: pass
+            # #endregion
+            return
+        
+        if not text or not text.strip():
+            return
+        
+        # Stop any current playback
+        self.stop()
+        
+        self.stop_flag = False
+        self.is_playing = True
+        
+        # Set voice if specified
+        if voice:
+            self.set_voice(voice)
+        
+        # #region agent log H4
+        try:
+            with open("/home/chera/Public/my_stuffs/work/fiverr/ricardoo/.cursor/debug-e223a1.log", "a") as f:
+                import json as _json
+                f.write(_json.dumps({**_debug_log, "message": "after_set_voice", "data": {"current_voice": self.current_voice, "current_piper_voice_is_none": self.current_piper_voice is None}}) + "\n")
+        except: pass
+        # #endregion
+        
+        if not self.current_piper_voice:
+            downloaded = self.list_downloaded_voices()
+            # #region agent log H4
+            try:
+                with open("/home/chera/Public/my_stuffs/work/fiverr/ricardoo/.cursor/debug-e223a1.log", "a") as f:
+                    import json as _json
+                    f.write(_json.dumps({**_debug_log, "message": "no_voice_trying_download", "data": {"downloaded_voices": downloaded}}) + "\n")
+            except: pass
+            # #endregion
+            if downloaded:
+                self.set_voice(downloaded[0])
+            else:
+                logging.error("No Piper voice downloaded. Please download a voice first.")
+                self.is_playing = False
+                return
+        
+        # #region agent log H4
+        try:
+            with open("/home/chera/Public/my_stuffs/work/fiverr/ricardoo/.cursor/debug-e223a1.log", "a") as f:
+                import json as _json
+                f.write(_json.dumps({**_debug_log, "message": "starting_playback_thread", "data": {"current_voice": self.current_voice, "has_piper_voice": self.current_piper_voice is not None}}) + "\n")
+        except: pass
+        # #endregion
+        
+        # Run in background thread
+        self._playback_thread = threading.Thread(
+            target=self._speak_threaded,
+            args=(text,),
+            daemon=True
+        )
+        self._playback_thread.start()
+    
+    def _speak_threaded(self, text: str):
+        """Generate and play speech in a thread."""
+        # #region agent log H3
+        _debug_log = {"sessionId": "e223a1", "hypothesisId": "H3", "location": "tts_engine.py:_speak_threaded", "timestamp": int(time.time() * 1000)}
+        try:
+            with open("/home/chera/Public/my_stuffs/work/fiverr/ricardoo/.cursor/debug-e223a1.log", "a") as f:
+                import json as _json
+                f.write(_json.dumps({**_debug_log, "message": "speak_threaded_start", "data": {"text_len": len(text), "has_piper_voice": self.current_piper_voice is not None}}) + "\n")
+        except: pass
+        # #endregion
+        try:
+            # Split text into manageable chunks
+            chunks = self._split_text(text)
+            # #region agent log H3
+            try:
+                with open("/home/chera/Public/my_stuffs/work/fiverr/ricardoo/.cursor/debug-e223a1.log", "a") as f:
+                    import json as _json
+                    f.write(_json.dumps({**_debug_log, "message": "chunks_created", "data": {"num_chunks": len(chunks)}}) + "\n")
+            except: pass
+            # #endregion
+            
+            for i, chunk in enumerate(chunks):
+                if self.stop_flag:
+                    break
+                
+                if not chunk.strip():
+                    continue
+                
+                # Generate audio to temp file
+                temp_file = tempfile.NamedTemporaryFile(suffix='.wav', delete=False)
+                self._temp_files.append(temp_file.name)
+                temp_file.close()
+                
+                # Synthesize with Piper
+                # #region agent log H3
+                try:
+                    with open("/home/chera/Public/my_stuffs/work/fiverr/ricardoo/.cursor/debug-e223a1.log", "a") as f:
+                        import json as _json
+                        f.write(_json.dumps({**_debug_log, "message": "synthesizing_chunk", "data": {"chunk_index": i, "chunk_len": len(chunk), "temp_file": temp_file.name}}) + "\n")
+                except: pass
+                # #endregion
+                try:
+                    with wave.open(temp_file.name, 'wb') as wav_file:
+                        self.current_piper_voice.synthesize(chunk, wav_file)
+                    # #region agent log H3
+                    try:
+                        import os as _os
+                        with open("/home/chera/Public/my_stuffs/work/fiverr/ricardoo/.cursor/debug-e223a1.log", "a") as f:
+                            import json as _json
+                            f.write(_json.dumps({**_debug_log, "message": "synthesize_success", "data": {"chunk_index": i, "wav_file_size": _os.path.getsize(temp_file.name) if _os.path.exists(temp_file.name) else 0}}) + "\n")
+                    except: pass
+                    # #endregion
+                except Exception as synth_err:
+                    # #region agent log H3
+                    try:
+                        with open("/home/chera/Public/my_stuffs/work/fiverr/ricardoo/.cursor/debug-e223a1.log", "a") as f:
+                            import json as _json
+                            f.write(_json.dumps({**_debug_log, "message": "synthesize_error", "data": {"chunk_index": i, "error": str(synth_err), "error_type": type(synth_err).__name__}}) + "\n")
+                    except: pass
+                    # #endregion
+                    raise
+                
+                if self.stop_flag:
+                    break
+                
+                # Play the audio
+                self._play_audio_file(temp_file.name)
+                
+        except Exception as e:
+            logging.error(f"Piper TTS error: {e}")
+            # #region agent log H3
+            try:
+                with open("/home/chera/Public/my_stuffs/work/fiverr/ricardoo/.cursor/debug-e223a1.log", "a") as f:
+                    import json as _json
+                    f.write(_json.dumps({**_debug_log, "message": "speak_threaded_error", "data": {"error": str(e), "error_type": type(e).__name__}}) + "\n")
+            except: pass
+            # #endregion
+        finally:
+            self.is_playing = False
+            self._cleanup_temp_files()
+    
+    def _play_audio_file(self, file_path: str):
+        """Play an audio file using pygame."""
+        # #region agent log H3
+        _debug_log = {"sessionId": "e223a1", "hypothesisId": "H3", "location": "tts_engine.py:_play_audio_file", "timestamp": int(time.time() * 1000)}
+        try:
+            import os as _os
+            with open("/home/chera/Public/my_stuffs/work/fiverr/ricardoo/.cursor/debug-e223a1.log", "a") as f:
+                import json as _json
+                f.write(_json.dumps({**_debug_log, "message": "play_audio_start", "data": {"file_path": file_path, "file_exists": _os.path.exists(file_path), "pygame_available": pygame is not None}}) + "\n")
+        except: pass
+        # #endregion
+        if not pygame or self.stop_flag:
+            return
+        
+        try:
+            pygame.mixer.music.load(file_path)
+            pygame.mixer.music.play()
+            # #region agent log H3
+            try:
+                with open("/home/chera/Public/my_stuffs/work/fiverr/ricardoo/.cursor/debug-e223a1.log", "a") as f:
+                    import json as _json
+                    f.write(_json.dumps({**_debug_log, "message": "play_started", "data": {"file_path": file_path}}) + "\n")
+            except: pass
+            # #endregion
+            
+            while pygame.mixer.music.get_busy():
+                if self.stop_flag:
+                    pygame.mixer.music.stop()
+                    break
+                time.sleep(0.1)
+            
+            # #region agent log H3
+            try:
+                with open("/home/chera/Public/my_stuffs/work/fiverr/ricardoo/.cursor/debug-e223a1.log", "a") as f:
+                    import json as _json
+                    f.write(_json.dumps({**_debug_log, "message": "play_finished", "data": {"file_path": file_path}}) + "\n")
+            except: pass
+            # #endregion
+                
+        except Exception as e:
+            logging.error(f"Playback error: {e}")
+            # #region agent log H3
+            try:
+                with open("/home/chera/Public/my_stuffs/work/fiverr/ricardoo/.cursor/debug-e223a1.log", "a") as f:
+                    import json as _json
+                    f.write(_json.dumps({**_debug_log, "message": "play_error", "data": {"file_path": file_path, "error": str(e), "error_type": type(e).__name__}}) + "\n")
+            except: pass
+            # #endregion
+    
+    def _split_text(self, text: str) -> List[str]:
+        """Split text into chunks for processing."""
+        import re
+        paragraphs = text.split('\n\n')
+        
+        result = []
+        for para in paragraphs:
+            para = para.strip()
+            if not para:
+                continue
+            
+            if len(para) > 500:
+                sentences = re.split(r'(?<=[.!?])\s+', para)
+                current = []
+                current_len = 0
+                
+                for sent in sentences:
+                    if current_len + len(sent) > 500:
+                        if current:
+                            result.append(' '.join(current))
+                        current = [sent]
+                        current_len = len(sent)
+                    else:
+                        current.append(sent)
+                        current_len += len(sent)
+                
+                if current:
+                    result.append(' '.join(current))
+            else:
+                result.append(para)
+        
+        return result
+    
+    def _cleanup_temp_files(self):
+        """Clean up temporary audio files."""
+        for f in self._temp_files:
+            try:
+                if os.path.exists(f):
+                    os.unlink(f)
+            except:
+                pass
+        self._temp_files = []
+    
+    def stop(self):
+        """Stop current playback."""
+        self.stop_flag = True
+        self.is_playing = False
+        
+        if pygame:
+            try:
+                pygame.mixer.music.stop()
+            except:
+                pass
+    
+    def tts_generate_mp3(self, text: str, voice: str, output_path: str, progress_callback=None) -> str:
+        """Generate audio file from text."""
+        if not self.is_loaded or not self.current_piper_voice:
+            return ""
+        
+        if voice:
+            self.set_voice(voice)
+        
+        if not self.current_piper_voice:
+            return ""
+        
+        try:
+            # Generate WAV first
+            wav_path = output_path.replace('.mp3', '.wav')
+            
+            if progress_callback:
+                progress_callback(10)
+            
+            with wave.open(wav_path, 'wb') as wav_file:
+                self.current_piper_voice.synthesize(text, wav_file)
+            
+            if progress_callback:
+                progress_callback(90)
+            
+            # For now, just return the WAV file (MP3 conversion would need additional library)
+            if progress_callback:
+                progress_callback(100)
+            
+            return wav_path
+            
+        except Exception as e:
+            logging.error(f"Failed to generate audio: {e}")
+            return ""
+    
+    def add_paragraph_voice(self, name: str, wav_path: str):
+        return False, "Voice cloning not supported"
+    
+    def delete_paragraph_voice(self, name: str):
+        return False
+    
+    def extract_speaker_embedding(self, wav_path: str):
+        return None
+
+
+def get_piper_download_progress() -> int:
+    """Get current Piper voice download progress."""
+    global _piper_download_progress
+    return _piper_download_progress
+
+
+# ============================================================
 # PYTTSX3 FALLBACK (Offline, robotic but works without internet)
 # ============================================================
 
@@ -460,44 +1069,260 @@ class OfflineTTSEngine:
 # SINGLETON ENGINE FACTORY
 # ============================================================
 
-_engine = None
-_engine_type = "neural"  # Default to neural voices
+_cloud_engine = None  # Edge TTS engine
+_local_engine = None  # Piper TTS engine
+_current_mode = "cloud"  # Default to cloud (Edge TTS)
 
-def set_engine_type(engine_type: str):
+
+def set_tts_mode(mode: str) -> dict:
     """
     Set which TTS engine to use:
-    - "neural": Edge TTS with realistic voices (default, needs internet)
-    - "offline": pyttsx3 system TTS (no internet, robotic voice)
+    - "cloud": Edge TTS with realistic voices (default, needs internet)
+    - "local": Piper TTS with neural voices (offline, requires model download)
+    
+    Returns status dict with success and any error message.
+    Allows switching to local even if Piper is not installed (for pre-downloading voices).
     """
-    global _engine, _engine_type
-    _engine_type = engine_type
-    _engine = None  # Force recreation
+    global _current_mode
+    
+    if mode not in ("cloud", "local"):
+        return {"success": False, "error": f"Invalid mode: {mode}. Use 'cloud' or 'local'."}
+    
+    warnings = []
+    
+    if mode == "local":
+        if not PIPER_TTS_AVAILABLE:
+            warnings.append("Piper TTS engine not installed. Voice playback won't work until piper-tts is installed, but you can still download voices.")
+        if not PYGAME_AVAILABLE:
+            warnings.append("pygame not available for audio playback")
+        
+        # Check if any voices are downloaded
+        downloaded_voices = [v for v in list_local_voices() if v.get("downloaded")]
+        if not downloaded_voices:
+            warnings.append("No local voices downloaded. Please download a voice to use local TTS.")
+    
+    elif mode == "cloud":
+        if not EDGE_TTS_AVAILABLE:
+            return {"success": False, "error": "Edge TTS not available. Install with: pip install edge-tts"}
+        if not PYGAME_AVAILABLE:
+            return {"success": False, "error": "pygame not available for audio playback"}
+    
+    _current_mode = mode
+    logging.info(f"TTS mode set to: {mode}")
+    
+    result = {"success": True, "mode": mode}
+    if warnings:
+        result["warning"] = " ".join(warnings)
+    return result
+
+
+def get_tts_mode() -> str:
+    """Get current TTS mode ('cloud' or 'local')."""
+    return _current_mode
+
+
+def get_cloud_engine():
+    """Get the cloud (Edge TTS) engine instance."""
+    global _cloud_engine
+    if _cloud_engine is None:
+        if EDGE_TTS_AVAILABLE and PYGAME_AVAILABLE:
+            _cloud_engine = EdgeTTSEngine()
+        else:
+            _cloud_engine = DummyTTSEngine()
+    return _cloud_engine
+
+
+def get_local_engine():
+    """Get the local (Piper TTS) engine instance."""
+    global _local_engine
+    if _local_engine is None:
+        if PIPER_TTS_AVAILABLE and PYGAME_AVAILABLE:
+            _local_engine = PiperTTSEngine()
+        else:
+            _local_engine = DummyTTSEngine()
+    return _local_engine
+
 
 def get_engine():
     """
-    Returns the TTS engine instance.
-    Uses Edge TTS (neural voices) by default for realistic speech.
+    Returns the current TTS engine based on mode setting.
     """
-    global _engine, _engine_type
+    if _current_mode == "local":
+        return get_local_engine()
+    else:
+        return get_cloud_engine()
+
+
+# Legacy function for backward compatibility
+def set_engine_type(engine_type: str):
+    """Legacy function - use set_tts_mode instead."""
+    if engine_type == "neural":
+        set_tts_mode("cloud")
+    elif engine_type == "offline" or engine_type == "local":
+        set_tts_mode("local")
+
+
+# ============================================================
+# HELPER FUNCTIONS FOR LOCAL TTS
+# ============================================================
+
+def _get_piper_model_dir() -> Path:
+    """Get the directory for storing Piper voice models (works even without Piper installed)."""
+    return get_piper_models_dir()
+
+
+def _is_voice_downloaded(voice_name: str) -> bool:
+    """Check if a voice model is downloaded (works even without Piper installed)."""
+    if voice_name not in PIPER_VOICE_MODELS:
+        return False
     
-    if _engine is None:
-        if _engine_type == "neural" and EDGE_TTS_AVAILABLE and PYGAME_AVAILABLE:
-            logging.info("🎙️ Using Edge TTS - Realistic neural voices")
-            _engine = EdgeTTSEngine()
-        elif _engine_type == "offline" and PYTTSX3_AVAILABLE:
-            logging.info("📢 Using offline TTS (pyttsx3)")
-            _engine = OfflineTTSEngine()
-        elif EDGE_TTS_AVAILABLE and PYGAME_AVAILABLE:
-            logging.info("🎙️ Using Edge TTS - Realistic neural voices")
-            _engine = EdgeTTSEngine()
-        elif PYTTSX3_AVAILABLE:
-            logging.info("📢 Fallback: Using offline TTS (pyttsx3)")
-            _engine = OfflineTTSEngine()
-        else:
-            logging.warning("⚠️ No TTS engine available")
-            _engine = DummyTTSEngine()
+    voice_info = PIPER_VOICE_MODELS[voice_name]
+    voice_id = voice_info["id"]
+    model_dir = _get_piper_model_dir()
+    model_path = model_dir / f"{voice_id}.onnx"
+    config_path = model_dir / f"{voice_id}.onnx.json"
+    return model_path.exists() and config_path.exists()
+
+
+def list_local_voices() -> List[Dict[str, Any]]:
+    """List all available local (Piper) voices with download status.
+    Works even when Piper TTS is not installed - allows downloading voices in advance.
+    """
+    # First try the engine if available
+    engine = get_local_engine()
+    if hasattr(engine, 'list_all_voices'):
+        return engine.list_all_voices()
     
-    return _engine
+    # Fallback: list voices from PIPER_VOICE_MODELS directly
+    # This allows viewing and downloading voices even without piper-tts installed
+    voices = []
+    for voice_name, info in PIPER_VOICE_MODELS.items():
+        voices.append({
+            "name": voice_name,
+            "id": info["id"],
+            "size_mb": info["size_mb"],
+            "downloaded": _is_voice_downloaded(voice_name)
+        })
+    return voices
+
+
+def download_local_voice(voice_name: str, progress_callback: Callable[[int], None] = None) -> bool:
+    """Download a local (Piper) voice model.
+    Works even when Piper TTS is not installed - users can pre-download voices.
+    """
+    global _piper_download_progress
+    
+    # First try the engine if available
+    engine = get_local_engine()
+    if hasattr(engine, 'download_voice'):
+        return engine.download_voice(voice_name, progress_callback)
+    
+    # Fallback: download directly (works without piper-tts installed)
+    if voice_name not in PIPER_VOICE_MODELS:
+        logging.error(f"Unknown voice: {voice_name}")
+        return False
+    
+    voice_info = PIPER_VOICE_MODELS[voice_name]
+    voice_id = voice_info["id"]
+    model_dir = _get_piper_model_dir()
+    model_dir.mkdir(parents=True, exist_ok=True)
+    
+    model_path = model_dir / f"{voice_id}.onnx"
+    config_path = model_dir / f"{voice_id}.onnx.json"
+    
+    try:
+        import requests
+        
+        _piper_download_progress = 0
+        
+        # Download model file
+        logging.info(f"Downloading Piper voice: {voice_name}")
+        
+        response = requests.get(voice_info["model_url"], stream=True)
+        response.raise_for_status()
+        
+        total_size = int(response.headers.get('content-length', 0))
+        downloaded = 0
+        
+        with open(model_path, 'wb') as f:
+            for chunk in response.iter_content(chunk_size=8192):
+                if chunk:
+                    f.write(chunk)
+                    downloaded += len(chunk)
+                    if total_size > 0:
+                        progress = int((downloaded / total_size) * 90)
+                        _piper_download_progress = progress
+                        if progress_callback:
+                            progress_callback(progress)
+        
+        # Download config file
+        _piper_download_progress = 92
+        if progress_callback:
+            progress_callback(92)
+        
+        config_response = requests.get(voice_info["config_url"])
+        config_response.raise_for_status()
+        
+        with open(config_path, 'wb') as f:
+            f.write(config_response.content)
+        
+        _piper_download_progress = 100
+        if progress_callback:
+            progress_callback(100)
+        
+        logging.info(f"Downloaded Piper voice: {voice_name}")
+        return True
+        
+    except Exception as e:
+        logging.error(f"Failed to download voice {voice_name}: {e}")
+        # Clean up partial downloads
+        if model_path.exists():
+            model_path.unlink()
+        if config_path.exists():
+            config_path.unlink()
+        return False
+
+
+def delete_local_voice(voice_name: str) -> bool:
+    """Delete a local (Piper) voice model.
+    Works even when Piper TTS is not installed.
+    """
+    # First try the engine if available
+    engine = get_local_engine()
+    if hasattr(engine, 'delete_voice'):
+        return engine.delete_voice(voice_name)
+    
+    # Fallback: delete directly
+    if voice_name not in PIPER_VOICE_MODELS:
+        return False
+    
+    voice_info = PIPER_VOICE_MODELS[voice_name]
+    voice_id = voice_info["id"]
+    model_dir = _get_piper_model_dir()
+    model_path = model_dir / f"{voice_id}.onnx"
+    config_path = model_dir / f"{voice_id}.onnx.json"
+    
+    try:
+        if model_path.exists():
+            model_path.unlink()
+        if config_path.exists():
+            config_path.unlink()
+        logging.info(f"Deleted Piper voice: {voice_name}")
+        return True
+    except Exception as e:
+        logging.error(f"Failed to delete voice {voice_name}: {e}")
+        return False
+
+
+def get_tts_availability() -> Dict[str, bool]:
+    """Check availability of TTS engines."""
+    return {
+        "cloud": EDGE_TTS_AVAILABLE and PYGAME_AVAILABLE,
+        "local": PIPER_TTS_AVAILABLE and PYGAME_AVAILABLE,
+        "edge_tts": EDGE_TTS_AVAILABLE,
+        "piper_tts": PIPER_TTS_AVAILABLE,
+        "pygame": PYGAME_AVAILABLE
+    }
 
 
 # ============================================================
@@ -507,13 +1332,16 @@ def get_engine():
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
     
+    print("TTS Availability:", get_tts_availability())
+    print("Current mode:", get_tts_mode())
+    
     engine = get_engine()
     print(f"Engine loaded: {engine.is_loaded}")
     print(f"Available voices: {engine.list_available_voices()}")
     
     # Test speech
     engine.tts_read_text(
-        "Hello! This is a test of the neural text to speech system. "
+        "Hello! This is a test of the text to speech system. "
         "It should sound natural and human-like.",
         voice="Jenny (US Female)"
     )

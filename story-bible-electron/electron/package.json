@@ -25,34 +25,50 @@
     "appId": "com.exelsias.app",
     "productName": "Exelsias",
     "forceCodeSigning": false,
+    "compression": "maximum",
     "directories": {
       "output": "../dist"
     },
     "files": [
       "main.js",
-      "preload.js"
+      "preload.js",
+      "!**/*.map",
+      "!**/*.md",
+      "!**/test/**",
+      "!**/tests/**"
     ],
     "extraResources": [
       {
         "from": "../frontend/dist/",
         "to": "frontend/",
-        "filter": ["**/*"]
+        "filter": [
+          "**/*",
+          "!**/*.map",
+          "!**/*.md"
+        ]
       },
       {
         "from": "../backend/dist-win/",
         "to": "backend/",
-        "filter": ["**/*"]
-      },
-      {
-        "from": "../../models/tts/",
-        "to": "models/tts/",
-        "filter": ["**/*"]
+        "filter": [
+          "api_bridge.exe"
+        ]
       },
       {
         "from": "../../data/",
         "to": "data/",
-        "filter": ["**/*", "!*.db", "!*.db-shm", "!*.db-wal"]
+        "filter": [
+          "**/*",
+          "!*.db",
+          "!*.db-shm",
+          "!*.db-wal",
+          "!*.log",
+          "!**/__pycache__/**"
+        ]
       }
+    ],
+    "asarUnpack": [
+      "**/*.node"
     ],
     "win": {
       "target": [

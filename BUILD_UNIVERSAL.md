@@ -4,6 +4,11 @@
 
 This guide creates a build that works on **ALL Windows PCs**, including older gaming PCs without AVX2 support.
 
+**OPTIMIZED BUILD**: This build has been optimized to reduce installer size by:
+- Removing unused Python packages (transformers, spacy, nltk, pandas, etc.)
+- Excluding test files, documentation, and unnecessary data
+- Using maximum compression for the installer
+
 ---
 
 ## Prerequisites
