@@ -59,6 +59,36 @@ if piper_dir.exists():
     for pyd in piper_dir.glob('*.pyd'):
         binaries.append((str(pyd), 'piper'))
 
+# Add espeak-ng data files (REQUIRED for Piper TTS phoneme generation)
+# These files are needed for Piper to convert text to phonemes
+# piper_phonemize includes espeak-ng-data in its package
+espeak_ng_found = False
+for espeak_path, dest in [
+    (venv_site_packages / 'piper_phonemize' / 'espeak-ng-data', 'piper/espeak-ng-data'),
+    (venv_site_packages / 'piper' / 'espeak-ng-data', 'piper/espeak-ng-data'),
+    (venv_site_packages / 'espeak_ng' / 'data', 'espeak-ng-data'),
+]:
+    if espeak_path.exists():
+        datas.append((str(espeak_path), dest))
+        espeak_ng_found = True
+        print(f"Found espeak-ng-data at: {espeak_path}")
+        break
+
+if not espeak_ng_found:
+    print("WARNING: espeak-ng-data not found! Piper TTS may not work.")
+    print(f"Searched in: {venv_site_packages}")
+
+# Also include piper_phonemize package data
+piper_phonemize_dir = venv_site_packages / 'piper_phonemize'
+if piper_phonemize_dir.exists():
+    # Include the entire piper_phonemize package with its data
+    datas.append((str(piper_phonemize_dir), 'piper_phonemize'))
+    # Also collect any DLLs
+    for dll in piper_phonemize_dir.glob('*.dll'):
+        binaries.append((str(dll), 'piper_phonemize'))
+    for pyd in piper_phonemize_dir.glob('*.pyd'):
+        binaries.append((str(pyd), 'piper_phonemize'))
+
 # Analysis with MINIMAL hidden imports (only what's actually used)
 a = Analysis(
     ['api_bridge.py'],
@@ -119,6 +149,8 @@ a = Analysis(
         'piper',
         'piper.voice',
         'piper.download',
+        'piper_phonemize',
+        'piper_phonemize.phonemize',
         'onnxruntime',
         'onnxruntime.capi',
         'onnxruntime.capi._pybind_state',

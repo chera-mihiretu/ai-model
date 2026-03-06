@@ -19,6 +19,36 @@ from typing import List, Optional, Dict, Any, Callable
 from pathlib import Path
 
 # ============================================================
+# ESPEAK-NG DATA PATH SETUP (must be done before importing piper)
+# ============================================================
+# Piper uses piper_phonemize which requires espeak-ng data files.
+# In PyInstaller builds, we need to set the path to bundled data.
+
+def _setup_espeak_ng_data():
+    """Set up espeak-ng data path for PyInstaller builds."""
+    if getattr(sys, 'frozen', False):
+        # Running as PyInstaller bundle
+        bundle_dir = Path(sys._MEIPASS)
+        
+        # Check multiple possible locations for espeak-ng-data
+        possible_paths = [
+            bundle_dir / 'piper' / 'espeak-ng-data',
+            bundle_dir / 'espeak-ng-data',
+            bundle_dir / 'piper_phonemize' / 'espeak-ng-data',
+        ]
+        
+        for espeak_path in possible_paths:
+            if espeak_path.exists():
+                os.environ['ESPEAK_DATA_PATH'] = str(espeak_path)
+                logging.info(f"Set ESPEAK_DATA_PATH to: {espeak_path}")
+                return True
+        
+        logging.warning(f"espeak-ng-data not found in bundle. Checked: {possible_paths}")
+    return False
+
+_setup_espeak_ng_data()
+
+# ============================================================
 # AVAILABILITY FLAGS
 # ============================================================
 
@@ -36,8 +66,8 @@ except ImportError:
 try:
     from piper import PiperVoice
     PIPER_TTS_AVAILABLE = True
-except ImportError:
-    logging.warning("piper-tts not available - install with: pip install piper-tts")
+except ImportError as e:
+    logging.warning(f"piper-tts not available: {e}")
     PiperVoice = None
 
 try:

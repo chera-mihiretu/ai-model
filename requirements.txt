@@ -26,7 +26,8 @@ packaging>=23.0,<25.0
 typing_extensions>=4.9.0,<5.0.0
 
 # Audio/TTS (REQUIRED - do not remove)
-edge-tts>=6.1.0,<7.0.0
+# NOTE: edge-tts 7.x has fixes for 403 authentication errors
+edge-tts>=7.0.0
 pygame>=2.5.0,<3.0.0
 piper-tts>=1.2.0
 
