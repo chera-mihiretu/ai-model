@@ -43,6 +43,22 @@ datas = [
     (str(venv_site_packages / 'llama_cpp'), 'llama_cpp'),
 ]
 
+# Add onnxruntime DLLs explicitly (required for Piper TTS)
+onnxruntime_capi = venv_site_packages / 'onnxruntime' / 'capi'
+if onnxruntime_capi.exists():
+    for dll in onnxruntime_capi.glob('*.dll'):
+        binaries.append((str(dll), 'onnxruntime/capi'))
+    for pyd in onnxruntime_capi.glob('*.pyd'):
+        binaries.append((str(pyd), 'onnxruntime/capi'))
+
+# Add piper DLLs explicitly
+piper_dir = venv_site_packages / 'piper'
+if piper_dir.exists():
+    for dll in piper_dir.glob('*.dll'):
+        binaries.append((str(dll), 'piper'))
+    for pyd in piper_dir.glob('*.pyd'):
+        binaries.append((str(pyd), 'piper'))
+
 # Analysis with MINIMAL hidden imports (only what's actually used)
 a = Analysis(
     ['api_bridge.py'],
@@ -104,6 +120,9 @@ a = Analysis(
         'piper.voice',
         'piper.download',
         'onnxruntime',
+        'onnxruntime.capi',
+        'onnxruntime.capi._pybind_state',
+        'onnxruntime.capi.onnxruntime_pybind11_state',
         
         # Pygame for audio playback (REQUIRED for TTS)
         'pygame',
@@ -284,9 +303,9 @@ excluded_patterns = [
     'fixtures/',
     
     # Large model files that shouldn't be bundled
+    # NOTE: .onnx is NOT excluded - needed for Piper TTS voice models
     '.bin',
     '.safetensors',
-    '.onnx',
     '.pt',
     '.pth',
     '.h5',
@@ -337,12 +356,9 @@ exe = EXE(
     name='api_bridge',
     debug=False,
     bootloader_ignore_signals=False,
-    strip=True,      # Strip symbols to reduce size
-    upx=True,        # Compress with UPX
-    upx_exclude=[
-        'vcruntime140.dll',  # Don't compress VC runtime
-        'python*.dll',       # Don't compress Python DLL
-    ],
+    strip=False,     # Disabled - strip is Unix-only and causes errors on Windows
+    upx=False,       # Disabled - UPX can cause antivirus false positives and DLL loading issues
+    upx_exclude=[],
     runtime_tmpdir=None,
     console=True,  # Keep console for stdin/stdout communication
     disable_windowed_traceback=False,
