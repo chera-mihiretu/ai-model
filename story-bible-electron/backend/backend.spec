@@ -236,9 +236,9 @@ a = Analysis(
         'distutils',
         'docutils',
         'sphinx',
-        'email',
-        'html',
-        'xml',
+        # NOTE: 'xml' is NOT excluded - required by plistlib/pkg_resources
+        # NOTE: 'email' is NOT excluded - may be needed by some packages
+        # NOTE: 'html' is NOT excluded - may be needed by some packages
         'ctypes.test',
         'lib2to3',
         'curses',
