@@ -341,14 +341,77 @@ function AssistantPanel() {
   // Handle pending AI requests from Editor
   useEffect(() => {
     if (pendingAiRequest && !isLoading) {
+      // Auto-expand assistant panel if collapsed
+      const state = useStore.getState()
+      if (state.assistantCollapsed) {
+        state.toggleAssistant()
+      }
       handlePendingRequest(pendingAiRequest)
       clearPendingAiRequest()
     }
   }, [pendingAiRequest])
 
+  // Strip markdown from AI text for clean output
+  const stripMarkdown = (text) => {
+    return text
+      .replace(/\*\*([^*]+)\*\*/g, '$1')
+      .replace(/__([^_]+)__/g, '$1')
+      .replace(/\*([^*]+)\*/g, '$1')
+      .replace(/_([^_]+)_/g, '$1')
+      .replace(/^#{1,6}\s*/gm, '')
+      .replace(/^>\s*/gm, '')
+      .replace(/^[\*\-]\s*/gm, '')
+      .replace(/^\d+\.\s*/gm, '')
+      .replace(/`([^`]+)`/g, '$1')
+      .replace(/```[^`]*```/gs, '')
+      .trim()
+  }
+
+  // Route completed AI text to the generation panel below the editor
+  const pushToGenerationPanel = (text, meta) => {
+    if (!text?.trim()) return
+    const plainText = stripMarkdown(text)
+    const { setGeneratedResults, addGeneratedResult } = useStore.getState()
+
+    const typeLabels = {
+      write: `Write: ${meta?.mode || 'Continue'}`,
+      draft: 'Draft',
+      openings: '3 Openings',
+      brainstorm: 'Brainstorm',
+      rewrite: `Rewrite: ${meta?.style || ''}`,
+      describe: 'Describe',
+      visualize: 'Visualize',
+      twist: 'Plot Twists',
+      poem: 'Poem',
+    }
+    const label = typeLabels[meta?.type] || 'AI Generated'
+
+    // For openings, try to split into multiple results
+    if (meta?.type === 'openings') {
+      const parts = plainText.split(/(?:^|\n)(?:Option|Opening|\d+[\.\):])\s*/i).filter(p => p.trim())
+      if (parts.length > 1) {
+        setGeneratedResults(
+          parts.map((p, i) => ({ content: p.trim(), label: `Opening ${i + 1}` })),
+          label
+        )
+        return
+      }
+    }
+
+    // Single result — include selection metadata for rewrite/describe replace
+    addGeneratedResult({
+      content: plainText,
+      label,
+      type: meta?.type,
+      replaceSelection: meta?.replaceSelection,
+      selectionStart: meta?.selectionStart,
+      selectionEnd: meta?.selectionEnd,
+    })
+    useStore.getState().generationLabel || useStore.setState({ generationLabel: label })
+  }
+
   // Finalize streaming: read final text from Zustand store and update the placeholder message
   const finalizeStream = (meta) => {
-    // Read the final accumulated text directly from the store (most reliable)
     const finalText = useStore.getState().aiStreamedText || ''
 
     // Update the last (placeholder) assistant message with the final content
@@ -365,27 +428,9 @@ function AssistantPanel() {
       return updated
     })
 
-    // Auto-insert for 'write' type
-    if (finalText && meta?.insertAtCursor && meta?.type === 'write' && editorInsertCallback) {
-      const plainText = finalText
-        .replace(/\*\*([^*]+)\*\*/g, '$1')
-        .replace(/__([^_]+)__/g, '$1')
-        .replace(/\*([^*]+)\*/g, '$1')
-        .replace(/_([^_]+)_/g, '$1')
-        .replace(/^#{1,6}\s*/gm, '')
-        .replace(/^>\s*/gm, '')
-        .replace(/^[\*\-]\s*/gm, '')
-        .replace(/^\d+\.\s*/gm, '')
-        .replace(/`([^`]+)`/g, '$1')
-        .replace(/```[^`]*```/gs, '')
-        .trim()
-
-      try {
-        editorInsertCallback('\n\n' + plainText)
-        addNotification({ type: 'success', message: 'AI text inserted at cursor position' })
-      } catch (err) {
-        console.error('Error auto-inserting text:', err)
-      }
+    // Push to generation panel instead of auto-inserting
+    if (finalText?.trim()) {
+      pushToGenerationPanel(finalText, meta)
     }
 
     setIsLoading(false)
@@ -451,27 +496,8 @@ function AssistantPanel() {
           return updated
         })
 
-        // Auto-insert for 'write' type
-        if (meta?.insertAtCursor && meta?.type === 'write' && editorInsertCallback) {
-          const plainText = response
-            .replace(/\*\*([^*]+)\*\*/g, '$1')
-            .replace(/__([^_]+)__/g, '$1')
-            .replace(/\*([^*]+)\*/g, '$1')
-            .replace(/_([^_]+)_/g, '$1')
-            .replace(/^#{1,6}\s*/gm, '')
-            .replace(/^>\s*/gm, '')
-            .replace(/^[\*\-]\s*/gm, '')
-            .replace(/^\d+\.\s*/gm, '')
-            .replace(/`([^`]+)`/g, '$1')
-            .replace(/```[^`]*```/gs, '')
-            .trim()
-          try {
-            editorInsertCallback('\n\n' + plainText)
-            addNotification({ type: 'success', message: 'AI text inserted at cursor position' })
-          } catch (err) {
-            console.error('Error auto-inserting text:', err)
-          }
-        }
+        // Push to generation panel
+        pushToGenerationPanel(response, meta)
       } else {
         // Both streaming and blocking failed
         setMessages(prev => {
@@ -524,6 +550,21 @@ function AssistantPanel() {
       return
     }
 
+    // Clear previous generation results and open the panel with a label
+    const typeLabels = {
+      write: `Writing...`,
+      draft: 'Generating Draft...',
+      openings: 'Generating Openings...',
+      brainstorm: 'Brainstorming...',
+      rewrite: 'Rewriting...',
+      describe: 'Describing...',
+    }
+    useStore.getState().clearGeneratedResults()
+    useStore.setState({
+      isGenerationPanelOpen: true,
+      generationLabel: typeLabels[request.type] || 'Generating...',
+    })
+
     // Add user message showing what was requested
     let userMessage = '⚡ Generate Story Draft'
     if (request.type === 'openings') {
@@ -535,6 +576,9 @@ function AssistantPanel() {
     } else if (request.type === 'describe') {
       const sensesList = request.senses?.join(', ') || 'selected senses'
       userMessage = `✨ Describe: "${request.originalText?.substring(0, 50)}${request.originalText?.length > 50 ? '...' : ''}"\n\nSenses: ${sensesList}`
+    } else if (request.type === 'brainstorm') {
+      const cat = request.formData?.category || 'general'
+      userMessage = `💡 Brainstorm: ${cat}`
     }
 
     setMessages(prev => [...prev, {
@@ -566,6 +610,8 @@ function AssistantPanel() {
               series_context: request.context.seriesContext || '',
               preceding_text: request.context.precedingText || '',
               text_after: request.context.textAfterCursor || '',
+              style: request.context.styleContext || '',
+              genre: request.context.genreContext || '',
             }
           } else {
             // For rewrite/describe/chat: build structured context from project data
@@ -614,6 +660,8 @@ function AssistantPanel() {
                 chapter_continuity: contextWindow?.prev_summary || '',
                 scene_context: sceneStr,
                 series_context: seriesCtx || '',
+                style: bible?.style || '',
+                genre: bible?.genre || '',
               }
 
               // For rewrite/describe, include surrounding editor context if available

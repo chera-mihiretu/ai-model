@@ -544,9 +544,10 @@ function GenerateDraftModal({ isOpen, onClose, onGenerate, isGenerating, hasExis
   })
   
   const lengths = [
-    { id: 'short', label: 'Short (1-2 paragraphs)' },
-    { id: 'medium', label: 'Medium (3-5 paragraphs)' },
-    { id: 'long', label: 'Long (full scene)' },
+    { id: 'short', label: 'Short (1-2 paragraphs, ~200 words)' },
+    { id: 'medium', label: 'Medium (3-5 paragraphs, ~400 words)' },
+    { id: 'long', label: 'Long (full scene, ~600 words)' },
+    { id: 'first_draft', label: 'First Draft (extended, 800-1000+ words)' },
   ]
   
   const handleChange = (field, value) => {
@@ -574,11 +575,9 @@ function GenerateDraftModal({ isOpen, onClose, onGenerate, isGenerating, hasExis
           <div className="flex items-center gap-3">
             <span className="text-3xl">{Icons.MAGIC}</span>
             <div>
-              <h2 className="text-xl font-bold text-gray-100">Generate Draft</h2>
+              <h2 className="text-xl font-bold text-gray-100">Generate Draft / First Draft</h2>
               <p className="text-sm text-gray-400">
-                {hasExistingContent 
-                  ? 'Tell AI what to write next in your story' 
-                  : 'Describe what you want AI to write for you'}
+                AI uses your Scenes, Characters, Style, and Outline to generate prose. Choose "First Draft" length for an extended 800-1000+ word passage.
               </p>
             </div>
           </div>
@@ -592,13 +591,13 @@ function GenerateDraftModal({ isOpen, onClose, onGenerate, isGenerating, hasExis
         <div className="space-y-4 mb-6">
           <div>
             <label className="block text-sm font-medium text-gold-pale mb-1">
-              What should happen in this section? <span className="text-red-400">*</span>
+              Extra instructions <span className="text-gray-500 text-xs font-normal">(optional — AI uses your Scenes, Outline, and Story Bible automatically)</span>
             </label>
             <textarea
               className="input-textarea min-h-[100px]"
               placeholder={hasExistingContent 
-                ? "e.g., The protagonist discovers the hidden room and finds a clue about their past..."
-                : "e.g., Open with the main character waking up to find their town deserted..."}
+                ? "e.g., Focus on the tension between the characters, add a cliffhanger... (leave blank to let AI use your scenes and outline)"
+                : "e.g., Start with vivid imagery, slow pacing... (leave blank to let AI use your scenes and outline)"}
               value={formData.whatToWrite}
               onChange={(e) => handleChange('whatToWrite', e.target.value)}
               disabled={isGenerating}
@@ -665,8 +664,9 @@ function GenerateDraftModal({ isOpen, onClose, onGenerate, isGenerating, hasExis
         
         <div className="mb-6 p-3 rounded-lg bg-gold-rich/10 border border-gold-rich/30">
           <p className="text-sm text-gray-300">
-            <span className="text-gold-rich font-medium">💡 Tip:</span> The more specific you are, the better the result. 
-            {hasExistingContent && " AI will read your existing content and continue naturally from where you left off."}
+            <span className="text-gold-rich font-medium">💡 Tip:</span> AI automatically uses your Scenes, Characters, Style, Genre, and Outline to generate prose. 
+            Add extra instructions above to guide tone, pacing, or specific events.
+            {hasExistingContent && " AI will also read your existing content and continue naturally."}
           </p>
         </div>
         
@@ -675,7 +675,7 @@ function GenerateDraftModal({ isOpen, onClose, onGenerate, isGenerating, hasExis
           <button
             className="btn btn-primary min-w-[180px]"
             onClick={handleSubmit}
-            disabled={isGenerating || !formData.whatToWrite.trim()}
+            disabled={isGenerating}
           >
             {isGenerating ? (
               <><div className="spinner !w-4 !h-4" /><span>Generating...</span></>
@@ -701,7 +701,202 @@ function GenerateDraftModal({ isOpen, onClose, onGenerate, isGenerating, hasExis
   )
 }
 
-function ActionButtons({ onGenerate, onOpenings, onChat, isGenerating }) {
+// Brainstorm Modal
+function BrainstormModal({ isOpen, onClose, onBrainstorm, isGenerating }) {
+  const brainstormCategories = [
+    { id: 'plot', label: 'Plot Ideas', description: 'Story twists, subplots, and narrative arcs' },
+    { id: 'character', label: 'Character Development', description: 'Backstories, motivations, and arcs' },
+    { id: 'dialogue', label: 'Dialogue', description: 'Conversations, monologues, and voice' },
+    { id: 'worldbuilding', label: 'Worldbuilding', description: 'Settings, cultures, rules, and lore' },
+    { id: 'conflict', label: 'Conflict & Tension', description: 'Obstacles, stakes, and dramatic moments' },
+    { id: 'theme', label: 'Themes & Motifs', description: 'Recurring ideas, symbols, and messages' },
+    { id: 'opening', label: 'Opening Lines', description: 'Hook sentences and first paragraphs' },
+    { id: 'ending', label: 'Endings', description: 'Climaxes, resolutions, and final scenes' },
+  ]
+
+  const [selectedCategory, setSelectedCategory] = useState('plot')
+  const [customPrompt, setCustomPrompt] = useState('')
+
+  if (!isOpen) return null
+
+  const handleSubmit = () => {
+    const category = brainstormCategories.find(c => c.id === selectedCategory)
+    onBrainstorm({ category: category || brainstormCategories[0], customPrompt: customPrompt.trim() })
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={onClose}>
+      <div className="bg-gray-900 border border-gold-rich/20 rounded-xl max-w-lg w-full p-6 shadow-2xl" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center gap-4 mb-6">
+          <span className="text-3xl">{Icons.SPARKLE}</span>
+          <div>
+            <h2 className="text-xl font-bold text-gray-100">Brainstorm</h2>
+            <p className="text-sm text-gray-400">Generate creative ideas based on your story context</p>
+          </div>
+        </div>
+
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-2">Category</label>
+            <div className="grid grid-cols-2 gap-2">
+              {brainstormCategories.map(cat => (
+                <button
+                  key={cat.id}
+                  onClick={() => setSelectedCategory(cat.id)}
+                  className={clsx(
+                    'text-left p-3 rounded-lg border transition-all text-sm',
+                    selectedCategory === cat.id
+                      ? 'border-gold-rich bg-gold-rich/10 text-gold-rich'
+                      : 'border-gray-700 bg-gray-800/50 text-gray-300 hover:border-gray-600'
+                  )}
+                >
+                  <div className="font-medium">{cat.label}</div>
+                  <div className="text-xs text-gray-500 mt-0.5">{cat.description}</div>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-2">
+              Custom prompt <span className="text-gray-500">(optional)</span>
+            </label>
+            <textarea
+              value={customPrompt}
+              onChange={e => setCustomPrompt(e.target.value)}
+              placeholder="e.g. Give me 5 ways the villain could be introduced..."
+              className="w-full bg-gray-800 border border-gray-700 rounded-lg p-3 text-gray-200 text-sm resize-y min-h-[80px] focus:border-gold-rich/50 focus:outline-none"
+              rows={3}
+            />
+          </div>
+        </div>
+
+        <div className="flex gap-3 mt-6">
+          <button className="btn btn-ghost flex-1" onClick={onClose}>Cancel</button>
+          <button
+            className="btn btn-primary flex-1 flex items-center justify-center gap-2"
+            onClick={handleSubmit}
+            disabled={isGenerating}
+          >
+            {isGenerating ? (
+              <><div className="spinner !w-4 !h-4" /><span>Brainstorming...</span></>
+            ) : (
+              <><span>{Icons.SPARKLE}</span><span>Brainstorm</span></>
+            )}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// Generation Results Panel - displays AI-generated content below the editor
+function GenerationPanel({ onInsert, onReplace }) {
+  const { generatedResults, generationLabel, isGenerationPanelOpen, clearGeneratedResults, isAiGenerating } = useStore()
+  const [copiedId, setCopiedId] = useState(null)
+
+  if (!isGenerationPanelOpen) return null
+  const showLoading = isAiGenerating && generatedResults.length === 0
+
+  const handleCopy = async (text, id) => {
+    try {
+      await navigator.clipboard.writeText(text)
+      setCopiedId(id)
+      setTimeout(() => setCopiedId(null), 2000)
+    } catch {
+      const textarea = document.createElement('textarea')
+      textarea.value = text
+      document.body.appendChild(textarea)
+      textarea.select()
+      document.execCommand('copy')
+      document.body.removeChild(textarea)
+      setCopiedId(id)
+      setTimeout(() => setCopiedId(null), 2000)
+    }
+  }
+
+  const handleInsertOrReplace = (result) => {
+    if (result.replaceSelection && result.selectionStart != null && result.selectionEnd != null) {
+      onReplace(result.content, result.selectionStart, result.selectionEnd)
+    } else {
+      onInsert(result.content)
+    }
+  }
+
+  return (
+    <div className="border-t border-gold-rich/20 bg-dark-850/80 backdrop-blur-sm flex flex-col max-h-[45%] min-h-[120px]">
+      {/* Header */}
+      <div className="flex items-center justify-between px-4 py-2 border-b border-gold-rich/10 shrink-0">
+        <div className="flex items-center gap-2">
+          <span className="text-gold-rich text-sm">{Icons.SPARKLE}</span>
+          <span className="text-sm font-medium text-gray-200">
+            {generationLabel || 'Generated Content'}
+          </span>
+          <span className="text-xs text-gray-500">
+            {generatedResults.length} result{generatedResults.length !== 1 ? 's' : ''}
+          </span>
+        </div>
+        <button
+          onClick={clearGeneratedResults}
+          className="text-gray-500 hover:text-gray-300 transition-colors p-1 rounded hover:bg-dark-700"
+          title="Close"
+        >
+          {Icons.CLOSE}
+        </button>
+      </div>
+
+      {/* Results */}
+      <div className="flex-1 overflow-y-auto p-3 space-y-3">
+        {showLoading && (
+          <div className="flex items-center gap-3 p-4 rounded-xl border border-gold-rich/10 bg-dark-800/40">
+            <div className="spinner !w-5 !h-5" />
+            <span className="text-gray-400 text-sm">AI is generating content...</span>
+          </div>
+        )}
+
+        {generatedResults.map((result) => (
+          <div
+            key={result.id}
+            className="rounded-xl border border-gold-rich/10 bg-dark-800/60 overflow-hidden"
+          >
+            {/* Content */}
+            <div className="p-4 text-gray-200 text-sm leading-relaxed whitespace-pre-wrap max-h-[250px] overflow-y-auto">
+              {result.content}
+            </div>
+
+            {/* Action bar */}
+            <div className="flex items-center gap-1 px-3 py-2 border-t border-gold-rich/10 bg-dark-900/40">
+              <button
+                onClick={() => handleInsertOrReplace(result)}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-gray-300 hover:text-gold-rich hover:bg-gold-rich/10 transition-all"
+              >
+                <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M12 5v14M5 12h14" />
+                </svg>
+                {result.replaceSelection ? 'Replace' : 'Insert'}
+              </button>
+              <button
+                onClick={() => handleCopy(result.content, result.id)}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-gray-300 hover:text-gold-rich hover:bg-gold-rich/10 transition-all"
+              >
+                <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+                  <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" />
+                </svg>
+                {copiedId === result.id ? 'Copied!' : 'Copy'}
+              </button>
+              {result.label && (
+                <span className="ml-auto text-xs text-gray-600">{result.label}</span>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function ActionButtons({ onGenerate, onOpenings, onChat, onBrainstorm, isGenerating }) {
   return (
     <div className="flex items-center gap-3 mt-6">
       <button
@@ -719,6 +914,14 @@ function ActionButtons({ onGenerate, onOpenings, onChat, isGenerating }) {
       >
         <span>{Icons.SPARKLE}</span>
         <span>3 Openings</span>
+      </button>
+      <button
+        className="btn btn-secondary flex-1"
+        onClick={onBrainstorm}
+        disabled={isGenerating}
+      >
+        <span>{Icons.SPARKLE}</span>
+        <span>Brainstorm</span>
       </button>
       <button
         className="btn btn-secondary flex-1"
@@ -755,10 +958,14 @@ function Editor() {
     updateChapterContent,
     startAiStream,
     getContextWindow,
+    getStoryBible,
+    getCharacters,
+    getSceneContext,
   } = usePythonBridge()
   
   const [showOpeningsModal, setShowOpeningsModal] = useState(false)
   const [showDraftModal, setShowDraftModal] = useState(false)
+  const [showBrainstormModal, setShowBrainstormModal] = useState(false)
   const [showRewriteModal, setShowRewriteModal] = useState(false)
   const saveTimeoutRef = useRef(null)
   const editorRef = useRef(null)
@@ -1253,45 +1460,97 @@ RULES:
   }
   
   // Handle generate draft with form data - sends to AssistantPanel
-  const handleGenerateDraft = (formData) => {
+  const handleGenerateDraft = async (formData) => {
     if (!currentProjectId || !currentChapterId) return
     
     const currentText = editor?.getText() || ''
-    
-    // Build detailed instruction from form data
+    const hasContent = currentText.trim().length > 50
+
+    // Fetch scene + Story Bible context automatically
+    let sceneBlueprint = ''
+    let styleStr = ''
+    let genreStr = ''
+    let characterStr = ''
+    let outlineStr = ''
+    let synopsisStr = ''
+    let worldbuildingStr = ''
+    try {
+      const [bible, sceneData, chars] = await Promise.all([
+        getStoryBible(currentProjectId),
+        getSceneContext(currentChapterId),
+        getCharacters(currentProjectId),
+      ])
+
+      if (sceneData?.formatted) sceneBlueprint = sceneData.formatted
+      if (bible?.style) styleStr = bible.style
+      if (bible?.genre) genreStr = bible.genre
+      if (bible?.worldbuilding) worldbuildingStr = bible.worldbuilding.substring(0, 500)
+      if (bible?.synopsis) synopsisStr = bible.synopsis.substring(0, 600)
+
+      if (bible?.outline) {
+        try {
+          const outlineData = JSON.parse(bible.outline)
+          if (Array.isArray(outlineData)) {
+            outlineStr = outlineData.slice(0, 15).map(ch =>
+              `Chapter ${ch.chapter_number || '?'}: ${ch.title || 'Untitled'} - ${ch.summary || ''}`
+            ).join('\n')
+          }
+        } catch { outlineStr = bible.outline.substring(0, 500) }
+      }
+
+      if (chars?.length > 0) {
+        const visible = chars.filter(c => c.is_visible !== 0).slice(0, 8)
+        characterStr = visible.map(c => {
+          let entry = `${c.name}${c.role ? ` (${c.role})` : ''}`
+          if (c.personality_traits) entry += `: ${c.personality_traits}`
+          if (c.speech_pattern) entry += ` | Speech: ${c.speech_pattern}`
+          return entry
+        }).join('\n')
+      }
+    } catch (e) {
+      console.log('Could not fetch story context for draft:', e)
+    }
+
+    // Build instruction — user input is optional extra guidance
     let instruction = ''
-    
-    if (formData.whatToWrite) {
+
+    if (formData.whatToWrite?.trim()) {
       instruction = `Write the following for my story:\n${formData.whatToWrite}`
+    } else if (sceneBlueprint) {
+      instruction = `Write the next section of this chapter. Use the scene blueprint below as your guide for what happens, who is involved, and where the action takes place.`
+    } else if (outlineStr) {
+      instruction = `Write the next section of this chapter based on the story outline provided below.`
+    } else {
+      instruction = `Write engaging narrative prose for this chapter using the story context provided below.`
     }
-    
-    if (formData.characters) {
-      instruction += `\n\nCharacters in this scene: ${formData.characters}`
-    }
-    
-    if (formData.events) {
-      instruction += `\n\nKey events to include: ${formData.events}`
-    }
-    
-    if (formData.emotion) {
-      instruction += `\n\nEmotional tone: ${formData.emotion}`
-    }
-    
-    // Add length guidance
+
+    if (formData.characters?.trim()) instruction += `\n\nCharacters in this scene: ${formData.characters}`
+    if (formData.events?.trim()) instruction += `\n\nKey events to include: ${formData.events}`
+    if (formData.emotion?.trim()) instruction += `\n\nEmotional tone: ${formData.emotion}`
+
     const lengthGuide = {
-      short: 'Keep it brief - 1-2 paragraphs.',
-      medium: 'Write 3-5 solid paragraphs.',
-      long: 'Write a full, detailed scene.',
+      short: 'Keep it brief - 1-2 paragraphs, around 200 words.',
+      medium: 'Write 3-5 solid paragraphs, around 400 words.',
+      long: 'Write a full, detailed scene, around 600 words.',
+      first_draft: 'Write an extended first draft of 800-1000+ words. Include rich detail, dialogue, sensory descriptions, and full scene development. This should be a substantial, publication-ready passage.'
     }
     instruction += `\n\n${lengthGuide[formData.length] || lengthGuide.medium}`
-    
-    if (currentText.trim().length > 50) {
-      instruction += '\n\nHere is the existing story content to continue from:\n\n' + currentText.slice(-1000)
+
+    // Append scene + story context directly into the instruction
+    if (sceneBlueprint) instruction += `\n\n=== CHAPTER SCENES (blueprint) ===\n${sceneBlueprint}`
+    if (styleStr) instruction += `\n\n=== WRITING STYLE ===\n${styleStr}`
+    if (genreStr) instruction += `\n\n=== GENRE ===\n${genreStr}`
+    if (characterStr) instruction += `\n\n=== KEY CHARACTERS ===\n${characterStr}`
+    if (synopsisStr) instruction += `\n\n=== STORY SYNOPSIS ===\n${synopsisStr}`
+    if (outlineStr) instruction += `\n\n=== STORY OUTLINE ===\n${outlineStr}`
+    if (worldbuildingStr) instruction += `\n\n=== WORLDBUILDING ===\n${worldbuildingStr}`
+
+    if (hasContent) {
+      instruction += '\n\n=== EXISTING STORY CONTENT (continue from here) ===\n' + currentText.slice(-1000)
     }
     
     setShowDraftModal(false)
     
-    // Send to AssistantPanel instead of directly to editor
     setPendingAiRequest({
       type: 'draft',
       instruction: instruction,
@@ -1301,11 +1560,39 @@ RULES:
   }
   
   // Handle generate openings with form data - sends to AssistantPanel
-  const handleGenerateOpenings = (formData) => {
-    const currentText = editor?.getText() || ''
-    
-    // Build detailed instruction from form data
-    let instruction = 'Generate 3 DIFFERENT and DISTINCT opening paragraphs for a story. Label them as:\n\n**OPENING 1:**\n\n**OPENING 2:**\n\n**OPENING 3:**'
+  const handleGenerateOpenings = async (formData) => {
+    // Fetch scene + Story Bible context automatically
+    let sceneBlueprint = ''
+    let styleStr = ''
+    let genreStr = ''
+    let characterStr = ''
+    let synopsisStr = ''
+    try {
+      const [bible, sceneData, chars] = await Promise.all([
+        currentProjectId ? getStoryBible(currentProjectId) : Promise.resolve(null),
+        currentChapterId ? getSceneContext(currentChapterId) : Promise.resolve(null),
+        currentProjectId ? getCharacters(currentProjectId) : Promise.resolve([]),
+      ])
+
+      if (sceneData?.formatted) sceneBlueprint = sceneData.formatted
+      if (bible?.style) styleStr = bible.style
+      if (bible?.genre) genreStr = bible.genre
+      if (bible?.synopsis) synopsisStr = bible.synopsis.substring(0, 500)
+
+      if (chars?.length > 0) {
+        const visible = chars.filter(c => c.is_visible !== 0).slice(0, 6)
+        characterStr = visible.map(c => {
+          let entry = c.name
+          if (c.role) entry += ` (${c.role})`
+          if (c.personality_traits) entry += `: ${c.personality_traits}`
+          return entry
+        }).join('\n')
+      }
+    } catch (e) {
+      console.log('Could not fetch story context for openings:', e)
+    }
+
+    let instruction = 'Generate 3 DIFFERENT and DISTINCT opening paragraphs for this chapter. Label them as:\n\nOPENING 1:\n\nOPENING 2:\n\nOPENING 3:'
     
     if (formData.style) {
       const styleDesc = {
@@ -1315,30 +1602,25 @@ RULES:
         descriptive: 'descriptive, atmospheric opening',
         introspective: 'introspective, character thoughts opening',
       }
-      instruction += `\n\nStyle: ${styleDesc[formData.style] || 'narrative style'}`
+      instruction += `\n\nOpening style: ${styleDesc[formData.style] || 'narrative style'}`
     }
     
-    if (formData.mood) {
-      instruction += `\n\nMood/Atmosphere: ${formData.mood}`
-    }
-    
-    if (formData.setting) {
-      instruction += `\n\nSetting: ${formData.setting}`
-    }
-    
-    if (formData.character) {
-      instruction += `\n\nCharacter(s): ${formData.character}`
-    }
-    
-    if (formData.hook) {
-      instruction += `\n\nHook/What's happening: ${formData.hook}`
-    }
+    if (formData.mood?.trim()) instruction += `\n\nMood/Atmosphere: ${formData.mood}`
+    if (formData.setting?.trim()) instruction += `\n\nSetting: ${formData.setting}`
+    if (formData.character?.trim()) instruction += `\n\nCharacter(s): ${formData.character}`
+    if (formData.hook?.trim()) instruction += `\n\nHook/What's happening: ${formData.hook}`
     
     instruction += '\n\nMake each opening unique and engaging. Each should be 2-3 paragraphs.'
+
+    // Append story context so the AI knows what to write about
+    if (sceneBlueprint) instruction += `\n\n=== CHAPTER SCENES (blueprint) ===\n${sceneBlueprint}`
+    if (styleStr) instruction += `\n\n=== WRITING STYLE ===\n${styleStr}`
+    if (genreStr) instruction += `\n\n=== GENRE ===\n${genreStr}`
+    if (characterStr) instruction += `\n\n=== KEY CHARACTERS ===\n${characterStr}`
+    if (synopsisStr) instruction += `\n\n=== STORY SYNOPSIS ===\n${synopsisStr}`
     
     setShowOpeningsModal(false)
     
-    // Send to AssistantPanel instead of directly to editor
     setPendingAiRequest({
       type: 'openings',
       instruction: instruction,
@@ -1346,9 +1628,51 @@ RULES:
     })
   }
   
+  // Handle brainstorm - sends brainstorm request to AssistantPanel
+  const handleBrainstorm = async ({ category, customPrompt }) => {
+    let instruction = `Brainstorm creative ideas for the category: "${category.label}" (${category.description}).`
+
+    // Auto-fetch story context
+    try {
+      if (currentProjectId) {
+        const bible = await getStoryBible(currentProjectId)
+        const allChars = await getCharacters(currentProjectId)
+
+        const synopsisStr = bible?.synopsis?.trim() || ''
+        const genreStr = bible?.genre?.trim() || ''
+        const styleStr = bible?.style?.trim() || ''
+        const worldbuildingStr = bible?.worldbuilding?.trim() || ''
+
+        if (synopsisStr) instruction += `\n\n=== STORY SYNOPSIS ===\n${synopsisStr}`
+        if (genreStr) instruction += `\n\n=== GENRE ===\n${genreStr}`
+        if (styleStr) instruction += `\n\n=== STYLE ===\n${styleStr}`
+        if (worldbuildingStr) instruction += `\n\n=== WORLDBUILDING ===\n${worldbuildingStr}`
+        if (allChars?.length > 0) {
+          const charStr = allChars.map(c => `${c.name}: ${c.role || ''} - ${c.description || ''}`).join('\n')
+          instruction += `\n\n=== CHARACTERS ===\n${charStr}`
+        }
+      }
+    } catch (err) {
+      console.warn('Could not fetch story context for brainstorm:', err)
+    }
+
+    if (customPrompt) {
+      instruction += `\n\n=== SPECIFIC REQUEST ===\n${customPrompt}`
+    }
+
+    instruction += '\n\nProvide 5-7 creative, specific, and actionable ideas. Number each idea and include a brief explanation of how it could work in the story. Be creative and surprising.'
+
+    setShowBrainstormModal(false)
+
+    setPendingAiRequest({
+      type: 'brainstorm',
+      instruction: instruction,
+      formData: { category: category.id, customPrompt },
+    })
+  }
+
   // Handle chat about ideas - opens assistant panel
   const handleChatIdeas = () => {
-    // Send a chat request to the AssistantPanel
     setPendingAiRequest({
       type: 'chat',
       instruction: '',
@@ -1356,6 +1680,21 @@ RULES:
     })
   }
   
+  // Insert generated content into the editor at cursor position
+  const handleInsertGenerated = (text) => {
+    if (!editorRef.current || !text) return
+    const ed = editorRef.current
+    ed.chain().focus().insertContent(text.split('\n').map(p => `<p>${p}</p>`).join('')).run()
+  }
+
+  // Replace a selection range in the editor with generated content
+  const handleReplaceGenerated = (text, from, to) => {
+    if (!editorRef.current || !text) return
+    const ed = editorRef.current
+    const html = text.split('\n').map(p => `<p>${p}</p>`).join('')
+    ed.chain().focus().deleteRange({ from, to }).insertContentAt(from, html).run()
+  }
+
   // Cleanup on unmount
   useEffect(() => {
     return () => {
@@ -1417,11 +1756,17 @@ RULES:
         )}
       </div>
       
+      {/* Generated Content Panel */}
+      {currentChapterId && (
+        <GenerationPanel onInsert={handleInsertGenerated} onReplace={handleReplaceGenerated} />
+      )}
+
       {/* Action Buttons */}
       {currentChapterId && (
         <ActionButtons
           onGenerate={() => setShowDraftModal(true)}
           onOpenings={() => setShowOpeningsModal(true)}
+          onBrainstorm={() => setShowBrainstormModal(true)}
           onChat={handleChatIdeas}
           isGenerating={isAiGenerating}
         />
@@ -1450,6 +1795,14 @@ RULES:
         onGenerate={handleGenerateDraft}
         isGenerating={isAiGenerating}
         hasExistingContent={(editor?.getText() || '').trim().length > 50}
+      />
+      
+      {/* Brainstorm Modal */}
+      <BrainstormModal
+        isOpen={showBrainstormModal}
+        onClose={() => setShowBrainstormModal(false)}
+        onBrainstorm={handleBrainstorm}
+        isGenerating={isAiGenerating}
       />
       
       {/* Selection Menu - Floating context menu */}

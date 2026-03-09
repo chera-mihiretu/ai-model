@@ -164,6 +164,26 @@ export const useStore = create((set, get) => ({
   
   // Set editor instance
   setEditorInstance: (editor) => set({ editorInstance: editor }),
+
+  // Generated content panel (below editor)
+  generatedResults: [],  // [{ id, content, label, type, timestamp }]
+  generationLabel: '',   // e.g. "3 Openings", "Brainstorm: Plot Ideas"
+  isGenerationPanelOpen: false,
+
+  addGeneratedResult: (result) => set((state) => ({
+    generatedResults: [...state.generatedResults, { ...result, id: Date.now() + Math.random(), timestamp: Date.now() }],
+    isGenerationPanelOpen: true,
+  })),
+
+  setGeneratedResults: (results, label) => set({
+    generatedResults: results.map((r, i) => ({ ...r, id: Date.now() + i, timestamp: Date.now() })),
+    generationLabel: label || '',
+    isGenerationPanelOpen: true,
+  }),
+
+  clearGeneratedResults: () => set({ generatedResults: [], generationLabel: '', isGenerationPanelOpen: false }),
+
+  setGenerationPanelOpen: (open) => set({ isGenerationPanelOpen: open }),
   
   // ==================== TTS STATE ====================
   ttsVoices: [],

@@ -144,8 +144,11 @@ function App() {
         const projects = await getProjectsWithChapters()
         setProjects(projects || [])
         
-        // Check AI status
+        // Check AI status and update store
         const aiStatus = await getAiStatus()
+        if (aiStatus?.is_loaded) {
+          setAiStatus('ready', aiStatus.status, aiStatus.context_size || 0)
+        }
         
         if (isElectronApi) {
           // Check first launch status

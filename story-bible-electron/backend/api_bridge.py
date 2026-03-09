@@ -1016,11 +1016,40 @@ class APIBridge:
             chapter_content = params.get('chapter_content')
             return self.ai.update_chapter_summary(chapter_content)
         
+        elif method == 'generate_chapter_summary':
+            chapter_number = self._validate_int(params.get('chapter_number'), 'chapter_number', required=True)
+            chapter_title = params.get('chapter_title', f'Chapter {chapter_number}')
+            synopsis = params.get('synopsis', '')
+            genre = params.get('genre', 'fiction')
+            custom_instructions = params.get('custom_instructions', '')
+            existing_outline = params.get('existing_outline', '')
+            return self.ai.generate_chapter_summary(
+                chapter_number, chapter_title, synopsis, genre,
+                custom_instructions, existing_outline
+            )
+        
         elif method == 'expand_scene_from_summary':
             scene_summary = params.get('scene_summary')
             context = params.get('context', '')
             genre = params.get('genre', 'fiction')
+            style = params.get('style', '')
+            characters = params.get('characters', '')
+            worldbuilding = params.get('worldbuilding', '')
+            chapter_outline = params.get('chapter_outline', '')
+            extra_instructions = params.get('extra_instructions', '')
+            has_rich_context = any([style, characters, worldbuilding, chapter_outline, extra_instructions])
+            if has_rich_context:
+                return self.ai.expand_scene_with_context(
+                    scene_summary, context, genre, style,
+                    characters, worldbuilding, chapter_outline,
+                    extra_instructions
+                )
             return self.ai.expand_scene_from_summary(scene_summary, context, genre)
+        
+        elif method == 'generate_bible_section':
+            section_key = params.get('section_key')
+            project_id = self._validate_int(params.get('project_id'), 'project_id', required=True)
+            return self.ai.generate_bible_section(section_key, project_id, self.db)
         
         elif method == 'import_manuscript_to_project':
             # Full import flow: create project, add chapters, extract story bible
@@ -1080,11 +1109,13 @@ class APIBridge:
     # These are dispatched to a thread pool so the main loop stays responsive.
     _LONG_RUNNING_METHODS = frozenset({
         'generate_outline_from_synopsis',
+        'generate_chapter_summary',
         'generate_characters_from_synopsis',
         'generate_single_character',
         'generate_world_from_synopsis',
         'generate_single_world_element',
         'generate_synopsis',
+        'generate_bible_section',
         'generate_beat_summary',
         'generate_beats_from_prose',
         'suggest_next_beats',

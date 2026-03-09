@@ -290,12 +290,7 @@ function Toolbar() {
     }
     
     const { precedingText, textAfterCursor, cursorPosition } = cursorContext
-    
-    // If no preceding text, show a message
-    if (!precedingText.trim() && mode === 'Continue Writing') {
-      addNotification({ type: 'info', message: 'Write some text first, then place your cursor where you want AI to continue.' })
-      return
-    }
+    const isEmptyChapter = !precedingText.trim()
     
     // Get chapter continuity context (summaries from previous chapters)
     let chapterContinuity = ''
@@ -339,6 +334,8 @@ function Toolbar() {
     let storyContext = ''
     let worldbuildingContext = ''
     let outlineContext = ''
+    let styleContext = ''
+    let genreContext = ''
     try {
       const characters = await getCharacters(currentProjectId)
       if (characters && characters.length > 0) {
@@ -370,6 +367,10 @@ function Toolbar() {
           worldbuildingContext = bible.worldbuilding.substring(0, 600)
         }
         
+        // Style & Genre context
+        if (bible.style) styleContext = bible.style.substring(0, 300)
+        if (bible.genre) genreContext = bible.genre.substring(0, 100)
+
         // Outline context
         if (bible.outline_summary) {
           outlineContext = bible.outline_summary
@@ -395,20 +396,47 @@ function Toolbar() {
     let instruction = ''
     switch (mode) {
       case 'Continue Writing':
-        instruction = `Continue writing the story naturally from where it left off. Match the tone, style, and pacing of the existing text. Write 2-3 paragraphs that flow seamlessly from the last sentence.`
+        if (isEmptyChapter) {
+          instruction = 'Write the opening of this chapter based on the scene blueprint and story context below. Establish the setting, introduce the key characters for this chapter, and set the tone. Write 3-4 vivid paragraphs.'
+        } else {
+          instruction = 'Continue writing the story naturally from where it left off. Match the tone, style, and pacing of the existing text. Write 2-3 paragraphs that flow seamlessly from the last sentence.'
+        }
         break
       case 'Write Scene':
-        instruction = `Write a new dramatic scene that advances the plot. Include vivid descriptions, character interactions, and forward momentum. Write 3-4 paragraphs.`
+        if (isEmptyChapter) {
+          instruction = 'Write a dramatic opening scene for this chapter using the scene blueprint below. Ground the reader in the setting, introduce conflict, and establish momentum. Write 3-4 paragraphs.'
+        } else {
+          instruction = 'Write a new dramatic scene that advances the plot. Include vivid descriptions, character interactions, and forward momentum. Write 3-4 paragraphs.'
+        }
         break
       case 'Generate Opening':
-        instruction = `Write a captivating opening paragraph that hooks the reader immediately. Use vivid imagery and establish the scene.`
+        instruction = 'Write a captivating opening paragraph that hooks the reader immediately. Use vivid imagery, establish the scene, and leverage the story context below.'
+        break
+      case 'Expand':
+        if (isEmptyChapter) {
+          instruction = 'Write an extended, richly detailed passage for this chapter opening. Include sensory details, internal thoughts, dialogue, and atmosphere. Write 4-6 substantial paragraphs.'
+        } else {
+          instruction = 'Expand and enrich the existing text with more detail, sensory descriptions, internal thoughts, and nuance. Deepen the scene without changing its direction. Write 3-5 paragraphs.'
+        }
         break
       default:
         instruction = 'Write creative narrative prose that continues the story.'
     }
     
-    // Build full context for AI - Sudowrite-style comprehensive awareness
+    // Build full context for AI - scene blueprint first, then style/genre, then story context
     let fullPrompt = instruction + '\n\n'
+    
+    if (sceneContext) {
+      fullPrompt += `=== SCENE BLUEPRINT (primary guide for this chapter) ===\n${sceneContext}\n\n`
+    }
+    
+    if (styleContext) {
+      fullPrompt += `=== WRITING STYLE ===\n${styleContext}\n\n`
+    }
+    
+    if (genreContext) {
+      fullPrompt += `=== GENRE ===\n${genreContext}\n\n`
+    }
     
     if (chapterContinuity) {
       fullPrompt += `=== PREVIOUS CHAPTER SUMMARY ===\n${chapterContinuity}\n\n`
@@ -428,10 +456,6 @@ function Toolbar() {
     
     if (characterContext) {
       fullPrompt += `=== KEY CHARACTERS ===\n${characterContext}\n\n`
-    }
-    
-    if (sceneContext) {
-      fullPrompt += `=== CHAPTER SCENES ===\n${sceneContext}\n\n`
     }
     
     if (seriesContext) {
@@ -473,20 +497,38 @@ function Toolbar() {
         outlineContext,
         sceneContext,
         seriesContext,
+        styleContext,
+        genreContext,
       }
     })
     
-    addNotification({ type: 'info', message: `AI is writing... (using ${precedingText.split(/\s+/).length} words of context)` })
+    const contextMsg = isEmptyChapter
+      ? 'AI is writing from story context...'
+      : `AI is writing... (using ${precedingText.split(/\s+/).length} words of context)`
+    addNotification({ type: 'info', message: contextMsg })
   }
   
+  // Helper: get the current editor selection from multiple sources
+  const getEditorSelection = () => {
+    if (currentEditorSelection?.hasSelection && currentEditorSelection.selectedText?.trim()) {
+      return currentEditorSelection
+    }
+    if (editorInstance) {
+      const { from, to } = editorInstance.state.selection
+      if (from !== to) {
+        const text = editorInstance.state.doc.textBetween(from, to, ' ')
+        if (text.trim()) {
+          return { selectedText: text, selectionStart: from, selectionEnd: to, hasSelection: true }
+        }
+      }
+    }
+    return { selectedText: '', hasSelection: false, selectionStart: 0, selectionEnd: 0 }
+  }
+
   // Handle Rewrite action - rewrites selected text in a specific style
   const handleRewrite = async (style) => {
-    // Use the stored selection state (captured before click)
-    const selection = currentEditorSelection || { selectedText: '', hasSelection: false }
+    const selection = getEditorSelection()
     
-    console.log('Rewrite - selection state:', selection)
-    
-    // Check if there's selected text
     if (!selection.hasSelection || !selection.selectedText.trim()) {
       addNotification({ type: 'warning', message: 'Please select some text to rewrite first' })
       return
@@ -555,10 +597,8 @@ function Toolbar() {
   
   // Handle Describe action - describes selected text based on chosen senses
   const handleDescribe = async () => {
-    // Get selected text from editor
-    const selection = currentEditorSelection || { selectedText: '', hasSelection: false }
+    const selection = getEditorSelection()
     
-    // Check if there's selected text
     if (!selection.hasSelection || !selection.selectedText.trim()) {
       addNotification({ type: 'warning', message: 'Please select some text to describe first' })
       return
@@ -635,7 +675,43 @@ function Toolbar() {
     
     addNotification({ type: 'info', message: `Generating ${senses.join(', ')} descriptions...` })
   }
-  
+
+  // Handle More Tools (Brainstorm, Visualize, Twist, Poem)
+  const handleMoreTool = (tool) => {
+    const editorText = editorInstance?.getText()?.trim() || ''
+    const excerpt = editorText.slice(-600) || '(No content yet)'
+
+    const toolPrompts = {
+      brainstorm: {
+        instruction: 'Brainstorm 5-7 creative ideas for the current story. Consider plot developments, character arcs, thematic depth, and surprising twists. Number each idea with a brief explanation.',
+        message: 'Brainstorming ideas...',
+      },
+      visualize: {
+        instruction: `Create a vivid, cinematic visualization of this scene. Describe the setting in rich sensory detail — lighting, atmosphere, character positioning, and mood.\n\nScene text:\n${editorText.slice(-800) || '(Describe the opening scene based on available story context.)'}`,
+        message: 'Visualizing scene...',
+      },
+      twist: {
+        instruction: `Generate 5 unexpected plot twists for this story. Each should subvert expectations, raise stakes, and feel earned. Number each with setup and payoff.\n\nCurrent text:\n${excerpt}`,
+        message: 'Generating plot twists...',
+      },
+      poem: {
+        instruction: `Write a poem inspired by this story capturing themes, emotions, and imagery. Choose the style that fits the tone best.\n\nStory excerpt:\n${excerpt}`,
+        message: 'Writing poem...',
+      },
+    }
+
+    const config = toolPrompts[tool]
+    if (!config) return
+
+    setPendingAiRequest({
+      type: tool === 'brainstorm' ? 'brainstorm' : 'write',
+      instruction: config.instruction,
+      formData: { tool },
+    })
+
+    addNotification({ type: 'info', message: config.message })
+  }
+
   // Handle TTS
   const { setTtsPlaying } = useStore()
   const [isDownloading, setIsDownloading] = useState(false)
@@ -894,7 +970,7 @@ function Toolbar() {
     : ttsVoices
   
   return (
-    <header className="h-toolbar flex items-center px-4 gap-4 glass drag-region">
+    <header className="h-toolbar flex items-center px-4 gap-4 glass drag-region overflow-visible">
       {/* Left: Navigation */}
       <div className="flex items-center gap-2 no-drag shrink-0">
         {/* Back to Dashboard */}
@@ -917,7 +993,7 @@ function Toolbar() {
       </div>
       
       {/* Center: AI Tools */}
-      <div className="flex items-center gap-2 flex-1 justify-center no-drag min-w-0 overflow-hidden">
+      <div className="flex items-center gap-2 flex-1 justify-center no-drag min-w-0 overflow-visible">
         {/* Write Button */}
         <ToolbarButton
           icon={<LuPenLine className={ic} />}
@@ -928,6 +1004,7 @@ function Toolbar() {
           <MenuItem label="Continue Writing" onClick={() => handleWrite('Continue Writing')} />
           <MenuItem label="Write Scene" onClick={() => handleWrite('Write Scene')} />
           <MenuItem label="Generate Opening" onClick={() => handleWrite('Generate Opening')} />
+          <MenuItem label="Expand" onClick={() => handleWrite('Expand')} />
         </ToolbarButton>
         
         {/* Rewrite Button */}
@@ -1006,9 +1083,10 @@ function Toolbar() {
           tooltip="Additional AI tools"
           hasMenu
         >
-          <MenuItem icon={<LuClapperboard className={ic} />} label="Visualize" onClick={() => {}} />
-          <MenuItem icon={<LuShuffle className={ic} />} label="Twist" onClick={() => {}} />
-          <MenuItem icon={<LuScroll className={ic} />} label="Poem" onClick={() => {}} />
+          <MenuItem icon={<LuLightbulb className={ic} />} label="Brainstorm" onClick={() => handleMoreTool('brainstorm')} />
+          <MenuItem icon={<LuClapperboard className={ic} />} label="Visualize" onClick={() => handleMoreTool('visualize')} />
+          <MenuItem icon={<LuShuffle className={ic} />} label="Twist" onClick={() => handleMoreTool('twist')} />
+          <MenuItem icon={<LuScroll className={ic} />} label="Poem" onClick={() => handleMoreTool('poem')} />
           <hr className="my-2 border-gold-rich/10" />
           <MenuItem icon={<LuUpload className={ic} />} label="Export" onClick={() => {}} />
           <MenuItem icon={<LuSettings className={ic} />} label="Settings" onClick={() => {}} />

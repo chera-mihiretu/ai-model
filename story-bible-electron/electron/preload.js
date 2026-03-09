@@ -270,10 +270,27 @@ contextBridge.exposeInMainWorld('api', {
   updateChapterSummaryAi: (chapterContent) => ipcRenderer.invoke('python-call', 'update_chapter_summary_ai', {
     chapter_content: chapterContent
   }),
-  expandSceneFromSummary: (sceneSummary, context, genre) => ipcRenderer.invoke('python-call', 'expand_scene_from_summary', {
+  generateChapterSummary: (chapterNumber, chapterTitle, synopsis, genre, customInstructions, existingOutline) => ipcRenderer.invoke('python-call', 'generate_chapter_summary', {
+    chapter_number: chapterNumber,
+    chapter_title: chapterTitle,
+    synopsis,
+    genre,
+    custom_instructions: customInstructions || '',
+    existing_outline: existingOutline || ''
+  }),
+  expandSceneFromSummary: (sceneSummary, context, genre, storyContext = {}) => ipcRenderer.invoke('python-call', 'expand_scene_from_summary', {
     scene_summary: sceneSummary,
     context,
-    genre
+    genre,
+    style: storyContext.style || '',
+    characters: storyContext.characters || '',
+    worldbuilding: storyContext.worldbuilding || '',
+    chapter_outline: storyContext.chapterOutline || '',
+    extra_instructions: storyContext.extraInstructions || ''
+  }),
+  generateBibleSection: (sectionKey, projectId) => ipcRenderer.invoke('python-call', 'generate_bible_section', {
+    section_key: sectionKey,
+    project_id: projectId
   }),
 
   // ==================== TTS METHODS ====================

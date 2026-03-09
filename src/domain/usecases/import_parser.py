@@ -6,6 +6,14 @@ import json
 import logging
 from typing import List, Dict, Optional, Any
 
+try:
+    from src.services.ai_engine import safe_parse_json
+except ImportError:
+    try:
+        from ...services.ai_engine import safe_parse_json
+    except ImportError:
+        safe_parse_json = None
+
 
 # AI Prompts for extraction
 PROMPT_EXTRACT_SYNOPSIS = """<|begin_of_text|><|start_header_id|>system<|end_header_id|>
@@ -26,18 +34,26 @@ Write a 2-3 paragraph synopsis:
 
 PROMPT_EXTRACT_CHARACTERS = """<|begin_of_text|><|start_header_id|>system<|end_header_id|>
 You are a literary analyst specializing in character analysis. Extract character profiles from manuscripts.
-Output ONLY valid JSON.
-<|eot_id|><|start_header_id|>user<|end_header_id|>
-Analyze this manuscript and identify ALL named characters. For each character, provide:
-- name: Full name
-- role: (protagonist, antagonist, supporting, minor)
-- personality_traits: Key personality characteristics
-- physical_description: Physical appearance if mentioned
-- backstory: Background information if provided
-- speech_pattern: How they talk (formal, casual, accent, etc.)
-- motivations: What drives them
+You MUST output ONLY a valid JSON array. No prose, no explanations, no markdown.
 
-CRITICAL: You MUST return at least 3-5 main characters. If fewer are explicitly named, include supporting characters who appear in the text.
+STRICT OUTPUT RULES:
+1. Your entire response must be a valid JSON array starting with [ and ending with ]
+2. Do NOT wrap the JSON in markdown code fences (no ```json or ```)
+3. Do NOT add any text before or after the JSON array
+4. Every string value must use double quotes, not single quotes
+5. Do NOT use trailing commas after the last item in an array or object
+6. All string values must be plain text with no markdown (no *, **, #, etc.)
+<|eot_id|><|start_header_id|>user<|end_header_id|>
+Analyze this manuscript and identify ALL named characters. For each character, return a JSON object with EXACTLY these keys:
+- "name": string (full name)
+- "role": string (one of: "protagonist", "antagonist", "supporting", "minor")
+- "personality_traits": string (key characteristics, plain text)
+- "physical_description": string (appearance if mentioned, plain text)
+- "backstory": string (background if provided, plain text)
+- "speech_pattern": string (how they talk, plain text)
+- "motivations": string (what drives them, plain text)
+
+CRITICAL: You MUST return at least 3-5 main characters.
 
 MANUSCRIPT (excerpt):
 {text}
@@ -48,20 +64,22 @@ Return a JSON array of character objects:
 
 PROMPT_EXTRACT_WORLD = """<|begin_of_text|><|start_header_id|>system<|end_header_id|>
 You are a literary analyst specializing in worldbuilding. Extract world elements from manuscripts.
-Output ONLY valid JSON.
-<|eot_id|><|start_header_id|>user<|end_header_id|>
-Analyze this manuscript and identify key worldbuilding elements:
-- Settings/Locations: Places where the story takes place
-- Events: Significant historical or plot events
-- Systems: Magic systems, political systems, social structures
-- Items: Important objects or artifacts
+You MUST output ONLY a valid JSON array. No prose, no explanations, no markdown.
 
-For each element provide:
-- name: Element name
-- element_type: (setting, location, event, system, item)
-- description: What it is
-- sensory_details: Visual, auditory, or other sensory descriptions
-- significance: Why it matters to the story
+STRICT OUTPUT RULES:
+1. Your entire response must be a valid JSON array starting with [ and ending with ]
+2. Do NOT wrap the JSON in markdown code fences (no ```json or ```)
+3. Do NOT add any text before or after the JSON array
+4. Every string value must use double quotes, not single quotes
+5. Do NOT use trailing commas after the last item in an array or object
+6. All string values must be plain text with no markdown (no *, **, #, etc.)
+<|eot_id|><|start_header_id|>user<|end_header_id|>
+Analyze this manuscript and identify key worldbuilding elements. For each element, return a JSON object with EXACTLY these keys:
+- "name": string (element name)
+- "element_type": string (one of: "setting", "location", "event", "system", "item")
+- "description": string (what it is, plain text)
+- "sensory_details": string (visual/auditory/sensory descriptions, plain text)
+- "significance": string (why it matters, plain text)
 
 CRITICAL: You MUST return at least 2-3 world elements. Include the primary setting at minimum.
 
@@ -90,36 +108,28 @@ Provide your analysis in 2-3 sentences:
 
 PROMPT_EXTRACT_COMBINED = """<|begin_of_text|><|start_header_id|>system<|end_header_id|>
 You are a literary analyst extracting story elements from manuscripts.
-Output ONLY valid JSON in the exact format specified.
+You MUST output ONLY a valid JSON object. No prose, no explanations, no markdown.
+
+STRICT OUTPUT RULES:
+1. Your entire response must be a single valid JSON object
+2. Do NOT wrap the JSON in markdown code fences (no ```json or ```)
+3. Do NOT add any text before or after the JSON
+4. Every string value must use double quotes, not single quotes
+5. Do NOT use trailing commas after the last item in an array or object
+6. All string values must be plain text with no markdown (no *, **, #, etc.)
 <|eot_id|><|start_header_id|>user<|end_header_id|>
 Analyze this manuscript and extract TWO types of story elements:
 
-1. CHARACTERS - Identify ALL named characters with complete profiles:
-   - name: Full character name
-   - role: One of (protagonist, antagonist, supporting, minor)
-   - personality_traits: Key personality characteristics
-   - physical_description: Physical appearance if mentioned
-   - backstory: Background information if provided
-   - speech_pattern: How they talk (formal, casual, accent, etc.)
-   - motivations: What drives them
+1. CHARACTERS - each with keys: "name", "role" (protagonist/antagonist/supporting/minor), "personality_traits", "physical_description", "backstory", "speech_pattern", "motivations" (all strings, plain text)
 
-2. WORLD ELEMENTS - Identify key worldbuilding elements:
-   - name: Element name
-   - element_type: One of (setting, location, event, system, item)
-   - description: What it is
-   - sensory_details: Visual, auditory, or other sensory descriptions
-   - significance: Why it matters to the story
+2. WORLD ELEMENTS - each with keys: "name", "element_type" (setting/location/event/system/item), "description", "sensory_details", "significance" (all strings, plain text)
 
-CRITICAL REQUIREMENTS:
-- Extract at least 3-5 characters (include supporting characters if needed)
-- Extract at least 2-3 world elements (include primary setting at minimum)
-- Do NOT omit any named characters or important locations
-- Return complete, valid JSON
+CRITICAL: Extract at least 3-5 characters and 2-3 world elements. All values must be plain text strings.
 
 MANUSCRIPT (excerpt):
 {text}
 
-Return JSON in this EXACT format:
+Return JSON in this EXACT format (a single object with two arrays):
 <|eot_id|><|start_header_id|>assistant<|end_header_id|>
 {{
   "characters": ["""
@@ -283,29 +293,36 @@ class ImportParser:
             logging.info(f"Character extraction completed in {elapsed:.2f}s")
             logging.info(f"Raw AI response length: {len(raw_response)} chars")
             
-            json_str = "[" + raw_response
+            if safe_parse_json:
+                characters = safe_parse_json(raw_response, expected_type="array", prepend="[")
+            else:
+                json_str = "[" + raw_response
+                if not json_str.endswith("]"):
+                    last_bracket = json_str.rfind("}")
+                    if last_bracket > 0:
+                        json_str = json_str[:last_bracket + 1] + "]"
+                characters = json.loads(json_str)
             
-            # Clean up JSON
-            if not json_str.endswith("]"):
-                # Find last complete object
-                last_bracket = json_str.rfind("}")
-                if last_bracket > 0:
-                    json_str = json_str[:last_bracket + 1] + "]"
+            if not characters or not isinstance(characters, list):
+                logging.warning(f"Character extraction returned no parseable data. Raw: {raw_response[:300]}")
+                return []
             
-            characters = json.loads(json_str)
+            def _ensure_str(val):
+                if isinstance(val, list):
+                    return ', '.join(str(v) for v in val)
+                return str(val).strip() if val else ''
             
-            # Validate and clean character data
             cleaned = []
             for char in characters:
                 if isinstance(char, dict) and char.get('name'):
                     cleaned.append({
-                        'name': char.get('name', ''),
-                        'role': char.get('role', 'supporting'),
-                        'personality_traits': char.get('personality_traits', ''),
-                        'physical_description': char.get('physical_description', ''),
-                        'backstory': char.get('backstory', ''),
-                        'speech_pattern': char.get('speech_pattern', ''),
-                        'motivations': char.get('motivations', ''),
+                        'name': _ensure_str(char.get('name', '')),
+                        'role': _ensure_str(char.get('role', 'supporting')),
+                        'personality_traits': _ensure_str(char.get('personality_traits', '')),
+                        'physical_description': _ensure_str(char.get('physical_description', '')),
+                        'backstory': _ensure_str(char.get('backstory', '')),
+                        'speech_pattern': _ensure_str(char.get('speech_pattern', '')),
+                        'motivations': _ensure_str(char.get('motivations', '')),
                         'is_visible': 1
                     })
             
@@ -314,12 +331,8 @@ class ImportParser:
                 logging.warning(f"Only extracted {len(cleaned)} characters - expected at least 3")
             
             return cleaned
-        except json.JSONDecodeError as e:
-            logging.error(f"Failed to parse character JSON: {e}")
-            logging.error(f"Raw response preview: {json_str[:500] if 'json_str' in locals() else 'N/A'}...")
-            return []
         except Exception as e:
-            logging.error(f"Character extraction failed: {e}")
+            logging.error(f"Character extraction failed: {e}", exc_info=True)
             return []
     
     def extract_world_elements(self, content: str) -> List[Dict[str, Any]]:
@@ -345,26 +358,34 @@ class ImportParser:
             logging.info(f"World element extraction completed in {elapsed:.2f}s")
             logging.info(f"Raw AI response length: {len(raw_response)} chars")
             
-            json_str = "[" + raw_response
+            if safe_parse_json:
+                elements = safe_parse_json(raw_response, expected_type="array", prepend="[")
+            else:
+                json_str = "[" + raw_response
+                if not json_str.endswith("]"):
+                    last_bracket = json_str.rfind("}")
+                    if last_bracket > 0:
+                        json_str = json_str[:last_bracket + 1] + "]"
+                elements = json.loads(json_str)
             
-            # Clean up JSON
-            if not json_str.endswith("]"):
-                last_bracket = json_str.rfind("}")
-                if last_bracket > 0:
-                    json_str = json_str[:last_bracket + 1] + "]"
+            if not elements or not isinstance(elements, list):
+                logging.warning(f"World extraction returned no parseable data. Raw: {raw_response[:300]}")
+                return []
             
-            elements = json.loads(json_str)
+            def _ensure_str(val):
+                if isinstance(val, list):
+                    return ', '.join(str(v) for v in val)
+                return str(val).strip() if val else ''
             
-            # Validate and clean element data
             cleaned = []
             for elem in elements:
                 if isinstance(elem, dict) and elem.get('name'):
                     cleaned.append({
-                        'name': elem.get('name', ''),
-                        'element_type': elem.get('element_type', 'other'),
-                        'description': elem.get('description', ''),
-                        'sensory_details': elem.get('sensory_details', ''),
-                        'significance': elem.get('significance', ''),
+                        'name': _ensure_str(elem.get('name', '')),
+                        'element_type': _ensure_str(elem.get('element_type', 'other')),
+                        'description': _ensure_str(elem.get('description', '')),
+                        'sensory_details': _ensure_str(elem.get('sensory_details', '')),
+                        'significance': _ensure_str(elem.get('significance', '')),
                         'is_visible': 1
                     })
             
@@ -373,12 +394,8 @@ class ImportParser:
                 logging.warning(f"Only extracted {len(cleaned)} world elements - expected at least 2")
             
             return cleaned
-        except json.JSONDecodeError as e:
-            logging.error(f"Failed to parse world elements JSON: {e}")
-            logging.error(f"Raw response preview: {json_str[:500] if 'json_str' in locals() else 'N/A'}...")
-            return []
         except Exception as e:
-            logging.error(f"World extraction failed: {e}")
+            logging.error(f"World extraction failed: {e}", exc_info=True)
             return []
     
     def extract_characters_and_world_combined(self, content: str) -> Dict[str, List[Dict[str, Any]]]:
@@ -410,87 +427,92 @@ class ImportParser:
             logging.info(f"Combined extraction completed in {elapsed:.2f}s")
             logging.info(f"Raw AI response length: {len(raw_response)} chars")
             
-            # The response should start with { "characters": [
-            json_str = "{" + raw_response
+            combined_data = None
+            if safe_parse_json:
+                combined_data = safe_parse_json(raw_response, expected_type="object", prepend='{\n  "characters": [')
             
-            # Clean up JSON - find the end of the structure
-            if not json_str.endswith("}"):
-                # Try to find the last complete closing brace for the main object
-                # Look for pattern: ]} or similar
-                last_world_bracket = json_str.rfind("]")
-                if last_world_bracket > 0:
-                    # Add closing brace after the last array
-                    json_str = json_str[:last_world_bracket + 1] + "}"
-            
-            # Parse the combined JSON
-            try:
-                combined_data = json.loads(json_str)
-            except json.JSONDecodeError:
-                # If that fails, try to extract each section separately
-                logging.warning("Failed to parse combined JSON, attempting to extract sections...")
+            if not combined_data or not isinstance(combined_data, dict):
+                json_str = '{\n  "characters": [' + raw_response
+                if not json_str.endswith("}"):
+                    last_world_bracket = json_str.rfind("]")
+                    if last_world_bracket > 0:
+                        json_str = json_str[:last_world_bracket + 1] + "}"
                 
-                # Try to find characters array
-                char_start = json_str.find('"characters"')
-                world_start = json_str.find('"world_elements"')
-                
-                characters = []
-                world_elements = []
-                
-                if char_start > 0:
-                    char_array_start = json_str.find('[', char_start)
-                    if world_start > char_start:
-                        char_array_end = json_str.rfind(']', char_array_start, world_start)
-                    else:
-                        char_array_end = json_str.rfind(']')
+                try:
+                    combined_data = json.loads(json_str)
+                except json.JSONDecodeError:
+                    logging.warning("Failed to parse combined JSON, attempting section extraction...")
                     
-                    if char_array_start > 0 and char_array_end > char_array_start:
-                        char_json = json_str[char_array_start:char_array_end + 1]
-                        try:
-                            characters = json.loads(char_json)
-                        except:
-                            pass
-                
-                if world_start > 0:
-                    world_array_start = json_str.find('[', world_start)
-                    world_array_end = json_str.rfind(']')
+                    char_start = json_str.find('"characters"')
+                    world_start = json_str.find('"world_elements"')
                     
-                    if world_array_start > 0 and world_array_end > world_array_start:
-                        world_json = json_str[world_array_start:world_array_end + 1]
-                        try:
-                            world_elements = json.loads(world_json)
-                        except:
-                            pass
-                
-                combined_data = {
-                    'characters': characters,
-                    'world_elements': world_elements
-                }
+                    characters = []
+                    world_elements = []
+                    
+                    if char_start > 0:
+                        char_array_start = json_str.find('[', char_start)
+                        if world_start > char_start:
+                            char_array_end = json_str.rfind(']', char_array_start, world_start)
+                        else:
+                            char_array_end = json_str.rfind(']')
+                        
+                        if char_array_start > 0 and char_array_end > char_array_start:
+                            char_json = json_str[char_array_start:char_array_end + 1]
+                            if safe_parse_json:
+                                characters = safe_parse_json(char_json, expected_type="array") or []
+                            else:
+                                try:
+                                    characters = json.loads(char_json)
+                                except json.JSONDecodeError:
+                                    pass
+                    
+                    if world_start > 0:
+                        world_array_start = json_str.find('[', world_start)
+                        world_array_end = json_str.rfind(']')
+                        
+                        if world_array_start > 0 and world_array_end > world_array_start:
+                            world_json = json_str[world_array_start:world_array_end + 1]
+                            if safe_parse_json:
+                                world_elements = safe_parse_json(world_json, expected_type="array") or []
+                            else:
+                                try:
+                                    world_elements = json.loads(world_json)
+                                except json.JSONDecodeError:
+                                    pass
+                    
+                    combined_data = {
+                        'characters': characters,
+                        'world_elements': world_elements
+                    }
             
-            # Validate and clean character data
+            def _ensure_str(val):
+                if isinstance(val, list):
+                    return ', '.join(str(v) for v in val)
+                return str(val).strip() if val else ''
+            
             cleaned_chars = []
             for char in combined_data.get('characters', []):
                 if isinstance(char, dict) and char.get('name'):
                     cleaned_chars.append({
-                        'name': char.get('name', ''),
-                        'role': char.get('role', 'supporting'),
-                        'personality_traits': char.get('personality_traits', ''),
-                        'physical_description': char.get('physical_description', ''),
-                        'backstory': char.get('backstory', ''),
-                        'speech_pattern': char.get('speech_pattern', ''),
-                        'motivations': char.get('motivations', ''),
+                        'name': _ensure_str(char.get('name', '')),
+                        'role': _ensure_str(char.get('role', 'supporting')),
+                        'personality_traits': _ensure_str(char.get('personality_traits', '')),
+                        'physical_description': _ensure_str(char.get('physical_description', '')),
+                        'backstory': _ensure_str(char.get('backstory', '')),
+                        'speech_pattern': _ensure_str(char.get('speech_pattern', '')),
+                        'motivations': _ensure_str(char.get('motivations', '')),
                         'is_visible': 1
                     })
             
-            # Validate and clean world element data
             cleaned_world = []
             for elem in combined_data.get('world_elements', []):
                 if isinstance(elem, dict) and elem.get('name'):
                     cleaned_world.append({
-                        'name': elem.get('name', ''),
-                        'element_type': elem.get('element_type', 'other'),
-                        'description': elem.get('description', ''),
-                        'sensory_details': elem.get('sensory_details', ''),
-                        'significance': elem.get('significance', ''),
+                        'name': _ensure_str(elem.get('name', '')),
+                        'element_type': _ensure_str(elem.get('element_type', 'other')),
+                        'description': _ensure_str(elem.get('description', '')),
+                        'sensory_details': _ensure_str(elem.get('sensory_details', '')),
+                        'significance': _ensure_str(elem.get('significance', '')),
                         'is_visible': 1
                     })
             

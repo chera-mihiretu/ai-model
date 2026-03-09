@@ -560,10 +560,8 @@ class DatabaseManager:
                                 ch_num = ch.get('chapter_number', '?')
                                 ch_title = ch.get('title', 'Untitled')
                                 ch_summary = ch.get('summary', '')
-                                ch_events = ch.get('key_events', '')
                                 lines = [f"Chapter {ch_num}: {ch_title}"]
-                                if ch_summary: lines.append(f"Summary: {ch_summary}")
-                                if ch_events: lines.append(f"Events: {ch_events}")
+                                if ch_summary: lines.append(ch_summary)
                                 parts.append("\n".join(lines))
                             return "\n\n".join(parts)
                     except Exception:
@@ -1691,11 +1689,9 @@ class DatabaseManager:
                                 ch_num = ch.get('chapter_number', '?')
                                 ch_title = ch.get('title', 'Untitled')
                                 ch_summary = ch.get('summary', '')
-                                ch_events = ch.get('key_events', '')
                                 
-                                memory.append(f"=== Chapter {ch_num}: {ch_title} ===")
-                                if ch_summary: memory.append(f"Summary: {ch_summary}")
-                                if ch_events: memory.append(f"Key Events: {ch_events}")
+                                memory.append(f"Chapter {ch_num}: {ch_title}")
+                                if ch_summary: memory.append(ch_summary)
                                 memory.append("")
                         else:
                             memory.append("Outline exists but has no chapters defined.")

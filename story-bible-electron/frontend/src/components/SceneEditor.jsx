@@ -257,6 +257,7 @@ function SceneEditor() {
     currentProjectId,
     currentChapterId,
     addNotification,
+    projects,
   } = useStore()
   
   const {
@@ -266,6 +267,8 @@ function SceneEditor() {
     deleteScene,
     getChapterContent,
     updateChapterContent,
+    getStoryBible,
+    getCharacters,
     isElectronApi,
   } = usePythonBridge()
   
@@ -273,6 +276,7 @@ function SceneEditor() {
   const [isLoading, setIsLoading] = useState(true)
   const [editingScene, setEditingScene] = useState(null)
   const [expandingSceneId, setExpandingSceneId] = useState(null)
+  const [storyContext, setStoryContext] = useState(null)
   
   // Load scenes
   useEffect(() => {
@@ -290,6 +294,24 @@ function SceneEditor() {
     }
     loadScenes()
   }, [currentChapterId])
+
+  // Load Story Bible context once per project for scene expansion
+  useEffect(() => {
+    async function loadStoryContext() {
+      if (!currentProjectId) { setStoryContext(null); return }
+      try {
+        const [bible, chars] = await Promise.all([
+          getStoryBible(currentProjectId),
+          getCharacters(currentProjectId)
+        ])
+        setStoryContext({ bible: bible || {}, characters: chars || [] })
+      } catch (e) {
+        console.error('Failed to load story context for scenes:', e)
+        setStoryContext(null)
+      }
+    }
+    loadStoryContext()
+  }, [currentProjectId])
   
   const handleCreateScene = () => {
     setEditingScene({})
@@ -335,28 +357,65 @@ function SceneEditor() {
     setExpandingSceneId(scene.id)
     
     try {
-      // Get previous scene content as context
       const sceneIndex = scenes.findIndex(s => s.id === scene.id)
-      let context = ''
+      let prevContext = ''
       if (sceneIndex > 0) {
         const prevScene = scenes[sceneIndex - 1]
-        context = prevScene.content || prevScene.summary || ''
+        prevContext = prevScene.content || prevScene.summary || ''
       }
-      
+
+      const bible = storyContext?.bible || {}
+      const allChars = storyContext?.characters || []
+      const genre = bible.genre || 'fiction'
+      const style = bible.style || ''
+      const worldbuilding = bible.worldbuilding || ''
+
+      // Find the chapter outline summary for the current chapter
+      let chapterOutline = ''
+      try {
+        const project = projects?.find(p => p.id === currentProjectId)
+        const chapterIndex = project?.chapters?.findIndex(c => c.id === currentChapterId) ?? -1
+        if (bible.outline && chapterIndex >= 0) {
+          const outlineArr = typeof bible.outline === 'string' ? JSON.parse(bible.outline) : bible.outline
+          if (Array.isArray(outlineArr)) {
+            const match = outlineArr.find(ch => ch.chapter_number === chapterIndex + 1)
+            if (match) {
+              chapterOutline = `Chapter ${match.chapter_number}: ${match.title}\n${match.summary || ''}`
+            }
+          }
+        }
+      } catch (_) { /* outline parse failed, proceed without */ }
+
+      // Filter characters to those mentioned in the scene summary or POV
+      const sceneLower = (scene.summary + ' ' + (scene.pov_character || '')).toLowerCase()
+      const relevantChars = allChars.filter(c => {
+        const name = (c.name || '').toLowerCase()
+        const otherNames = (c.other_names || '').toLowerCase()
+        return name && (sceneLower.includes(name) || (otherNames && sceneLower.includes(otherNames)))
+      })
+      let charactersStr = ''
+      if (relevantChars.length > 0) {
+        charactersStr = relevantChars.map(c => {
+          const parts = [c.name]
+          if (c.role) parts.push(`Role: ${c.role}`)
+          if (c.personality_traits) parts.push(`Personality: ${c.personality_traits}`)
+          if (c.speech_pattern) parts.push(`Speech: ${c.speech_pattern}`)
+          if (c.motivations) parts.push(`Motivations: ${c.motivations}`)
+          return parts.join('. ')
+        }).join('\n')
+      }
+
       const result = await window.api.expandSceneFromSummary(
         scene.summary,
-        context,
-        'fiction'
+        prevContext,
+        genre,
+        { style, characters: charactersStr, worldbuilding, chapterOutline }
       )
       
       if (result) {
-        // Update scene with expanded content
         await updateScene(scene.id, { content: result })
-        
-        // Refresh
         const updated = await getScenes(currentChapterId)
         setScenes(updated || [])
-        
         addNotification({ type: 'success', message: 'Scene expanded with AI' })
       }
     } catch (error) {
