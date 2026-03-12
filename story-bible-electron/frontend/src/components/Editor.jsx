@@ -951,6 +951,8 @@ function Editor() {
     setCurrentEditorSelection,
     setEditorReplaceSelectionCallback,
     setEditorInstance,
+    projects,
+    setProjects,
   } = useStore()
   
   const {
@@ -961,15 +963,20 @@ function Editor() {
     getStoryBible,
     getCharacters,
     getSceneContext,
+    renameChapter,
   } = usePythonBridge()
   
   const [showOpeningsModal, setShowOpeningsModal] = useState(false)
   const [showDraftModal, setShowDraftModal] = useState(false)
   const [showBrainstormModal, setShowBrainstormModal] = useState(false)
   const [showRewriteModal, setShowRewriteModal] = useState(false)
+  const [chapterTitle, setChapterTitle] = useState('')
   const saveTimeoutRef = useRef(null)
+  const titleSaveTimeoutRef = useRef(null)
   const editorRef = useRef(null)
   const editorContainerRef = useRef(null)
+  const titleInputRef = useRef(null)
+  const isEditingTitleRef = useRef(false)
   
   // Selection menu state
   const [selectionMenu, setSelectionMenu] = useState({
@@ -1092,6 +1099,101 @@ function Editor() {
     
     loadContent()
   }, [currentChapterId, editor])
+  
+  // Track the previous chapter ID to detect actual chapter switches
+  const prevChapterIdRef = useRef(null)
+  
+  // Load chapter title when chapter changes (only when actually switching chapters)
+  useEffect(() => {
+    if (!currentChapterId || !currentProjectId) {
+      setChapterTitle('')
+      isEditingTitleRef.current = false
+      prevChapterIdRef.current = null
+      return
+    }
+    
+    // Only load title from projects if we're switching to a different chapter
+    const isChapterSwitch = prevChapterIdRef.current !== currentChapterId
+    prevChapterIdRef.current = currentChapterId
+    
+    if (isChapterSwitch) {
+      // Reset editing flag when switching chapters
+      isEditingTitleRef.current = false
+      
+      // Find the current chapter from projects
+      const project = projects.find(p => p.id === currentProjectId)
+      const chapter = project?.chapters?.find(ch => ch.id === currentChapterId)
+      setChapterTitle(chapter?.title || '')
+    }
+  }, [currentChapterId, currentProjectId, projects])
+  
+  // Handle chapter title change with debounced auto-save
+  const handleTitleChange = (e) => {
+    const newTitle = e.target.value
+    setChapterTitle(newTitle)
+    isEditingTitleRef.current = true
+    
+    // Update the projects store immediately for instant sidebar update
+    if (currentChapterId && currentProjectId) {
+      const updatedProjects = projects.map(p => {
+        if (p.id === currentProjectId) {
+          return {
+            ...p,
+            chapters: p.chapters?.map(ch => 
+              ch.id === currentChapterId 
+                ? { ...ch, title: newTitle }
+                : ch
+            )
+          }
+        }
+        return p
+      })
+      setProjects(updatedProjects)
+    }
+    
+    // Debounced save to backend
+    if (titleSaveTimeoutRef.current) {
+      clearTimeout(titleSaveTimeoutRef.current)
+    }
+    
+    if (currentChapterId) {
+      titleSaveTimeoutRef.current = setTimeout(async () => {
+        const titleToSave = newTitle.trim() || 'Untitled'
+        await renameChapter(currentChapterId, titleToSave)
+        isEditingTitleRef.current = false
+      }, 1000)
+    }
+  }
+  
+  // Handle title input blur - save immediately
+  const handleTitleBlur = () => {
+    if (titleSaveTimeoutRef.current) {
+      clearTimeout(titleSaveTimeoutRef.current)
+    }
+    
+    if (currentChapterId) {
+      const titleToSave = chapterTitle.trim() || 'Untitled'
+      renameChapter(currentChapterId, titleToSave)
+      isEditingTitleRef.current = false
+    }
+  }
+  
+  // Handle Enter key in title input - save and move focus to editor
+  const handleTitleKeyDown = (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault()
+      // Save immediately when Enter is pressed
+      if (titleSaveTimeoutRef.current) {
+        clearTimeout(titleSaveTimeoutRef.current)
+      }
+      if (currentChapterId) {
+        const titleToSave = chapterTitle.trim() || 'Untitled'
+        renameChapter(currentChapterId, titleToSave)
+        isEditingTitleRef.current = false
+      }
+      editor?.chain().focus().run()
+    }
+  }
   
   // Note: AI no longer writes directly to editor
   // AI responses go to AssistantPanel and user can click "Insert" to add to editor
@@ -1701,6 +1803,9 @@ RULES:
       if (saveTimeoutRef.current) {
         clearTimeout(saveTimeoutRef.current)
       }
+      if (titleSaveTimeoutRef.current) {
+        clearTimeout(titleSaveTimeoutRef.current)
+      }
     }
   }, [])
   
@@ -1735,8 +1840,24 @@ RULES:
       {/* Editor Area */}
       <div className="flex-1 overflow-hidden">
         {currentChapterId ? (
-          <div className="h-full overflow-y-auto paper-card">
-            <EditorContent editor={editor} />
+          <div className="h-full overflow-y-auto paper-card flex flex-col">
+            {/* Chapter Title Input */}
+            <div className="px-4 pt-4 pb-2 border-b border-gold-rich/10">
+              <input
+                ref={titleInputRef}
+                type="text"
+                value={chapterTitle}
+                onChange={handleTitleChange}
+                onKeyDown={handleTitleKeyDown}
+                onBlur={handleTitleBlur}
+                placeholder="Untitled"
+                className="w-full text-2xl font-serif font-semibold text-gold-pale bg-transparent border-none outline-none placeholder:text-gray-600"
+              />
+            </div>
+            {/* Main Content Editor */}
+            <div className="flex-1 overflow-y-auto">
+              <EditorContent editor={editor} />
+            </div>
           </div>
         ) : (
           <div className="h-full flex items-center justify-center paper-card">

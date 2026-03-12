@@ -275,107 +275,90 @@ function Toolbar() {
   
   // Handle Write action - Sudowrite-style context-aware writing
   const handleWrite = async (mode) => {
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/99078eb2-d644-4fa5-9cbc-a0baa688e7c0',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'d3edd1'},body:JSON.stringify({sessionId:'d3edd1',location:'Toolbar.jsx:handleWrite:entry',message:'handleWrite called',data:{mode,currentChapterId,currentProjectId},timestamp:Date.now(),hypothesisId:'A'})}).catch(()=>{});
+    // #endregion
     setWriteMode(mode)
     
-    // Check if we have an editor and chapter selected
+    // Check if we have a chapter selected
     if (!currentChapterId) {
       addNotification({ type: 'warning', message: 'Please select a chapter first' })
       return
     }
     
-    // Get cursor context (up to 1000 words preceding the cursor)
+    // Get cursor context and selection
     let cursorContext = { precedingText: '', cursorPosition: 0, fullText: '', textAfterCursor: '' }
     if (editorCursorContextCallback) {
       cursorContext = editorCursorContextCallback()
     }
     
     const { precedingText, textAfterCursor, cursorPosition } = cursorContext
-    const isEmptyChapter = !precedingText.trim()
+    const hasExistingText = precedingText.trim().length > 0
     
-    // Get chapter continuity context (summaries from previous chapters)
-    let chapterContinuity = ''
-    try {
-      const contextWindow = await getContextWindow(currentProjectId, currentChapterId, 2000)
-      if (contextWindow?.prev_summary) {
-        chapterContinuity = contextWindow.prev_summary
+    // Get current selection for Expand mode
+    const hasSelection = currentEditorSelection?.hasSelection && currentEditorSelection?.selectedText?.trim()
+    const selection = hasSelection ? currentEditorSelection : null
+    
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/99078eb2-d644-4fa5-9cbc-a0baa688e7c0',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'d3edd1'},body:JSON.stringify({sessionId:'d3edd1',location:'Toolbar.jsx:handleWrite:contextCheck',message:'Checking context',data:{mode,hasExistingText,hasSelection,precedingTextLength:precedingText?.length,hasCallback:!!editorCursorContextCallback},timestamp:Date.now(),hypothesisId:'G'})}).catch(()=>{});
+    // #endregion
+    
+    // === MODE-SPECIFIC VALIDATION ===
+    
+    // Expand: requires text selection
+    if (mode === 'Expand') {
+      if (!hasSelection) {
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/99078eb2-d644-4fa5-9cbc-a0baa688e7c0',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'d3edd1'},body:JSON.stringify({sessionId:'d3edd1',location:'Toolbar.jsx:handleWrite:expandNoSelection',message:'Expand failed - no selection',data:{},timestamp:Date.now(),hypothesisId:'G'})}).catch(()=>{});
+        // #endregion
+        addNotification({ type: 'warning', message: 'Please select text first to expand' })
+        return
       }
-    } catch (e) {
-      console.log('Could not get chapter continuity:', e)
     }
     
-    // Get scene context for the current chapter
-    let sceneContext = ''
-    try {
-      if (currentChapterId) {
-        const sceneData = await getSceneContext(currentChapterId)
-        if (sceneData?.formatted) {
-          sceneContext = sceneData.formatted
-        }
+    // Continue Writing: requires existing text
+    if (mode === 'Continue Writing') {
+      if (!hasExistingText) {
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/99078eb2-d644-4fa5-9cbc-a0baa688e7c0',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'d3edd1'},body:JSON.stringify({sessionId:'d3edd1',location:'Toolbar.jsx:handleWrite:continueNoText',message:'Continue Writing failed - no existing text',data:{},timestamp:Date.now(),hypothesisId:'G'})}).catch(()=>{});
+        // #endregion
+        addNotification({ type: 'warning', message: 'Please write something first, then use Continue Writing to extend it' })
+        return
       }
-    } catch (e) {
-      console.log('Could not get scene context:', e)
     }
     
-    // Get series context if project belongs to a series (shared characters & worldbuilding)
-    let seriesContext = ''
-    try {
-      if (currentProjectId) {
-        const seriesCtx = await getSeriesContextForProject(currentProjectId)
-        if (seriesCtx) {
-          seriesContext = seriesCtx
-        }
-      }
-    } catch (e) {
-      console.log('Could not get series context:', e)
-    }
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/99078eb2-d644-4fa5-9cbc-a0baa688e7c0',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'d3edd1'},body:JSON.stringify({sessionId:'d3edd1',location:'Toolbar.jsx:handleWrite:validationPassed',message:'Validation passed, gathering context',data:{mode,hasExistingText,hasSelection},timestamp:Date.now(),hypothesisId:'F'})}).catch(()=>{});
+    // #endregion
     
-    // Get character, story bible, worldbuilding, and outline context for consistency
-    let characterContext = ''
-    let storyContext = ''
-    let worldbuildingContext = ''
+    // === GATHER CONTEXT (with timeouts to prevent hanging) ===
     let outlineContext = ''
+    let storyContext = ''  // synopsis
+    let braindumpContext = ''
+    let characterContext = ''
+    let worldbuildingContext = ''
     let styleContext = ''
     let genreContext = ''
+    let sceneContext = ''
+    let chapterContinuity = ''
+    let seriesContext = ''
+    
     try {
-      const characters = await getCharacters(currentProjectId)
-      if (characters && characters.length > 0) {
-        const visibleChars = characters.filter(c => c.is_visible !== 0)
-        if (visibleChars.length > 0) {
-          characterContext = visibleChars.slice(0, 8).map(c => {
-            let entry = `${c.name}${c.role ? ` (${c.role})` : ''}`
-            if (c.personality_traits) entry += `: ${c.personality_traits}`
-            if (c.speech_pattern) entry += ` | Speech: ${c.speech_pattern}`
-            if (c.motivations) entry += ` | Motivations: ${c.motivations}`
-            return entry
-          }).join('\n')
-        }
-      }
+      // Get story bible data (contains outline, synopsis, braindump, style, genre, worldbuilding)
+      const bible = await Promise.race([
+        getStoryBible(currentProjectId),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 5000))
+      ]).catch(() => null)
       
-      const bible = await getStoryBible(currentProjectId)
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/99078eb2-d644-4fa5-9cbc-a0baa688e7c0',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'d3edd1'},body:JSON.stringify({sessionId:'d3edd1',location:'Toolbar.jsx:handleWrite:gotBible',message:'Got story bible',data:{hasBible:!!bible,hasOutline:!!(bible?.outline),hasSynopsis:!!(bible?.synopsis),hasBraindump:!!(bible?.braindump)},timestamp:Date.now(),hypothesisId:'F'})}).catch(()=>{});
+      // #endregion
+      
       if (bible) {
-        // Use summary if available, fall back to raw content (trimmed)
-        if (bible.synopsis_summary) {
-          storyContext = bible.synopsis_summary
-        } else if (bible.synopsis) {
-          storyContext = bible.synopsis.substring(0, 800)
-        }
-        
-        // Worldbuilding context
-        if (bible.worldbuilding_summary) {
-          worldbuildingContext = bible.worldbuilding_summary
-        } else if (bible.worldbuilding) {
-          worldbuildingContext = bible.worldbuilding.substring(0, 600)
-        }
-        
-        // Style & Genre context
-        if (bible.style) styleContext = bible.style.substring(0, 300)
-        if (bible.genre) genreContext = bible.genre.substring(0, 100)
-
-        // Outline context
+        // Extract outline
         if (bible.outline_summary) {
           outlineContext = bible.outline_summary
         } else if (bible.outline) {
-          // Try to parse JSON outline for a cleaner representation
           try {
             const outlineData = JSON.parse(bible.outline)
             if (Array.isArray(outlineData)) {
@@ -387,106 +370,176 @@ function Toolbar() {
             outlineContext = bible.outline.substring(0, 600)
           }
         }
+        
+        // Extract synopsis
+        if (bible.synopsis_summary) {
+          storyContext = bible.synopsis_summary
+        } else if (bible.synopsis) {
+          storyContext = bible.synopsis.substring(0, 800)
+        }
+        
+        // Extract braindump
+        if (bible.braindump) {
+          braindumpContext = bible.braindump.substring(0, 600)
+        }
+        
+        // Extract other context
+        if (bible.worldbuilding_summary) {
+          worldbuildingContext = bible.worldbuilding_summary
+        } else if (bible.worldbuilding) {
+          worldbuildingContext = bible.worldbuilding.substring(0, 600)
+        }
+        
+        if (bible.style) styleContext = bible.style.substring(0, 300)
+        if (bible.genre) genreContext = bible.genre.substring(0, 100)
       }
+      
+      // Get characters
+      const characters = await Promise.race([
+        getCharacters(currentProjectId),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 3000))
+      ]).catch(() => null)
+      
+      if (characters && characters.length > 0) {
+        const visibleChars = characters.filter(c => c.is_visible !== 0)
+        if (visibleChars.length > 0) {
+          characterContext = visibleChars.slice(0, 8).map(c => {
+            let entry = `${c.name}${c.role ? ` (${c.role})` : ''}`
+            if (c.personality_traits) entry += `: ${c.personality_traits}`
+            if (c.speech_pattern) entry += ` | Speech: ${c.speech_pattern}`
+            return entry
+          }).join('\n')
+        }
+      }
+      
+      // Get scene context (optional, don't block)
+      const sceneData = await Promise.race([
+        getSceneContext(currentChapterId),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 2000))
+      ]).catch(() => null)
+      
+      if (sceneData?.formatted) {
+        sceneContext = sceneData.formatted
+      }
+      
+      // Get chapter continuity (optional)
+      const contextWindow = await Promise.race([
+        getContextWindow(currentProjectId, currentChapterId, 2000),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 2000))
+      ]).catch(() => null)
+      
+      if (contextWindow?.prev_summary) {
+        chapterContinuity = contextWindow.prev_summary
+      }
+      
     } catch (e) {
-      console.log('Could not get character/story context:', e)
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/99078eb2-d644-4fa5-9cbc-a0baa688e7c0',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'d3edd1'},body:JSON.stringify({sessionId:'d3edd1',location:'Toolbar.jsx:handleWrite:contextError',message:'Error gathering context',data:{error:e?.message||String(e)},timestamp:Date.now(),hypothesisId:'F'})}).catch(()=>{});
+      // #endregion
     }
     
-    // Build the instruction based on mode
+    // === CHECK IF WE HAVE ENOUGH CONTEXT FOR WRITE SCENE / GENERATE OPENING ===
+    // Priority: outline -> synopsis -> braindump -> error
+    const primaryContext = outlineContext || storyContext || braindumpContext
+    
+    if (mode === 'Write Scene' || mode === 'Generate Opening') {
+      if (!primaryContext) {
+        addNotification({ 
+          type: 'error', 
+          message: 'Please add a chapter outline, synopsis, or braindump first to generate content' 
+        })
+        return
+      }
+    }
+    
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/99078eb2-d644-4fa5-9cbc-a0baa688e7c0',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'d3edd1'},body:JSON.stringify({sessionId:'d3edd1',location:'Toolbar.jsx:handleWrite:buildingPrompt',message:'Building prompt',data:{mode,hasOutline:!!outlineContext,hasSynopsis:!!storyContext,hasBraindump:!!braindumpContext,hasCharacters:!!characterContext},timestamp:Date.now(),hypothesisId:'F'})}).catch(()=>{});
+    // #endregion
+    
+    // === BUILD INSTRUCTION BASED ON MODE ===
     let instruction = ''
     switch (mode) {
       case 'Continue Writing':
-        if (isEmptyChapter) {
-          instruction = 'Write the opening of this chapter based on the scene blueprint and story context below. Establish the setting, introduce the key characters for this chapter, and set the tone. Write 3-4 vivid paragraphs.'
-        } else {
-          instruction = 'Continue writing the story naturally from where it left off. Match the tone, style, and pacing of the existing text. Write 2-3 paragraphs that flow seamlessly from the last sentence.'
-        }
+        instruction = 'Continue writing the story naturally from where it left off. Match the tone, style, and pacing of the existing text. Write 2-3 paragraphs that flow seamlessly from the last sentence.'
         break
       case 'Write Scene':
-        if (isEmptyChapter) {
-          instruction = 'Write a dramatic opening scene for this chapter using the scene blueprint below. Ground the reader in the setting, introduce conflict, and establish momentum. Write 3-4 paragraphs.'
-        } else {
-          instruction = 'Write a new dramatic scene that advances the plot. Include vivid descriptions, character interactions, and forward momentum. Write 3-4 paragraphs.'
-        }
+        instruction = hasExistingText
+          ? 'Write a new dramatic scene that advances the plot. Include vivid descriptions, character interactions, and forward momentum. Write 3-4 paragraphs.'
+          : 'Write a dramatic opening scene for this chapter. Ground the reader in the setting, introduce conflict, and establish momentum. Write 3-4 paragraphs.'
         break
       case 'Generate Opening':
-        instruction = 'Write a captivating opening paragraph that hooks the reader immediately. Use vivid imagery, establish the scene, and leverage the story context below.'
+        instruction = 'Write a captivating opening paragraph that hooks the reader immediately. Use vivid imagery, establish the scene, and create intrigue. This is the very first line the reader will see.'
         break
       case 'Expand':
-        if (isEmptyChapter) {
-          instruction = 'Write an extended, richly detailed passage for this chapter opening. Include sensory details, internal thoughts, dialogue, and atmosphere. Write 4-6 substantial paragraphs.'
-        } else {
-          instruction = 'Expand and enrich the existing text with more detail, sensory descriptions, internal thoughts, and nuance. Deepen the scene without changing its direction. Write 3-5 paragraphs.'
-        }
+        instruction = `Expand and enrich the following selected text with more detail, sensory descriptions, internal thoughts, and nuance. Deepen the scene without changing its direction.\n\nSELECTED TEXT TO EXPAND:\n${selection.selectedText}`
         break
       default:
         instruction = 'Write creative narrative prose that continues the story.'
     }
     
-    // Build full context for AI - scene blueprint first, then style/genre, then story context
+    // === BUILD FULL PROMPT WITH PRIORITIZED CONTEXT ===
     let fullPrompt = instruction + '\n\n'
     
-    if (sceneContext) {
-      fullPrompt += `=== SCENE BLUEPRINT (primary guide for this chapter) ===\n${sceneContext}\n\n`
+    // Primary context (outline > synopsis > braindump)
+    if (outlineContext) {
+      fullPrompt += `=== CHAPTER OUTLINE (follow this structure) ===\n${outlineContext}\n\n`
     }
-    
-    if (styleContext) {
-      fullPrompt += `=== WRITING STYLE ===\n${styleContext}\n\n`
-    }
-    
-    if (genreContext) {
-      fullPrompt += `=== GENRE ===\n${genreContext}\n\n`
-    }
-    
-    if (chapterContinuity) {
-      fullPrompt += `=== PREVIOUS CHAPTER SUMMARY ===\n${chapterContinuity}\n\n`
-    }
-    
     if (storyContext) {
       fullPrompt += `=== STORY SYNOPSIS ===\n${storyContext}\n\n`
     }
-    
-    if (outlineContext) {
-      fullPrompt += `=== STORY OUTLINE ===\n${outlineContext}\n\n`
+    if (!outlineContext && !storyContext && braindumpContext) {
+      fullPrompt += `=== STORY IDEAS (braindump) ===\n${braindumpContext}\n\n`
     }
     
-    if (worldbuildingContext) {
-      fullPrompt += `=== WORLDBUILDING ===\n${worldbuildingContext}\n\n`
-    }
-    
+    // Characters
     if (characterContext) {
       fullPrompt += `=== KEY CHARACTERS ===\n${characterContext}\n\n`
     }
     
-    if (seriesContext) {
-      fullPrompt += `=== SERIES CONTEXT (shared across books) ===\n${seriesContext}\n\n`
+    // Scene context
+    if (sceneContext) {
+      fullPrompt += `=== SCENE BLUEPRINT ===\n${sceneContext}\n\n`
     }
     
-    if (textAfterCursor && textAfterCursor.trim()) {
-      // Trim to ~500 chars so the model knows what comes next without overwhelming context
-      const aheadText = textAfterCursor.substring(0, 500)
-      fullPrompt += `=== TEXT AHEAD (do not repeat this, just be aware of what follows) ===\n${aheadText}\n\n`
+    // Genre & Style
+    if (genreContext) {
+      fullPrompt += `=== GENRE ===\n${genreContext}\n\n`
+    }
+    if (styleContext) {
+      fullPrompt += `=== WRITING STYLE ===\n${styleContext}\n\n`
     }
     
-    if (precedingText) {
-      fullPrompt += `=== TEXT TO CONTINUE FROM (last ~1000 words) ===\n${precedingText}\n\n`
-      fullPrompt += `Continue from here, matching the style and voice exactly. DO NOT repeat the existing text - just continue naturally.`
+    // Worldbuilding
+    if (worldbuildingContext) {
+      fullPrompt += `=== WORLDBUILDING ===\n${worldbuildingContext}\n\n`
     }
     
-    console.log('Write button - cursor position:', cursorPosition)
-    console.log('Write button - preceding text words:', precedingText.split(/\s+/).length)
-    console.log('Write button - has chapter continuity:', !!chapterContinuity)
-    console.log('Write button - has worldbuilding:', !!worldbuildingContext)
-    console.log('Write button - has outline:', !!outlineContext)
-    console.log('Write button - has text ahead:', !!textAfterCursor)
+    // Chapter continuity
+    if (chapterContinuity) {
+      fullPrompt += `=== PREVIOUS CHAPTER SUMMARY ===\n${chapterContinuity}\n\n`
+    }
     
-    // Send to AssistantPanel for generation and insertion
+    // Text context for continuation (only for Continue Writing)
+    if (mode === 'Continue Writing' && precedingText) {
+      fullPrompt += `=== TEXT TO CONTINUE FROM ===\n${precedingText}\n\n`
+      fullPrompt += `Continue from here, matching the style and voice exactly. DO NOT repeat the existing text.`
+    }
+    
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/99078eb2-d644-4fa5-9cbc-a0baa688e7c0',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'d3edd1'},body:JSON.stringify({sessionId:'d3edd1',location:'Toolbar.jsx:handleWrite:sendingRequest',message:'Sending to AssistantPanel',data:{mode,promptLength:fullPrompt.length},timestamp:Date.now(),hypothesisId:'B'})}).catch(()=>{});
+    // #endregion
+    
+    // Send to AssistantPanel for generation
     setPendingAiRequest({
       type: 'write',
       instruction: fullPrompt,
       mode: mode,
       cursorPosition: cursorPosition,
       insertAtCursor: true,
+      replaceSelection: mode === 'Expand',
+      originalText: mode === 'Expand' ? selection?.selectedText : undefined,
+      selectionStart: mode === 'Expand' ? selection?.selectionStart : undefined,
+      selectionEnd: mode === 'Expand' ? selection?.selectionEnd : undefined,
       context: {
         precedingText,
         textAfterCursor,
@@ -502,10 +555,11 @@ function Toolbar() {
       }
     })
     
-    const contextMsg = isEmptyChapter
-      ? 'AI is writing from story context...'
-      : `AI is writing... (using ${precedingText.split(/\s+/).length} words of context)`
-    addNotification({ type: 'info', message: contextMsg })
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/99078eb2-d644-4fa5-9cbc-a0baa688e7c0',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'d3edd1'},body:JSON.stringify({sessionId:'d3edd1',location:'Toolbar.jsx:handleWrite:requestSent',message:'Request sent successfully',data:{mode},timestamp:Date.now(),hypothesisId:'B'})}).catch(()=>{});
+    // #endregion
+    
+    addNotification({ type: 'info', message: `AI is generating ${mode.toLowerCase()}...` })
   }
   
   // Helper: get the current editor selection from multiple sources

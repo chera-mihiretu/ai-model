@@ -38,7 +38,7 @@ const Icons = {
 }
 
 // Outline Chapter Row Component
-function OutlineChapterRow({ chapter, index, onUpdate, onDelete, onDuplicate, onGenerate, isGeneratingThis }) {
+function OutlineChapterRow({ chapter, index, onUpdate, onDelete, onDuplicate, onGenerate, isGeneratingThis, onGenerateChapter, isGeneratingChapter }) {
   const [isExpanded, setIsExpanded] = useState(false)
   const [editData, setEditData] = useState(chapter)
   const [isDirty, setIsDirty] = useState(false)
@@ -243,6 +243,25 @@ function OutlineChapterRow({ chapter, index, onUpdate, onDelete, onDuplicate, on
               </button>
             </div>
           )}
+          
+          {/* Generate Chapter Button */}
+          <div className="mt-4 pt-4 border-t border-gold-rich/10">
+            <button
+              className="w-full flex items-center justify-center gap-2 px-4 py-2.5 text-sm bg-gradient-to-r from-gold-rich to-gold-deep text-dark-950 rounded-lg hover:from-gold-amber hover:to-gold-rich font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+              onClick={() => onGenerateChapter(index)}
+              disabled={isGeneratingChapter || !editData.summary?.trim()}
+              title={editData.summary?.trim() ? "Generate full chapter content from this outline" : "Add a summary first"}
+            >
+              {isGeneratingChapter ? (
+                <><div className="spinner !w-4 !h-4 !border-dark-950/30 !border-t-dark-950" /> Generating Chapter...</>
+              ) : (
+                <><span>📝</span> Generate Chapter from Outline</>
+              )}
+            </button>
+            {!editData.summary?.trim() && (
+              <p className="text-xs text-gray-500 mt-1.5 text-center">Add a summary above to enable chapter generation</p>
+            )}
+          </div>
         </div>
       )}
     </div>
@@ -250,9 +269,15 @@ function OutlineChapterRow({ chapter, index, onUpdate, onDelete, onDuplicate, on
 }
 
 // Outline Editor with Expandable Chapter Rows
-function OutlineEditor({ chapters, onSave, onGenerateFromSynopsis, onGenerateFromContext, isGenerating, generatingAction, hasSynopsis, hasSource, storyBibleData, addNotification }) {
+function OutlineEditor({ 
+  chapters, onSave, onGenerateFromSynopsis, onGenerateFromContext, isGenerating, generatingAction, 
+  hasSynopsis, hasSource, storyBibleData, addNotification,
+  // New props for chapter generation
+  createChapter, updateChapterContent, getCharacters, currentProjectId, refreshProjects
+}) {
   const [outlineChapters, setOutlineChapters] = useState([])
   const [generatingChapterIdx, setGeneratingChapterIdx] = useState(null)
+  const [generatingChapterForIdx, setGeneratingChapterForIdx] = useState(null)
   
   useEffect(() => {
     if (typeof chapters === 'string') {
@@ -348,6 +373,81 @@ function OutlineEditor({ chapters, onSave, onGenerateFromSynopsis, onGenerateFro
     }
   }
   
+  // Generate full chapter content from outline
+  const handleGenerateChapterFromOutline = async (index) => {
+    const chapter = outlineChapters[index]
+    if (!chapter?.summary?.trim()) {
+      addNotification?.({ type: 'warning', message: 'Please add a summary to this outline chapter first.' })
+      return
+    }
+    
+    if (!currentProjectId) {
+      addNotification?.({ type: 'warning', message: 'Please select a project first.' })
+      return
+    }
+
+    setGeneratingChapterForIdx(index)
+    try {
+      // 1. Create the chapter
+      const chapterTitle = chapter.title || `Chapter ${chapter.chapter_number}`
+      const newChapterId = await createChapter(currentProjectId, chapterTitle)
+      
+      if (!newChapterId) {
+        addNotification?.({ type: 'error', message: 'Failed to create chapter' })
+        return
+      }
+
+      // 2. Gather story context
+      const synopsis = storyBibleData?.['synopsis'] || ''
+      const style = storyBibleData?.['style'] || ''
+      const genre = storyBibleData?.['genre'] || 'fiction'
+      const worldbuilding = storyBibleData?.['worldbuilding'] || ''
+      
+      // Get characters
+      const characters = await getCharacters(currentProjectId)
+      const charactersStr = characters?.slice(0, 8).map(c => {
+        let entry = c.name
+        if (c.role) entry += ` (${c.role})`
+        if (c.personality_traits) entry += `: ${c.personality_traits}`
+        if (c.speech_pattern) entry += ` | Speech: ${c.speech_pattern}`
+        return entry
+      }).join('\n') || ''
+
+      // Build outline context (other chapters for continuity)
+      const outlineContext = outlineChapters
+        .map(ch => `Chapter ${ch.chapter_number}: ${ch.title} - ${(ch.summary || '').slice(0, 150)}`)
+        .join('\n')
+
+      // 3. Generate chapter content
+      const result = await window.api.expandSceneFromSummary(
+        chapter.summary,
+        synopsis.slice(0, 500),
+        genre,
+        {
+          style: style,
+          characters: charactersStr,
+          worldbuilding: worldbuilding.slice(0, 500),
+          chapterOutline: outlineContext,
+          extra_instructions: `This is Chapter ${chapter.chapter_number}: "${chapterTitle}". Write a complete, full-length chapter (1500-2500 words) with rich prose, dialogue, and scene development.`
+        }
+      )
+
+      // 4. Save content to chapter
+      if (result) {
+        await updateChapterContent(newChapterId, result)
+        await refreshProjects?.()
+        addNotification?.({ type: 'success', message: `Chapter "${chapterTitle}" generated and saved!` })
+      } else {
+        addNotification?.({ type: 'warning', message: 'Chapter created but generation returned empty content' })
+      }
+    } catch (error) {
+      console.error('Generate chapter error:', error)
+      addNotification?.({ type: 'error', message: `Failed to generate chapter: ${error.message}` })
+    } finally {
+      setGeneratingChapterForIdx(null)
+    }
+  }
+  
   const isOutlineGenerating = isGenerating && (generatingAction === 'outline' || generatingAction === 'generate_section')
   
   return (
@@ -437,6 +537,8 @@ function OutlineEditor({ chapters, onSave, onGenerateFromSynopsis, onGenerateFro
                 onDuplicate={handleDuplicateChapter}
                 onGenerate={handleGenerateChapterSummary}
                 isGeneratingThis={generatingChapterIdx === index}
+                onGenerateChapter={handleGenerateChapterFromOutline}
+                isGeneratingChapter={generatingChapterForIdx === index}
               />
             ))
           )}
@@ -537,6 +639,7 @@ function StoryBible() {
     updateBibleField,
     addNotification,
     setCharacters,
+    setProjects,
   } = useStore()
   
   const {
@@ -547,6 +650,9 @@ function StoryBible() {
     saveCharacter,
     getCharacters,
     createWorldElement,
+    createChapter,
+    updateChapterContent,
+    getProjectsWithChapters,
   } = usePythonBridge()
   
   const [isSaving, setIsSaving] = useState(false)
@@ -575,6 +681,12 @@ function StoryBible() {
     }
     loadBibleData()
   }, [currentProjectId])
+  
+  // Refresh projects list (for chapter list updates)
+  const refreshProjects = async () => {
+    const updatedProjects = await getProjectsWithChapters()
+    setProjects(updatedProjects || [])
+  }
   
   const handleContentChange = (value) => {
     updateBibleField(currentBibleTab, value)
@@ -947,6 +1059,11 @@ function StoryBible() {
             hasSource={!!(synopsisContent.trim() || braindumpContent.trim())}
             storyBibleData={storyBibleData}
             addNotification={addNotification}
+            createChapter={createChapter}
+            updateChapterContent={updateChapterContent}
+            getCharacters={getCharacters}
+            currentProjectId={currentProjectId}
+            refreshProjects={refreshProjects}
           />
         ) : (
           <textarea

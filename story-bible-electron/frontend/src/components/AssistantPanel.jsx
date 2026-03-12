@@ -340,7 +340,13 @@ function AssistantPanel() {
 
   // Handle pending AI requests from Editor
   useEffect(() => {
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/99078eb2-d644-4fa5-9cbc-a0baa688e7c0',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'d3edd1'},body:JSON.stringify({sessionId:'d3edd1',location:'AssistantPanel.jsx:useEffect:pendingAiRequest',message:'useEffect triggered',data:{pendingType:pendingAiRequest?.type,hasPending:!!pendingAiRequest,isLoading},timestamp:Date.now(),hypothesisId:'C'})}).catch(()=>{});
+    // #endregion
     if (pendingAiRequest && !isLoading) {
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/99078eb2-d644-4fa5-9cbc-a0baa688e7c0',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'d3edd1'},body:JSON.stringify({sessionId:'d3edd1',location:'AssistantPanel.jsx:useEffect:processing',message:'Processing pending request',data:{type:pendingAiRequest.type},timestamp:Date.now(),hypothesisId:'C'})}).catch(()=>{});
+      // #endregion
       // Auto-expand assistant panel if collapsed
       const state = useStore.getState()
       if (state.assistantCollapsed) {
@@ -348,8 +354,12 @@ function AssistantPanel() {
       }
       handlePendingRequest(pendingAiRequest)
       clearPendingAiRequest()
+    } else if (pendingAiRequest && isLoading) {
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/99078eb2-d644-4fa5-9cbc-a0baa688e7c0',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'d3edd1'},body:JSON.stringify({sessionId:'d3edd1',location:'AssistantPanel.jsx:useEffect:blocked',message:'Request blocked by isLoading',data:{pendingType:pendingAiRequest?.type,isLoading},timestamp:Date.now(),hypothesisId:'D'})}).catch(()=>{});
+      // #endregion
     }
-  }, [pendingAiRequest])
+  }, [pendingAiRequest, isLoading])
 
   // Strip markdown from AI text for clean output
   const stripMarkdown = (text) => {
@@ -535,6 +545,9 @@ function AssistantPanel() {
 
   // Process pending request from Editor
   const handlePendingRequest = async (request) => {
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/99078eb2-d644-4fa5-9cbc-a0baa688e7c0',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'d3edd1'},body:JSON.stringify({sessionId:'d3edd1',location:'AssistantPanel.jsx:handlePendingRequest:entry',message:'handlePendingRequest called',data:{requestType:request?.type,aiStatus},timestamp:Date.now(),hypothesisId:'E'})}).catch(()=>{});
+    // #endregion
     if (!request) return
 
     // Chat Ideas just focuses the input
@@ -546,11 +559,17 @@ function AssistantPanel() {
 
     // Check AI status
     if (aiStatus !== 'ready') {
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/99078eb2-d644-4fa5-9cbc-a0baa688e7c0',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'d3edd1'},body:JSON.stringify({sessionId:'d3edd1',location:'AssistantPanel.jsx:handlePendingRequest:aiNotReady',message:'AI not ready - returning early',data:{aiStatus},timestamp:Date.now(),hypothesisId:'E'})}).catch(()=>{});
+      // #endregion
       addNotification({ type: 'warning', message: 'AI is not ready. Please wait for the model to load.' })
       return
     }
 
     // Clear previous generation results and open the panel with a label
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/99078eb2-d644-4fa5-9cbc-a0baa688e7c0',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'d3edd1'},body:JSON.stringify({sessionId:'d3edd1',location:'AssistantPanel.jsx:handlePendingRequest:aiReady',message:'AI is ready - proceeding with generation',data:{requestType:request.type},timestamp:Date.now(),hypothesisId:'E'})}).catch(()=>{});
+    // #endregion
     const typeLabels = {
       write: `Writing...`,
       draft: 'Generating Draft...',

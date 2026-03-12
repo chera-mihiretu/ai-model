@@ -482,7 +482,6 @@ function ProjectSidebar() {
     getChapterContent,
   } = usePythonBridge()
   
-  const [showNewChapterModal, setShowNewChapterModal] = useState(false)
   const [isCreatingChapter, setIsCreatingChapter] = useState(false)
   
   // Get current project
@@ -501,22 +500,18 @@ function ProjectSidebar() {
     setCurrentView('editor')
   }
   
-  // Handle add chapter
-  const handleAddChapter = async (title) => {
-    if (!currentProjectId || !title) return
+  // Handle add chapter - creates with "Untitled" by default
+  const handleAddChapter = async () => {
+    if (!currentProjectId) return
     
     setIsCreatingChapter(true)
     try {
-      console.log('Creating chapter:', title, 'for project:', currentProjectId)
-      const chapterId = await createChapter(currentProjectId, title)
-      console.log('Chapter created with ID:', chapterId)
+      const chapterId = await createChapter(currentProjectId, 'Untitled')
       
       if (chapterId) {
         await refreshProjects()
         setCurrentChapter(chapterId)
         setCurrentView('editor')
-        setShowNewChapterModal(false)
-        addNotification({ type: 'success', message: `Chapter "${title}" created` })
       } else {
         addNotification({ type: 'error', message: 'Failed to create chapter' })
       }
@@ -662,10 +657,20 @@ function ProjectSidebar() {
       {/* Add Chapter Button */}
       <button
         className="w-full mb-4 px-4 py-2 rounded-lg bg-gold-rich/10 text-gold-rich hover:bg-gold-rich/20 transition-colors flex items-center justify-center gap-2 font-medium border border-gold-rich/30"
-        onClick={() => setShowNewChapterModal(true)}
+        onClick={handleAddChapter}
+        disabled={isCreatingChapter}
       >
-        <span className="text-lg font-bold">{Icons.PLUS}</span>
-        <span>New Chapter</span>
+        {isCreatingChapter ? (
+          <>
+            <div className="spinner !w-4 !h-4" />
+            <span>Creating...</span>
+          </>
+        ) : (
+          <>
+            <span className="text-lg font-bold">{Icons.PLUS}</span>
+            <span>New Chapter</span>
+          </>
+        )}
       </button>
       
       {/* Chapters List */}
@@ -735,13 +740,6 @@ function ProjectSidebar() {
         )}
       </div>
       
-      {/* New Chapter Modal */}
-      <NewChapterModal
-        isOpen={showNewChapterModal}
-        onClose={() => setShowNewChapterModal(false)}
-        onSubmit={handleAddChapter}
-        isCreating={isCreatingChapter}
-      />
     </div>
   )
 }

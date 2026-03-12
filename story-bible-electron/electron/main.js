@@ -344,7 +344,8 @@ function sendToPython(method, params = {}) {
       method.includes('analyze') ||    // text analysis
       method.includes('model') ||      // list_models, select_model (may wait for AI lock)
       method.includes('context') ||    // context_health, scene_context, etc.
-      method.includes('series');       // series operations
+      method.includes('series') ||     // series operations
+      method.includes('expand');       // expand_scene, expand_scene_from_summary
     
     const timeoutMs = isLongOperation
       ? 600000  // 10 minutes for AI generation and large manuscript processing
