@@ -4,7 +4,7 @@
  * Break chapters into scenes and expand them with AI.
  */
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import useStore from '../hooks/useStore'
 import { usePythonBridge } from '../hooks/usePythonBridge'
 import { clsx } from 'clsx'
@@ -155,9 +155,42 @@ function SceneEditModal({ scene, onSave, onClose }) {
     pov_character: '',
     location: ''
   })
+  const [isSaving, setIsSaving] = useState(false)
+  const saveTimeoutRef = useRef(null)
   
+  // Cleanup save timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current)
+      }
+    }
+  }, [])
+  
+  // Handle field change with debounced auto-save for existing scenes
   const handleChange = (field, value) => {
-    setFormData(prev => ({ ...prev, [field]: value }))
+    const newData = { ...formData, [field]: value }
+    setFormData(newData)
+    
+    // Only auto-save if this is an existing scene (has an id)
+    if (scene?.id) {
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current)
+      }
+      saveTimeoutRef.current = setTimeout(async () => {
+        setIsSaving(true)
+        await onSave(newData, true) // true = silent save (no close)
+        setIsSaving(false)
+      }, 1000)
+    }
+  }
+  
+  // Handle explicit save (for new scenes or manual save)
+  const handleExplicitSave = async () => {
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current)
+    }
+    await onSave(formData, false) // false = close after save
   }
   
   return (
@@ -236,15 +269,18 @@ function SceneEditModal({ scene, onSave, onClose }) {
         </div>
         
         <div className="flex justify-end gap-3 mt-6">
+          {isSaving && (
+            <span className="text-sm text-text-muted self-center">Saving...</span>
+          )}
           <button className="btn btn-ghost" onClick={onClose}>
-            Cancel
+            {scene?.id ? 'Close' : 'Cancel'}
           </button>
           <button
             className="btn btn-primary"
-            onClick={() => onSave(formData)}
+            onClick={handleExplicitSave}
             disabled={!formData.summary?.trim()}
           >
-            {Icons.SAVE} Save Scene
+            {Icons.SAVE} {scene?.id ? 'Save & Close' : 'Create Scene'}
           </button>
         </div>
       </div>
@@ -317,11 +353,13 @@ function SceneEditor() {
     setEditingScene({})
   }
   
-  const handleSaveScene = async (data) => {
+  const handleSaveScene = async (data, silentSave = false) => {
     if (data.id) {
       // Update existing
       await updateScene(data.id, data)
-      addNotification({ type: 'success', message: 'Scene updated' })
+      if (!silentSave) {
+        addNotification({ type: 'success', message: 'Scene updated' })
+      }
     } else {
       // Create new
       await createScene(currentChapterId, data)
@@ -331,7 +369,11 @@ function SceneEditor() {
     // Refresh
     const updated = await getScenes(currentChapterId)
     setScenes(updated || [])
-    setEditingScene(null)
+    
+    // Only close the modal if not a silent save
+    if (!silentSave) {
+      setEditingScene(null)
+    }
   }
   
   const handleDeleteScene = async (scene) => {

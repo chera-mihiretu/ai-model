@@ -11,6 +11,15 @@ class DatabaseManager:
         # Check for environment variable path first (set by Electron)
         data_path = os.environ.get('EXELSIAS_DATA_PATH')
         
+        # #region agent log
+        debug_log_path = '/home/chera/Public/my_stuffs/work/fiverr/ricardoo/.cursor/debug-7033cc.log'
+        log_entry = {"sessionId":"7033cc","location":"db_manager.py:__init__","message":"DB path resolution","data":{"data_path_env":data_path,"frozen":getattr(sys, 'frozen', False),"executable":sys.executable if getattr(sys, 'frozen', False) else None,"file_path":str(Path(__file__).resolve()),"uid":os.getuid(),"euid":os.geteuid(),"HOME":os.environ.get('HOME'),"USER":os.environ.get('USER')},"timestamp":int(__import__('time').time()*1000)}
+        try:
+            with open(debug_log_path, 'a') as f:
+                f.write(json.dumps(log_entry) + '\n')
+        except: pass
+        # #endregion
+        
         if data_path:
             # Production: use path provided by Electron
             self.base_dir = Path(data_path).parent
@@ -26,6 +35,14 @@ class DatabaseManager:
         
         db_existed = self.db_path.exists()
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
+        
+        # #region agent log
+        log_entry2 = {"sessionId":"7033cc","location":"db_manager.py:__init__:resolved","message":"Final DB path","data":{"db_path":str(self.db_path),"base_dir":str(self.base_dir),"db_existed":db_existed,"path_branch":"env" if data_path else ("frozen" if getattr(sys, 'frozen', False) else "dev")},"timestamp":int(__import__('time').time()*1000)}
+        try:
+            with open(debug_log_path, 'a') as f:
+                f.write(json.dumps(log_entry2) + '\n')
+        except: pass
+        # #endregion
         
         if not db_existed:
             logging.info(f"Database NOT FOUND. Creating persistent DB at: {self.db_path}")

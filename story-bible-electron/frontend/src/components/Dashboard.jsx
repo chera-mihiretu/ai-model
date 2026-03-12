@@ -249,8 +249,19 @@ const Icons = {
   MENU: '⋯',
 }
 
-// Project Card - with gold accent styling
-function ProjectCard({ project, onSelect, onDelete, onRename, onDuplicate, onExport }) {
+// Project Card - with gold accent styling and drag support
+function ProjectCard({ 
+  project, 
+  onSelect, 
+  onDelete, 
+  onRename, 
+  onDuplicate, 
+  onExport,
+  // Drag props
+  isDragging = false,
+  onDragStart,
+  onDragEnd,
+}) {
   const [showMenu, setShowMenu] = useState(false)
   const menuRef = useRef(null)
   
@@ -280,18 +291,34 @@ function ProjectCard({ project, onSelect, onDelete, onRename, onDuplicate, onExp
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
   
+  // Handle drag start
+  const handleDragStart = (e) => {
+    e.dataTransfer.effectAllowed = 'move'
+    e.dataTransfer.setData('text/plain', project.id)
+    onDragStart?.(project)
+  }
+  
+  // Handle drag end
+  const handleDragEnd = (e) => {
+    onDragEnd?.()
+  }
+  
   return (
     <div
+      draggable={true}
+      onDragStart={handleDragStart}
+      onDragEnd={handleDragEnd}
       className={clsx(
         'relative group cursor-pointer',
         'bg-dark-800 rounded-xl',
         'shadow-card hover:shadow-card-hover',
         'border border-gold-rich/20 hover:border-gold-rich/40',
         'transition-all duration-300 hover:-translate-y-1',
-        'min-h-[220px] flex flex-col'
+        'min-h-[220px] flex flex-col',
+        isDragging && 'opacity-50 scale-95 border-gold-rich/60'
       )}
       style={{ zIndex: showMenu ? 50 : 1 }}
-      onClick={() => onSelect(project)}
+      onClick={() => !isDragging && onSelect(project)}
     >
       {/* Three-dot Menu Button */}
       <div className="absolute top-3 right-3" ref={menuRef} style={{ zIndex: 200 }}>
@@ -375,8 +402,23 @@ function ProjectCard({ project, onSelect, onDelete, onRename, onDuplicate, onExp
   )
 }
 
-// Folder Card - elegant dark gold styling
-function FolderCard({ folder, onClick, onDelete, onRename, onDuplicateProject, onDeleteProject, onExportProject }) {
+// Folder Card - elegant dark gold styling with drop target support
+function FolderCard({ 
+  folder, 
+  onClick, 
+  onDelete, 
+  onRename, 
+  onDuplicateProject, 
+  onDeleteProject, 
+  onExportProject,
+  // Drop target props
+  isDragOver = false,
+  isDragging = false,
+  onDragOver,
+  onDragEnter,
+  onDragLeave,
+  onDrop,
+}) {
   const [showMenu, setShowMenu] = useState(false)
   const [showProjectMenu, setShowProjectMenu] = useState(null)
   const menuRef = useRef(null)
@@ -415,28 +457,76 @@ function FolderCard({ folder, onClick, onDelete, onRename, onDuplicateProject, o
   // Paper angles for stacking effect
   const paperAngles = [-2, 1, -0.5]
   
+  // Handle drag events
+  const handleDragOver = (e) => {
+    e.preventDefault()
+    e.dataTransfer.dropEffect = 'move'
+    onDragOver?.(folder)
+  }
+  
+  const handleDragEnter = (e) => {
+    e.preventDefault()
+    onDragEnter?.(folder)
+  }
+  
+  const handleDragLeave = (e) => {
+    e.preventDefault()
+    if (!e.currentTarget.contains(e.relatedTarget)) {
+      onDragLeave?.()
+    }
+  }
+  
+  const handleDrop = (e) => {
+    e.preventDefault()
+    onDrop?.(folder)
+  }
+  
   return (
     <div
-      className="relative group cursor-pointer transition-all duration-300 hover:-translate-y-1"
+      className={clsx(
+        "relative group cursor-pointer transition-all duration-300 hover:-translate-y-1",
+        isDragOver && "scale-105"
+      )}
       onClick={() => onClick(folder)}
       style={{ zIndex: showMenu || showProjectMenu !== null ? 100 : 1 }}
+      onDragOver={isDragging ? handleDragOver : undefined}
+      onDragEnter={isDragging ? handleDragEnter : undefined}
+      onDragLeave={isDragging ? handleDragLeave : undefined}
+      onDrop={isDragging ? handleDrop : undefined}
     >
       {/* Folder shape with tab */}
       <div className="relative">
         {/* Folder tab */}
         <div 
-          className="absolute -top-2 left-3 w-16 h-4 rounded-t-lg"
+          className={clsx(
+            "absolute -top-2 left-3 w-16 h-4 rounded-t-lg",
+            isDragOver && "border-t-2 border-l-2 border-r-2 border-dashed border-gold-rich"
+          )}
           style={{ backgroundColor: '#1E1E28' }}
         />
         
         {/* Folder body */}
         <div
-          className="relative rounded-xl overflow-hidden border border-gold-rich/20 hover:border-gold-rich/40 transition-all"
+          className={clsx(
+            "relative rounded-xl overflow-hidden border transition-all",
+            isDragOver 
+              ? "border-gold-rich border-dashed border-2" 
+              : "border-gold-rich/20 hover:border-gold-rich/40"
+          )}
           style={{ 
             background: 'linear-gradient(145deg, #1E1E28, #16161D)',
             boxShadow: '0 4px 20px rgba(0, 0, 0, 0.3), 0 0 1px rgba(212, 175, 55, 0.2)'
           }}
         >
+          {/* Drag overlay */}
+          {isDragOver && (
+            <div className="absolute inset-0 bg-gold-rich/10 backdrop-blur-sm flex items-center justify-center z-50 rounded-xl">
+              <div className="text-center">
+                <p className="text-gold-rich font-medium text-sm">Drag project here</p>
+              </div>
+            </div>
+          )}
+          
           {/* Menu Button */}
           <div className="absolute top-3 right-3" ref={menuRef} style={{ zIndex: 200 }}>
             <button
@@ -582,8 +672,23 @@ function FolderCard({ folder, onClick, onDelete, onRename, onDuplicateProject, o
   )
 }
 
-// Series Card - elegant dark gold styling with SERIES badge
-function SeriesCard({ series, onClick, onDelete, onRename, onDuplicateProject, onDeleteProject, onExportProject }) {
+// Series Card - elegant dark gold styling with SERIES badge and drop target support
+function SeriesCard({ 
+  series, 
+  onClick, 
+  onDelete, 
+  onRename, 
+  onDuplicateProject, 
+  onDeleteProject, 
+  onExportProject,
+  // Drop target props
+  isDragOver = false,
+  isDragging = false,
+  onDragOver,
+  onDragEnter,
+  onDragLeave,
+  onDrop,
+}) {
   const [showMenu, setShowMenu] = useState(false)
   const [showProjectMenu, setShowProjectMenu] = useState(null)
   const menuRef = useRef(null)
@@ -622,28 +727,76 @@ function SeriesCard({ series, onClick, onDelete, onRename, onDuplicateProject, o
   // Paper angles for stacking effect
   const paperAngles = [-2, 1, -0.5]
   
+  // Handle drag events
+  const handleDragOver = (e) => {
+    e.preventDefault()
+    e.dataTransfer.dropEffect = 'move'
+    onDragOver?.(series)
+  }
+  
+  const handleDragEnter = (e) => {
+    e.preventDefault()
+    onDragEnter?.(series)
+  }
+  
+  const handleDragLeave = (e) => {
+    e.preventDefault()
+    if (!e.currentTarget.contains(e.relatedTarget)) {
+      onDragLeave?.()
+    }
+  }
+  
+  const handleDrop = (e) => {
+    e.preventDefault()
+    onDrop?.(series)
+  }
+  
   return (
     <div
-      className="relative group cursor-pointer transition-all duration-300 hover:-translate-y-1"
+      className={clsx(
+        "relative group cursor-pointer transition-all duration-300 hover:-translate-y-1",
+        isDragOver && "scale-105"
+      )}
       onClick={() => onClick(series)}
       style={{ zIndex: showMenu || showProjectMenu !== null ? 100 : 1 }}
+      onDragOver={isDragging ? handleDragOver : undefined}
+      onDragEnter={isDragging ? handleDragEnter : undefined}
+      onDragLeave={isDragging ? handleDragLeave : undefined}
+      onDrop={isDragging ? handleDrop : undefined}
     >
       {/* Folder shape with tab */}
       <div className="relative">
         {/* Folder tab */}
         <div 
-          className="absolute -top-2 left-3 w-16 h-4 rounded-t-lg"
+          className={clsx(
+            "absolute -top-2 left-3 w-16 h-4 rounded-t-lg",
+            isDragOver && "border-t-2 border-l-2 border-r-2 border-dashed border-gold-rich"
+          )}
           style={{ backgroundColor: '#1E1E28' }}
         />
         
         {/* Folder body */}
         <div
-          className="relative rounded-xl overflow-hidden border border-gold-rich/20 hover:border-gold-rich/40 transition-all"
+          className={clsx(
+            "relative rounded-xl overflow-hidden border transition-all",
+            isDragOver 
+              ? "border-gold-rich border-dashed border-2" 
+              : "border-gold-rich/20 hover:border-gold-rich/40"
+          )}
           style={{ 
             background: 'linear-gradient(145deg, #1E1E28, #16161D)',
             boxShadow: '0 4px 20px rgba(0, 0, 0, 0.3), 0 0 1px rgba(212, 175, 55, 0.2)'
           }}
         >
+          {/* Drag overlay */}
+          {isDragOver && (
+            <div className="absolute inset-0 bg-gold-rich/10 backdrop-blur-sm flex items-center justify-center z-50 rounded-xl">
+              <div className="text-center">
+                <p className="text-gold-rich font-medium text-sm">Drag project here</p>
+              </div>
+            </div>
+          )}
+          
           {/* Menu Button */}
           <div className="absolute top-3 right-3" ref={menuRef} style={{ zIndex: 200 }}>
             <button
@@ -1378,7 +1531,20 @@ function RecycleBinModal({
 }
 
 // Folder View - when inside a folder
-function FolderView({ folder, onBack, onSelectProject, onCreateProject, onDeleteProject, onRenameProject, onDuplicateProject, onExportProject }) {
+function FolderView({ 
+  folder, 
+  onBack, 
+  onSelectProject, 
+  onCreateProject, 
+  onDeleteProject, 
+  onRenameProject, 
+  onDuplicateProject, 
+  onExportProject,
+  onMoveProjectToHome
+}) {
+  const [draggedProject, setDraggedProject] = useState(null)
+  const [isDragOverHome, setIsDragOverHome] = useState(false)
+  
   const formatTime = (timestamp) => {
     if (!timestamp) return 'Just now'
     const date = new Date(timestamp)
@@ -1398,14 +1564,43 @@ function FolderView({ folder, onBack, onSelectProject, onCreateProject, onDelete
       {/* Folder Header */}
       <div className="px-8 py-6">
         <div className="max-w-5xl mx-auto">
-          {/* Breadcrumb */}
-          <div className="flex items-center gap-2 text-text-muted mb-2">
+          {/* Breadcrumb - also acts as drop zone for "Move to Home" */}
+          <div 
+            className={clsx(
+              "flex items-center gap-2 text-text-muted mb-2 p-2 -m-2 rounded-lg transition-all",
+              draggedProject && "bg-dark-700/50",
+              isDragOverHome && "bg-gold-rich/20 border border-dashed border-gold-rich"
+            )}
+            onDragOver={draggedProject ? (e) => {
+              e.preventDefault()
+              e.dataTransfer.dropEffect = 'move'
+            } : undefined}
+            onDragEnter={draggedProject ? (e) => {
+              e.preventDefault()
+              setIsDragOverHome(true)
+            } : undefined}
+            onDragLeave={draggedProject ? (e) => {
+              e.preventDefault()
+              if (!e.currentTarget.contains(e.relatedTarget)) {
+                setIsDragOverHome(false)
+              }
+            } : undefined}
+            onDrop={draggedProject ? (e) => {
+              e.preventDefault()
+              onMoveProjectToHome?.(draggedProject)
+              setDraggedProject(null)
+              setIsDragOverHome(false)
+            } : undefined}
+          >
             <button 
               className="hover:text-gold-rich transition-colors"
               onClick={onBack}
             >
               Home
             </button>
+            {isDragOverHome && (
+              <span className="text-gold-rich text-sm ml-2">← Drop to move here</span>
+            )}
             <span className="text-text-light">›</span>
             <span className="text-gold-rich">{folder.name}</span>
           </div>
@@ -1449,6 +1644,12 @@ function FolderView({ folder, onBack, onSelectProject, onCreateProject, onDelete
                 onRename={onRenameProject}
                 onDuplicate={onDuplicateProject}
                 onExport={onExportProject}
+                isDragging={draggedProject?.id === project.id}
+                onDragStart={(p) => setDraggedProject(p)}
+                onDragEnd={() => {
+                  setDraggedProject(null)
+                  setIsDragOverHome(false)
+                }}
               />
             ))}
             
@@ -1852,6 +2053,12 @@ function Dashboard() {
   const [recycleBinItems, setRecycleBinItems] = useState([])
   const [recycleBinLoading, setRecycleBinLoading] = useState(false)
   
+  // Drag and drop state
+  const [draggedProject, setDraggedProject] = useState(null)
+  const [dragOverTarget, setDragOverTarget] = useState(null) // { type: 'folder'|'series'|'home', id: string }
+  const [dragSourceType, setDragSourceType] = useState(null) // 'standalone'|'folder'|'series'
+  const [dragSourceId, setDragSourceId] = useState(null) // folder or series id if dragging from one
+  
   // Load projects on mount
   useEffect(() => {
     async function loadProjects() {
@@ -2151,6 +2358,124 @@ function Dashboard() {
       console.error('Failed to duplicate project:', error)
       addNotification({ type: 'error', message: 'Failed to duplicate project' })
     }
+  }
+  
+  // Handle move project to folder (drag and drop)
+  const handleMoveProjectToFolder = (project, targetFolder) => {
+    if (!project || !targetFolder) return
+    
+    // Check if project is already in this folder
+    if (targetFolder.projects?.some(p => p.id === project.id)) {
+      addNotification({ type: 'info', message: 'Project is already in this folder' })
+      return
+    }
+    
+    // Remove project from any existing folder
+    const updatedFolders = folders.map(f => ({
+      ...f,
+      projects: f.projects?.filter(p => p.id !== project.id) || [],
+      updated_at: f.id === targetFolder.id ? new Date().toISOString() : f.updated_at
+    }))
+    
+    // Remove project from any existing series
+    const updatedSeries = series.map(s => ({
+      ...s,
+      projects: s.projects?.filter(p => p.id !== project.id) || []
+    }))
+    
+    // Add project to target folder
+    const finalFolders = updatedFolders.map(f => 
+      f.id === targetFolder.id 
+        ? { ...f, projects: [...(f.projects || []), project], updated_at: new Date().toISOString() }
+        : f
+    )
+    
+    setFolders(finalFolders)
+    setSeries(updatedSeries)
+    localStorage.setItem('exelsias_folders', JSON.stringify(finalFolders))
+    localStorage.setItem('exelsias_series', JSON.stringify(updatedSeries))
+    
+    // Clear drag state
+    setDraggedProject(null)
+    setDragOverTarget(null)
+    setDragSourceType(null)
+    setDragSourceId(null)
+    
+    addNotification({ type: 'success', message: `Moved "${project.name}" to ${targetFolder.name}` })
+  }
+  
+  // Handle move project to series (drag and drop)
+  const handleMoveProjectToSeries = (project, targetSeries) => {
+    if (!project || !targetSeries) return
+    
+    // Check if project is already in this series
+    if (targetSeries.projects?.some(p => p.id === project.id)) {
+      addNotification({ type: 'info', message: 'Project is already in this series' })
+      return
+    }
+    
+    // Remove project from any existing folder
+    const updatedFolders = folders.map(f => ({
+      ...f,
+      projects: f.projects?.filter(p => p.id !== project.id) || []
+    }))
+    
+    // Remove project from any existing series
+    const updatedSeries = series.map(s => ({
+      ...s,
+      projects: s.projects?.filter(p => p.id !== project.id) || [],
+      updated_at: s.id === targetSeries.id ? new Date().toISOString() : s.updated_at
+    }))
+    
+    // Add project to target series
+    const finalSeries = updatedSeries.map(s => 
+      s.id === targetSeries.id 
+        ? { ...s, projects: [...(s.projects || []), project], updated_at: new Date().toISOString() }
+        : s
+    )
+    
+    setFolders(updatedFolders)
+    setSeries(finalSeries)
+    localStorage.setItem('exelsias_folders', JSON.stringify(updatedFolders))
+    localStorage.setItem('exelsias_series', JSON.stringify(finalSeries))
+    
+    // Clear drag state
+    setDraggedProject(null)
+    setDragOverTarget(null)
+    setDragSourceType(null)
+    setDragSourceId(null)
+    
+    addNotification({ type: 'success', message: `Moved "${project.name}" to ${targetSeries.name}` })
+  }
+  
+  // Handle move project to home/standalone (drag and drop)
+  const handleMoveProjectToHome = (project) => {
+    if (!project) return
+    
+    // Remove project from any existing folder
+    const updatedFolders = folders.map(f => ({
+      ...f,
+      projects: f.projects?.filter(p => p.id !== project.id) || []
+    }))
+    
+    // Remove project from any existing series
+    const updatedSeries = series.map(s => ({
+      ...s,
+      projects: s.projects?.filter(p => p.id !== project.id) || []
+    }))
+    
+    setFolders(updatedFolders)
+    setSeries(updatedSeries)
+    localStorage.setItem('exelsias_folders', JSON.stringify(updatedFolders))
+    localStorage.setItem('exelsias_series', JSON.stringify(updatedSeries))
+    
+    // Clear drag state
+    setDraggedProject(null)
+    setDragOverTarget(null)
+    setDragSourceType(null)
+    setDragSourceId(null)
+    
+    addNotification({ type: 'success', message: `Moved "${project.name}" to home` })
   }
   
   // Handle export project (entire project as .zip)
@@ -2562,35 +2887,6 @@ function Dashboard() {
     addNotification({ type: 'success', message: 'Series timeline updated' })
   }
   
-  // Handle move project from series to home (standalone)
-  const handleMoveProjectToHome = (project) => {
-    if (!currentSeries) return
-    
-    if (!confirm(`Remove "${project.name}" from this series? It will become a standalone project and lose access to shared Story Bible data.`)) {
-      return
-    }
-    
-    // Remove from series
-    setSeries(prev => {
-      const updated = prev.map(s => 
-        s.id === currentSeries.id 
-          ? { ...s, projects: s.projects?.filter(p => p.id !== project.id) || [], updated_at: new Date().toISOString() }
-          : s
-      )
-      localStorage.setItem('exelsias_series', JSON.stringify(updated))
-      return updated
-    })
-    
-    // Update current series view
-    setCurrentSeries(prev => ({
-      ...prev,
-      projects: prev.projects?.filter(p => p.id !== project.id) || [],
-      updated_at: new Date().toISOString()
-    }))
-    
-    addNotification({ type: 'success', message: `"${project.name}" moved to Home` })
-  }
-  
   // Open folder
   const handleOpenFolder = (folder) => {
     // Sync folder projects with current project data
@@ -2667,6 +2963,14 @@ function Dashboard() {
           onRenameProject={handleRenameProject}
           onDuplicateProject={(p) => handleDuplicateProject(p, currentFolder)}
           onExportProject={handleExportProject}
+          onMoveProjectToHome={(project) => {
+            handleMoveProjectToHome(project)
+            // Update currentFolder view
+            setCurrentFolder(prev => ({
+              ...prev,
+              projects: prev.projects?.filter(p => p.id !== project.id) || []
+            }))
+          }}
         />
         
         <CreateModal
@@ -2736,7 +3040,14 @@ function Dashboard() {
           onDuplicateProject={(p) => handleDuplicateProject(p, currentSeries)}
           onExportProject={handleExportProject}
           onReorderProjects={handleReorderSeriesProjects}
-          onMoveProjectToHome={handleMoveProjectToHome}
+          onMoveProjectToHome={(project) => {
+            handleMoveProjectToHome(project)
+            // Update currentSeries view
+            setCurrentSeries(prev => ({
+              ...prev,
+              projects: prev.projects?.filter(p => p.id !== project.id) || []
+            }))
+          }}
         />
         
         <CreateModal
@@ -2832,6 +3143,18 @@ function Dashboard() {
                   onRename={handleRenameProject}
                   onDuplicate={(p) => handleDuplicateProject(p, null)}
                   onExport={handleExportProject}
+                  isDragging={draggedProject?.id === project.id}
+                  onDragStart={(p) => {
+                    setDraggedProject(p)
+                    setDragSourceType('standalone')
+                    setDragSourceId(null)
+                  }}
+                  onDragEnd={() => {
+                    setDraggedProject(null)
+                    setDragOverTarget(null)
+                    setDragSourceType(null)
+                    setDragSourceId(null)
+                  }}
                 />
               ))}
               
@@ -2846,6 +3169,11 @@ function Dashboard() {
                   onDuplicateProject={handleDuplicateProject}
                   onDeleteProject={handleDeleteProject}
                   onExportProject={handleExportProject}
+                  isDragOver={dragOverTarget?.type === 'folder' && dragOverTarget?.id === folder.id}
+                  isDragging={!!draggedProject}
+                  onDragEnter={(f) => setDragOverTarget({ type: 'folder', id: f.id })}
+                  onDragLeave={() => setDragOverTarget(null)}
+                  onDrop={(f) => handleMoveProjectToFolder(draggedProject, f)}
                 />
               ))}
               
@@ -2860,8 +3188,53 @@ function Dashboard() {
                   onDuplicateProject={handleDuplicateProject}
                   onDeleteProject={handleDeleteProject}
                   onExportProject={handleExportProject}
+                  isDragOver={dragOverTarget?.type === 'series' && dragOverTarget?.id === s.id}
+                  isDragging={!!draggedProject}
+                  onDragEnter={(ser) => setDragOverTarget({ type: 'series', id: ser.id })}
+                  onDragLeave={() => setDragOverTarget(null)}
+                  onDrop={(ser) => handleMoveProjectToSeries(draggedProject, ser)}
                 />
               ))}
+              
+              {/* Home Drop Zone - visible when dragging from folder/series */}
+              {draggedProject && (dragSourceType === 'folder' || dragSourceType === 'series') && (
+                <div
+                  className={clsx(
+                    "min-h-[220px] rounded-xl border-2 border-dashed transition-all duration-300 flex items-center justify-center",
+                    dragOverTarget?.type === 'home'
+                      ? "border-gold-rich bg-gold-rich/10 scale-105"
+                      : "border-gold-rich/30 bg-dark-800/50"
+                  )}
+                  onDragOver={(e) => {
+                    e.preventDefault()
+                    e.dataTransfer.dropEffect = 'move'
+                  }}
+                  onDragEnter={(e) => {
+                    e.preventDefault()
+                    setDragOverTarget({ type: 'home', id: 'standalone' })
+                  }}
+                  onDragLeave={(e) => {
+                    e.preventDefault()
+                    if (!e.currentTarget.contains(e.relatedTarget)) {
+                      setDragOverTarget(null)
+                    }
+                  }}
+                  onDrop={(e) => {
+                    e.preventDefault()
+                    handleMoveProjectToHome(draggedProject)
+                  }}
+                >
+                  <div className="text-center">
+                    <p className={clsx(
+                      "font-medium text-sm",
+                      dragOverTarget?.type === 'home' ? "text-gold-rich" : "text-gray-400"
+                    )}>
+                      Drag project here
+                    </p>
+                    <p className="text-xs text-gray-500 mt-1">Move to standalone</p>
+                  </div>
+                </div>
+              )}
               
               {/* Feature Card */}
               {(standaloneProjects.length > 0 || folders.length > 0 || series.length > 0) && (

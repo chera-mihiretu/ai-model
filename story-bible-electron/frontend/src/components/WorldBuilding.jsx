@@ -216,6 +216,7 @@ function WorldElementRow({ element, onToggleVisibility, onDuplicate, onDelete, o
   const [rewritingField, setRewritingField] = useState(null)
   const menuRef = useRef(null)
   const menuButtonRef = useRef(null)
+  const saveTimeoutRef = useRef(null)
   const isVisible = element.is_visible !== 0
   
   useEffect(() => {
@@ -233,13 +234,37 @@ function WorldElementRow({ element, onToggleVisibility, onDuplicate, onDelete, o
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
   
+  // Cleanup save timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current)
+      }
+    }
+  }, [])
+  
+  // Handle field change with debounced auto-save
   const handleChange = (field, value) => {
-    setEditData(prev => ({ ...prev, [field]: value }))
+    const newData = { ...editData, [field]: value }
+    setEditData(newData)
     setIsDirty(true)
+    
+    // Debounced auto-save (1 second)
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current)
+    }
+    saveTimeoutRef.current = setTimeout(() => {
+      onSave(newData)
+      setIsDirty(false)
+    }, 1000)
   }
   
+  // Handle immediate save (for blur events)
   const handleSave = () => {
     if (isDirty) {
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current)
+      }
       onSave(editData)
       setIsDirty(false)
     }
@@ -258,8 +283,14 @@ function WorldElementRow({ element, onToggleVisibility, onDuplicate, onDelete, o
     try {
       const rewritten = await onRewriteField(field, editData[field], instruction, editData.name)
       if (rewritten) {
-        handleChange(field, rewritten)
+        // Clear any pending auto-save
+        if (saveTimeoutRef.current) {
+          clearTimeout(saveTimeoutRef.current)
+        }
+        // Update state and save immediately after rewrite
         const newData = { ...editData, [field]: rewritten }
+        setEditData(newData)
+        setIsDirty(false)
         onSave(newData)
       }
     } finally {
@@ -650,7 +681,8 @@ function WorldBuilding() {
     currentSeriesId,
     currentSeriesProjects,
     projects,
-    addNotification 
+    addNotification,
+    storyBibleData,
   } = useStore()
   const { 
     getWorldElements, 
@@ -665,7 +697,6 @@ function WorldBuilding() {
   const [isLoading, setIsLoading] = useState(true)
   const [isSectionExpanded, setIsSectionExpanded] = useState(true)
   const [showSectionMenu, setShowSectionMenu] = useState(false)
-  const [showGenerateModal, setShowGenerateModal] = useState(false)
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [isGenerating, setIsGenerating] = useState(false)
   const sectionMenuRef = useRef(null)
@@ -847,34 +878,51 @@ Please rewrite following the instruction. Only output the rewritten content.`
     }
   }
   
-  // Generate element with AI
-  const handleGenerateElement = async (description, elementType) => {
+  // Generate world elements from synopsis/braindump
+  const handleGenerateElement = async () => {
+    const synopsisContent = storyBibleData['synopsis'] || ''
+    const braindumpContent = storyBibleData['braindump'] || ''
+    const genreContent = storyBibleData['genre'] || 'fiction'
+    
+    const sourceContent = synopsisContent.trim() || braindumpContent.trim()
+    if (!sourceContent) {
+      addNotification({ type: 'warning', message: 'Please write a Synopsis or Braindump first to generate world elements.' })
+      return
+    }
+    
     if (!isElectronApi) {
       addNotification({ type: 'warning', message: 'AI generation requires the Python backend' })
       return
     }
     
     setIsGenerating(true)
+    
     try {
-      const result = await window.api.generateSingleWorldElement(description, elementType, 'fiction')
+      const result = await window.api.generateWorldFromSynopsis(sourceContent, genreContent)
       
-      if (result && !result.error) {
-        await createWorldElement(currentProjectId, {
-          name: result.name || 'Unnamed Element',
-          element_type: result.element_type || elementType,
-          description: result.description || '',
-          is_visible: 1,
-        })
+      if (result && result.length > 0) {
+        let savedCount = 0
+        for (const elem of result) {
+          try {
+            await createWorldElement(currentProjectId, elem)
+            savedCount++
+          } catch (saveError) {
+            console.error('Save world element error:', saveError)
+          }
+        }
         
         const updated = await getWorldElements(currentProjectId, null, null)
         setElements(updated || [])
-        setShowGenerateModal(false)
-        addNotification({ type: 'success', message: `Element "${result.name}" created!` })
+        
+        if (savedCount > 0) {
+          addNotification({ type: 'success', message: `Generated ${savedCount} world elements from synopsis` })
+        }
       } else {
-        addNotification({ type: 'error', message: result?.error || 'Failed to generate' })
+        addNotification({ type: 'warning', message: 'No world elements could be extracted from the synopsis' })
       }
     } catch (error) {
-      addNotification({ type: 'error', message: 'Failed to generate element' })
+      console.error('Generate world elements error:', error)
+      addNotification({ type: 'error', message: `Failed to generate world elements: ${error.message}` })
     } finally {
       setIsGenerating(false)
     }
@@ -921,11 +969,21 @@ Please rewrite following the instruction. Only output the rewritten content.`
                   <button
                     className="w-full px-4 py-2 text-left text-sm text-gray-300 hover:bg-gold-rich/10 hover:text-gold-rich flex items-center gap-2"
                     onClick={() => {
-                      setShowGenerateModal(true)
+                      handleGenerateElement()
                       setShowSectionMenu(false)
                     }}
+                    disabled={isGenerating}
                   >
-                    {Icons.MAGIC} Generate with AI
+                    {isGenerating ? (
+                      <>
+                        <div className="spinner !w-4 !h-4" />
+                        <span>Generating...</span>
+                      </>
+                    ) : (
+                      <>
+                        {Icons.MAGIC} Generate from Synopsis
+                      </>
+                    )}
                   </button>
                 </div>
               )}
@@ -951,9 +1009,19 @@ Please rewrite following the instruction. Only output the rewritten content.`
                 <div className="flex items-center justify-center gap-3">
                   <button
                     className="px-4 py-2 rounded-lg bg-dark-700 text-gray-300 hover:bg-dark-600 text-sm font-medium flex items-center gap-2 border border-gold-rich/20"
-                    onClick={() => setShowGenerateModal(true)}
+                    onClick={handleGenerateElement}
+                    disabled={isGenerating}
                   >
-                    {Icons.MAGIC} Generate with AI
+                    {isGenerating ? (
+                      <>
+                        <div className="spinner !w-4 !h-4" />
+                        <span>Generating...</span>
+                      </>
+                    ) : (
+                      <>
+                        {Icons.MAGIC} Generate from Synopsis
+                      </>
+                    )}
                   </button>
                   <button
                     className="px-4 py-2 rounded-lg bg-gradient-to-r from-gold-rich to-gold-deep text-dark-950 hover:from-gold-amber hover:to-gold-rich text-sm font-medium flex items-center gap-2"
@@ -1020,14 +1088,6 @@ Please rewrite following the instruction. Only output the rewritten content.`
         isOpen={showCreateModal}
         onClose={() => setShowCreateModal(false)}
         onCreate={handleCreateElement}
-      />
-      
-      {/* Generate Modal */}
-      <GenerateElementModal
-        isOpen={showGenerateModal}
-        onClose={() => setShowGenerateModal(false)}
-        onGenerate={handleGenerateElement}
-        isGenerating={isGenerating}
       />
     </div>
   )

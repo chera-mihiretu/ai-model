@@ -611,6 +611,10 @@ function StoryBible() {
   }
   
   const handleGenerateSection = async () => {
+    if (currentBibleTab === 'outline') {
+      return handleGenerateOutline()
+    }
+    
     if (!isElectronApi) {
       addNotification({ type: 'warning', message: 'AI generation requires the Python backend' })
       return

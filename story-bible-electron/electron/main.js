@@ -63,6 +63,11 @@ function getProjectRoot() {
  * Get the data directory path
  */
 function getDataPath() {
+  // #region agent log
+  const fs = require('fs');
+  const logData = {sessionId:'7033cc',location:'main.js:getDataPath',message:'Path resolution debug',data:{isPackaged:app.isPackaged,userData:app.getPath('userData'),dirname:__dirname,uid:process.getuid?.(),euid:process.geteuid?.(),env_HOME:process.env.HOME,env_USER:process.env.USER},timestamp:Date.now()};
+  try { fs.appendFileSync('/home/chera/Public/my_stuffs/work/fiverr/ricardoo/.cursor/debug-7033cc.log', JSON.stringify(logData) + '\n'); } catch(e) {}
+  // #endregion
   if (app.isPackaged) {
     // In production, use user's app data directory for writable data
     return path.join(app.getPath('userData'), 'data');

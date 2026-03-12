@@ -231,6 +231,7 @@ function CharacterRow({ character, onToggleVisibility, onDuplicate, onDelete, on
   const [rewritingField, setRewritingField] = useState(null)
   const menuRef = useRef(null)
   const menuButtonRef = useRef(null)
+  const saveTimeoutRef = useRef(null)
   const isVisible = character.is_visible !== 0
   
   // Update editData when character changes
@@ -250,15 +251,37 @@ function CharacterRow({ character, onToggleVisibility, onDuplicate, onDelete, on
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
   
-  // Handle field change
+  // Cleanup save timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current)
+      }
+    }
+  }, [])
+  
+  // Handle field change with debounced auto-save
   const handleChange = (field, value) => {
-    setEditData(prev => ({ ...prev, [field]: value }))
+    const newData = { ...editData, [field]: value }
+    setEditData(newData)
     setIsDirty(true)
+    
+    // Debounced auto-save (1 second)
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current)
+    }
+    saveTimeoutRef.current = setTimeout(() => {
+      onSave(newData)
+      setIsDirty(false)
+    }, 1000)
   }
   
-  // Handle save
+  // Handle immediate save (for blur events)
   const handleSave = () => {
     if (isDirty) {
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current)
+      }
       onSave(editData)
       setIsDirty(false)
     }
@@ -279,9 +302,14 @@ function CharacterRow({ character, onToggleVisibility, onDuplicate, onDelete, on
     try {
       const rewritten = await onRewriteField(field, editData[field], instruction, editData.name)
       if (rewritten) {
-        handleChange(field, rewritten)
-        // Auto-save after rewrite
+        // Clear any pending auto-save
+        if (saveTimeoutRef.current) {
+          clearTimeout(saveTimeoutRef.current)
+        }
+        // Update state and save immediately after rewrite
         const newData = { ...editData, [field]: rewritten }
+        setEditData(newData)
+        setIsDirty(false)
         onSave(newData)
       }
     } finally {
@@ -807,6 +835,7 @@ function CharacterManager() {
     addCharacter,
     updateCharacter,
     addNotification,
+    storyBibleData,
   } = useStore()
   
   const {
@@ -821,7 +850,6 @@ function CharacterManager() {
   const [view, setView] = useState('list') // 'list' | 'edit'
   const [editingCharacter, setEditingCharacter] = useState(null)
   const [isGenerating, setIsGenerating] = useState(false)
-  const [showGenerateModal, setShowGenerateModal] = useState(false)
   const [showImportModal, setShowImportModal] = useState(false)
   const [isSectionExpanded, setIsSectionExpanded] = useState(true)
   const [showSectionMenu, setShowSectionMenu] = useState(false)
@@ -883,85 +911,60 @@ function CharacterManager() {
     setView('edit')
   }
   
-  // Handle AI generate character
-  const handleGenerateCharacter = async (description, genre) => {
-    if (!isElectronApi) {
-      addNotification({ type: 'warning', message: 'AI generation requires the Python backend' })
+  // Handle AI generate characters from synopsis/braindump
+  const handleGenerateCharacter = async () => {
+    const synopsisContent = storyBibleData['synopsis'] || ''
+    const braindumpContent = storyBibleData['braindump'] || ''
+    const genreContent = storyBibleData['genre'] || 'fiction'
+    
+    const sourceContent = synopsisContent.trim() || braindumpContent.trim()
+    if (!sourceContent) {
+      addNotification({ type: 'warning', message: 'Please write a Synopsis or Braindump first to generate characters.' })
       return
     }
     
-    if (!description || !description.trim()) {
-      addNotification({ type: 'warning', message: 'Please enter a character description' })
+    if (!isElectronApi) {
+      addNotification({ type: 'warning', message: 'AI generation requires the Python backend' })
       return
     }
     
     setIsGenerating(true)
     
     try {
-      console.log('Generating character with description:', description, 'genre:', genre)
+      console.log('Generating characters from synopsis/braindump')
       
-      // Call the AI to generate a character
-      const generatedCharacter = await window.api.generateSingleCharacter(description, genre)
+      const result = await window.api.generateCharactersFromSynopsis(sourceContent, genreContent)
       
-      console.log('AI response:', generatedCharacter)
-      
-      // Check for error response
-      if (generatedCharacter && generatedCharacter.error) {
-        addNotification({ type: 'error', message: generatedCharacter.error })
-        return
-      }
-      
-      // Check if we have a valid character with a name
-      if (generatedCharacter && generatedCharacter.name && generatedCharacter.name.trim()) {
-        // Add project_id and save immediately
-        const characterToSave = {
-          project_id: currentProjectId,
-          name: generatedCharacter.name,
-          role: generatedCharacter.role || '',
-          pronouns: generatedCharacter.pronouns || '',
-          personality_traits: generatedCharacter.personality_traits || '',
-          physical_description: generatedCharacter.physical_description || '',
-          backstory: generatedCharacter.backstory || '',
-          motivations: generatedCharacter.motivations || '',
-          internal_conflicts: generatedCharacter.internal_conflicts || '',
-          strengths: generatedCharacter.strengths || '',
-          weaknesses: generatedCharacter.weaknesses || '',
-          speech_pattern: generatedCharacter.speech_pattern || '',
-          character_arc: generatedCharacter.character_arc || '',
-          is_visible: 1,
+      if (result && result.length > 0) {
+        let savedCount = 0
+        let errors = []
+        
+        for (const char of result) {
+          try {
+            const success = await saveCharacter({ ...char, project_id: currentProjectId })
+            if (success) savedCount++
+          } catch (saveError) {
+            console.error('Save character error:', saveError)
+            errors.push(char.name || 'Unknown')
+          }
         }
         
-        console.log('Saving character:', characterToSave)
+        // Refresh characters list
+        const chars = await getCharacters(currentProjectId)
+        setCharacters(chars)
         
-        const success = await saveCharacter(characterToSave)
-        
-        if (success) {
-          // Refresh characters list
-          const chars = await getCharacters(currentProjectId)
-          setCharacters(chars)
-          
-          // Close modal and show success
-          setShowGenerateModal(false)
-          addNotification({ 
-            type: 'success', 
-            message: `Character "${generatedCharacter.name}" created successfully!` 
-          })
-        } else {
-          addNotification({ type: 'error', message: 'Failed to save the generated character to database' })
+        if (savedCount > 0) {
+          addNotification({ type: 'success', message: `Generated ${savedCount} characters from synopsis` })
+        }
+        if (errors.length > 0) {
+          addNotification({ type: 'warning', message: `Failed to save: ${errors.join(', ')}` })
         }
       } else {
-        console.error('Invalid character response:', generatedCharacter)
-        addNotification({ 
-          type: 'error', 
-          message: 'AI could not generate a valid character. Please try a different or more detailed description.' 
-        })
+        addNotification({ type: 'warning', message: 'No characters could be extracted from the synopsis' })
       }
     } catch (error) {
-      console.error('Character generation error:', error)
-      addNotification({ 
-        type: 'error', 
-        message: `Failed to generate character: ${error.message || 'Unknown error'}` 
-      })
+      console.error('Generate characters error:', error)
+      addNotification({ type: 'error', message: `Failed to generate characters: ${error.message}` })
     } finally {
       setIsGenerating(false)
     }
@@ -1225,11 +1228,21 @@ Please rewrite the ${fieldLabel} following the user's instruction. Keep it conci
                   <button
                     className="w-full px-4 py-2 text-left text-sm text-text-secondary hover:bg-gold-rich/10 hover:text-gold-rich flex items-center gap-2"
                     onClick={() => {
-                      setShowGenerateModal(true)
+                      handleGenerateCharacter()
                       setShowSectionMenu(false)
                     }}
+                    disabled={isGenerating}
                   >
-                    {Icons.MAGIC} Generate with AI
+                    {isGenerating ? (
+                      <>
+                        <div className="spinner !w-4 !h-4" />
+                        <span>Generating...</span>
+                      </>
+                    ) : (
+                      <>
+                        {Icons.MAGIC} Generate from Synopsis
+                      </>
+                    )}
                   </button>
                   <button
                     className="w-full px-4 py-2 text-left text-sm text-text-secondary hover:bg-gold-rich/10 hover:text-gold-rich flex items-center gap-2"
@@ -1270,9 +1283,19 @@ Please rewrite the ${fieldLabel} following the user's instruction. Keep it conci
                 <div className="flex items-center justify-center gap-3">
                   <button
                     className="px-4 py-2 rounded-lg bg-dark-700 border border-gold-rich/20 text-text-secondary hover:bg-gold-rich/10 hover:text-gold-rich hover:border-gold-rich/40 text-sm font-medium flex items-center gap-2 transition-colors"
-                    onClick={() => setShowGenerateModal(true)}
+                    onClick={handleGenerateCharacter}
+                    disabled={isGenerating}
                   >
-                    {Icons.MAGIC} Generate with AI
+                    {isGenerating ? (
+                      <>
+                        <div className="spinner !w-4 !h-4" />
+                        <span>Generating...</span>
+                      </>
+                    ) : (
+                      <>
+                        {Icons.MAGIC} Generate from Synopsis
+                      </>
+                    )}
                   </button>
                   <button
                     className="px-4 py-2 rounded-lg bg-gradient-to-r from-gold-rich to-gold-deep text-dark-950 hover:from-gold-amber hover:to-gold-rich text-sm font-medium flex items-center gap-2 shadow-gold-sm transition-all"
@@ -1335,14 +1358,6 @@ Please rewrite the ${fieldLabel} following the user's instruction. Keep it conci
           </div>
         )}
       </div>
-      
-      {/* Generate Character Modal */}
-      <GenerateCharacterModal
-        isOpen={showGenerateModal}
-        onClose={() => setShowGenerateModal(false)}
-        onGenerate={handleGenerateCharacter}
-        isGenerating={isGenerating}
-      />
       
       {/* CSV Import Modal */}
       <CSVImportModal
