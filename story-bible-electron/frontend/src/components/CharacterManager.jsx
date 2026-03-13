@@ -424,13 +424,21 @@ function CharacterRow({ character, onToggleVisibility, onDuplicate, onDelete, on
               ref={menuButtonRef}
               className="w-8 h-8 flex items-center justify-center rounded-lg text-text-muted hover:text-gold-rich hover:bg-gold-rich/10 transition-colors"
               onClick={() => {
+                // #region agent log
                 if (!showMenu && menuButtonRef.current) {
                   const rect = menuButtonRef.current.getBoundingClientRect()
-                  setMenuPosition({
+                  const scrollContainer = menuButtonRef.current.closest('.overflow-y-auto')
+                  const scrollTop = scrollContainer ? scrollContainer.scrollTop : 0
+                  const scrollContainerRect = scrollContainer ? scrollContainer.getBoundingClientRect() : null
+                  const calculatedPosition = {
                     top: rect.bottom + 4,
                     right: window.innerWidth - rect.right
-                  })
+                  }
+                  const logData = {characterName:character?.name,buttonRect:{top:rect.top,bottom:rect.bottom,left:rect.left,right:rect.right},calculatedMenuPosition:calculatedPosition,windowInnerWidth:window.innerWidth,windowInnerHeight:window.innerHeight,scrollContainerInfo:{found:!!scrollContainer,scrollTop,containerRect:scrollContainerRect?{top:scrollContainerRect.top,bottom:scrollContainerRect.bottom,height:scrollContainerRect.height}:null}}
+                  fetch('http://127.0.0.1:7242/ingest/99078eb2-d644-4fa5-9cbc-a0baa688e7c0',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'232279'},body:JSON.stringify({sessionId:'232279',location:'CharacterManager.jsx:427',message:'More button clicked',data:logData,runId:'run1',hypothesisId:'A,B,C',timestamp:Date.now()})}).catch(()=>{});
+                  setMenuPosition(calculatedPosition)
                 }
+                // #endregion
                 setShowMenu(!showMenu)
               }}
             >
@@ -913,6 +921,9 @@ function CharacterManager() {
   
   // Handle AI generate characters from synopsis/braindump
   const handleGenerateCharacter = async () => {
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/99078eb2-d644-4fa5-9cbc-a0baa688e7c0',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'232279'},body:JSON.stringify({sessionId:'232279',location:'CharacterManager.jsx:923',message:'handleGenerateCharacter called',data:{hasStoryBibleData:!!storyBibleData,currentProjectId},runId:'run1',hypothesisId:'A,B',timestamp:Date.now()})}).catch(()=>{});
+    // #endregion
     const synopsisContent = storyBibleData['synopsis'] || ''
     const braindumpContent = storyBibleData['braindump'] || ''
     const genreContent = storyBibleData['genre'] || 'fiction'
@@ -928,12 +939,22 @@ function CharacterManager() {
       return
     }
     
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/99078eb2-d644-4fa5-9cbc-a0baa688e7c0',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'232279'},body:JSON.stringify({sessionId:'232279',location:'CharacterManager.jsx:942',message:'About to setIsGenerating(true)',data:{sourceContentLength:sourceContent.length,genreContent},runId:'run1',hypothesisId:'B,E',timestamp:Date.now()})}).catch(()=>{});
+    // #endregion
     setIsGenerating(true)
     
     try {
       console.log('Generating characters from synopsis/braindump')
       
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/99078eb2-d644-4fa5-9cbc-a0baa688e7c0',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'232279'},body:JSON.stringify({sessionId:'232279',location:'CharacterManager.jsx:950',message:'Calling window.api.generateCharactersFromSynopsis',data:{hasWindowApi:!!window.api,hasMethod:!!window.api?.generateCharactersFromSynopsis},runId:'run1',hypothesisId:'A',timestamp:Date.now()})}).catch(()=>{});
+      // #endregion
       const result = await window.api.generateCharactersFromSynopsis(sourceContent, genreContent)
+      
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/99078eb2-d644-4fa5-9cbc-a0baa688e7c0',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'232279'},body:JSON.stringify({sessionId:'232279',location:'CharacterManager.jsx:956',message:'API call returned',data:{resultType:typeof result,isArray:Array.isArray(result),resultLength:result?.length,resultPreview:JSON.stringify(result)?.substring(0,200)},runId:'run1',hypothesisId:'A,C',timestamp:Date.now()})}).catch(()=>{});
+      // #endregion
       
       if (result && result.length > 0) {
         let savedCount = 0
@@ -944,6 +965,9 @@ function CharacterManager() {
             const success = await saveCharacter({ ...char, project_id: currentProjectId })
             if (success) savedCount++
           } catch (saveError) {
+            // #region agent log
+            fetch('http://127.0.0.1:7242/ingest/99078eb2-d644-4fa5-9cbc-a0baa688e7c0',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'232279'},body:JSON.stringify({sessionId:'232279',location:'CharacterManager.jsx:970',message:'Save character error',data:{charName:char?.name,errorMessage:saveError?.message},runId:'run1',hypothesisId:'D',timestamp:Date.now()})}).catch(()=>{});
+            // #endregion
             console.error('Save character error:', saveError)
             errors.push(char.name || 'Unknown')
           }
@@ -953,6 +977,10 @@ function CharacterManager() {
         const chars = await getCharacters(currentProjectId)
         setCharacters(chars)
         
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/99078eb2-d644-4fa5-9cbc-a0baa688e7c0',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'232279'},body:JSON.stringify({sessionId:'232279',location:'CharacterManager.jsx:983',message:'Generation completed successfully',data:{savedCount,errorsCount:errors.length},runId:'run1',hypothesisId:'A,B,C,D',timestamp:Date.now()})}).catch(()=>{});
+        // #endregion
+        
         if (savedCount > 0) {
           addNotification({ type: 'success', message: `Generated ${savedCount} characters from synopsis` })
         }
@@ -960,12 +988,21 @@ function CharacterManager() {
           addNotification({ type: 'warning', message: `Failed to save: ${errors.join(', ')}` })
         }
       } else {
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/99078eb2-d644-4fa5-9cbc-a0baa688e7c0',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'232279'},body:JSON.stringify({sessionId:'232279',location:'CharacterManager.jsx:995',message:'No characters extracted',data:{result},runId:'run1',hypothesisId:'A,C',timestamp:Date.now()})}).catch(()=>{});
+        // #endregion
         addNotification({ type: 'warning', message: 'No characters could be extracted from the synopsis' })
       }
     } catch (error) {
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/99078eb2-d644-4fa5-9cbc-a0baa688e7c0',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'232279'},body:JSON.stringify({sessionId:'232279',location:'CharacterManager.jsx:1002',message:'Generation threw error',data:{errorName:error?.name,errorMessage:error?.message,errorStack:error?.stack?.substring(0,300)},runId:'run1',hypothesisId:'A',timestamp:Date.now()})}).catch(()=>{});
+      // #endregion
       console.error('Generate characters error:', error)
       addNotification({ type: 'error', message: `Failed to generate characters: ${error.message}` })
     } finally {
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/99078eb2-d644-4fa5-9cbc-a0baa688e7c0',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'232279'},body:JSON.stringify({sessionId:'232279',location:'CharacterManager.jsx:1010',message:'Finally block - setIsGenerating(false)',data:{},runId:'run1',hypothesisId:'B',timestamp:Date.now()})}).catch(()=>{});
+      // #endregion
       setIsGenerating(false)
     }
   }

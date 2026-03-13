@@ -2,7 +2,12 @@ import sqlite3
 import logging
 import os
 import json
+import uuid
 from pathlib import Path
+
+def generate_uuid() -> str:
+    """Generate a new UUID string."""
+    return str(uuid.uuid4())
 
 class DatabaseManager:
     def __init__(self, db_name="app.db"):
@@ -10,15 +15,6 @@ class DatabaseManager:
         
         # Check for environment variable path first (set by Electron)
         data_path = os.environ.get('EXELSIAS_DATA_PATH')
-        
-        # #region agent log
-        debug_log_path = '/home/chera/Public/my_stuffs/work/fiverr/ricardoo/.cursor/debug-7033cc.log'
-        log_entry = {"sessionId":"7033cc","location":"db_manager.py:__init__","message":"DB path resolution","data":{"data_path_env":data_path,"frozen":getattr(sys, 'frozen', False),"executable":sys.executable if getattr(sys, 'frozen', False) else None,"file_path":str(Path(__file__).resolve()),"uid":os.getuid(),"euid":os.geteuid(),"HOME":os.environ.get('HOME'),"USER":os.environ.get('USER')},"timestamp":int(__import__('time').time()*1000)}
-        try:
-            with open(debug_log_path, 'a') as f:
-                f.write(json.dumps(log_entry) + '\n')
-        except: pass
-        # #endregion
         
         if data_path:
             # Production: use path provided by Electron
@@ -35,14 +31,6 @@ class DatabaseManager:
         
         db_existed = self.db_path.exists()
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
-        
-        # #region agent log
-        log_entry2 = {"sessionId":"7033cc","location":"db_manager.py:__init__:resolved","message":"Final DB path","data":{"db_path":str(self.db_path),"base_dir":str(self.base_dir),"db_existed":db_existed,"path_branch":"env" if data_path else ("frozen" if getattr(sys, 'frozen', False) else "dev")},"timestamp":int(__import__('time').time()*1000)}
-        try:
-            with open(debug_log_path, 'a') as f:
-                f.write(json.dumps(log_entry2) + '\n')
-        except: pass
-        # #endregion
         
         if not db_existed:
             logging.info(f"Database NOT FOUND. Creating persistent DB at: {self.db_path}")
@@ -86,7 +74,7 @@ class DatabaseManager:
                 
                 cursor.execute("""
                     CREATE TABLE IF NOT EXISTS projects (
-                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        id TEXT PRIMARY KEY,
                         name TEXT NOT NULL,
                         genre TEXT,
                         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -95,8 +83,8 @@ class DatabaseManager:
                 
                 cursor.execute("""
                     CREATE TABLE IF NOT EXISTS chapters (
-                        id INTEGER PRIMARY KEY AUTOINCREMENT,
-                        project_id INTEGER NOT NULL,
+                        id TEXT PRIMARY KEY,
+                        project_id TEXT NOT NULL,
                         title TEXT NOT NULL,
                         content TEXT,
                         chapter_order INTEGER,
@@ -110,8 +98,8 @@ class DatabaseManager:
                 
                 cursor.execute("""
                     CREATE TABLE IF NOT EXISTS characters (
-                        id INTEGER PRIMARY KEY AUTOINCREMENT,
-                        project_id INTEGER DEFAULT 0,
+                        id TEXT PRIMARY KEY,
+                        project_id TEXT DEFAULT '',
                         name TEXT NOT NULL,
                         role TEXT,
                         personality_traits TEXT,
@@ -144,9 +132,9 @@ class DatabaseManager:
                 
                 cursor.execute("""
                     CREATE TABLE IF NOT EXISTS story_beats (
-                        id INTEGER PRIMARY KEY AUTOINCREMENT,
-                        project_id INTEGER NOT NULL,
-                        chapter_id INTEGER NOT NULL,
+                        id TEXT PRIMARY KEY,
+                        project_id TEXT NOT NULL,
+                        chapter_id TEXT NOT NULL,
                         summary TEXT,
                         FOREIGN KEY (project_id) REFERENCES projects (id),
                         FOREIGN KEY (chapter_id) REFERENCES chapters (id)
@@ -155,7 +143,7 @@ class DatabaseManager:
                 
                 cursor.execute("""
                     CREATE TABLE IF NOT EXISTS story_bible (
-                        project_id INTEGER PRIMARY KEY,
+                        project_id TEXT PRIMARY KEY,
                         braindump TEXT,
                         braindump_summary TEXT,
                         genre TEXT,
@@ -176,8 +164,8 @@ class DatabaseManager:
 
                 cursor.execute("""
                     CREATE TABLE IF NOT EXISTS generation_chunks (
-                        id INTEGER PRIMARY KEY AUTOINCREMENT,
-                        chapter_id INTEGER NOT NULL,
+                        id TEXT PRIMARY KEY,
+                        chapter_id TEXT NOT NULL,
                         chunk_order INTEGER NOT NULL,
                         raw_text TEXT NOT NULL,
                         summary TEXT,
@@ -191,7 +179,7 @@ class DatabaseManager:
                 # Project Summaries - tiered pre-computed summaries for AI context
                 cursor.execute("""
                     CREATE TABLE IF NOT EXISTS project_summaries (
-                        project_id    INTEGER NOT NULL,
+                        project_id    TEXT NOT NULL,
                         content_type  TEXT NOT NULL,
                         token_tier    INTEGER NOT NULL,
                         summary_text  TEXT DEFAULT '',
@@ -204,7 +192,7 @@ class DatabaseManager:
                 # Content Versions - tracks staleness of each content type
                 cursor.execute("""
                     CREATE TABLE IF NOT EXISTS content_versions (
-                        project_id   INTEGER NOT NULL,
+                        project_id   TEXT NOT NULL,
                         content_type TEXT NOT NULL,
                         version      INTEGER DEFAULT 0,
                         PRIMARY KEY (project_id, content_type)
@@ -229,8 +217,8 @@ class DatabaseManager:
                     logging.info("Running migration: Version 3 (Generation Chunks)")
                     conn.execute("""
                         CREATE TABLE IF NOT EXISTS generation_chunks (
-                            id INTEGER PRIMARY KEY AUTOINCREMENT,
-                            chapter_id INTEGER NOT NULL,
+                            id TEXT PRIMARY KEY,
+                            chapter_id TEXT NOT NULL,
                             chunk_order INTEGER NOT NULL,
                             raw_text TEXT NOT NULL,
                             summary TEXT,
@@ -248,16 +236,16 @@ class DatabaseManager:
                     # World Building Elements
                     conn.execute("""
                         CREATE TABLE IF NOT EXISTS world_elements (
-                            id INTEGER PRIMARY KEY AUTOINCREMENT,
-                            project_id INTEGER,
-                            series_id INTEGER,
+                            id TEXT PRIMARY KEY,
+                            project_id TEXT,
+                            series_id TEXT,
                             name TEXT NOT NULL,
                             element_type TEXT DEFAULT 'other',
                             description TEXT,
                             sensory_details TEXT,
                             significance TEXT,
                             custom_traits TEXT,
-                            source_project_id INTEGER,
+                            source_project_id TEXT,
                             is_visible INTEGER DEFAULT 1,
                             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                             FOREIGN KEY (project_id) REFERENCES projects (id),
@@ -268,7 +256,7 @@ class DatabaseManager:
                     # Series Folders
                     conn.execute("""
                         CREATE TABLE IF NOT EXISTS series (
-                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            id TEXT PRIMARY KEY,
                             name TEXT NOT NULL,
                             description TEXT,
                             timeline_data TEXT,
@@ -279,8 +267,8 @@ class DatabaseManager:
                     # Series-Project linking
                     conn.execute("""
                         CREATE TABLE IF NOT EXISTS series_projects (
-                            series_id INTEGER NOT NULL,
-                            project_id INTEGER NOT NULL,
+                            series_id TEXT NOT NULL,
+                            project_id TEXT NOT NULL,
                             book_order INTEGER DEFAULT 0,
                             PRIMARY KEY (series_id, project_id),
                             FOREIGN KEY (series_id) REFERENCES series (id),
@@ -291,9 +279,9 @@ class DatabaseManager:
                     # Character Versions
                     conn.execute("""
                         CREATE TABLE IF NOT EXISTS character_versions (
-                            id INTEGER PRIMARY KEY AUTOINCREMENT,
-                            character_id INTEGER NOT NULL,
-                            project_id INTEGER NOT NULL,
+                            id TEXT PRIMARY KEY,
+                            character_id TEXT NOT NULL,
+                            project_id TEXT NOT NULL,
                             version_notes TEXT,
                             is_canonical INTEGER DEFAULT 0,
                             trait_overrides TEXT,
@@ -306,8 +294,8 @@ class DatabaseManager:
                     # Scenes (for draft tool)
                     conn.execute("""
                         CREATE TABLE IF NOT EXISTS scenes (
-                            id INTEGER PRIMARY KEY AUTOINCREMENT,
-                            chapter_id INTEGER NOT NULL,
+                            id TEXT PRIMARY KEY,
+                            chapter_id TEXT NOT NULL,
                             scene_order INTEGER DEFAULT 0,
                             title TEXT,
                             summary TEXT,
@@ -322,8 +310,8 @@ class DatabaseManager:
                     # Chapter-Outline Linking
                     conn.execute("""
                         CREATE TABLE IF NOT EXISTS chapter_outline_links (
-                            id INTEGER PRIMARY KEY AUTOINCREMENT,
-                            chapter_id INTEGER NOT NULL,
+                            id TEXT PRIMARY KEY,
+                            chapter_id TEXT NOT NULL,
                             outline_section TEXT,
                             outline_order INTEGER DEFAULT 0,
                             FOREIGN KEY (chapter_id) REFERENCES chapters (id)
@@ -346,7 +334,7 @@ class DatabaseManager:
                     
                     conn.execute("""
                         CREATE TABLE IF NOT EXISTS project_summaries (
-                            project_id    INTEGER NOT NULL,
+                            project_id    TEXT NOT NULL,
                             content_type  TEXT NOT NULL,
                             token_tier    INTEGER NOT NULL,
                             summary_text  TEXT DEFAULT '',
@@ -358,7 +346,7 @@ class DatabaseManager:
                     
                     conn.execute("""
                         CREATE TABLE IF NOT EXISTS content_versions (
-                            project_id   INTEGER NOT NULL,
+                            project_id   TEXT NOT NULL,
                             content_type TEXT NOT NULL,
                             version      INTEGER DEFAULT 0,
                             PRIMARY KEY (project_id, content_type)
@@ -374,7 +362,7 @@ class DatabaseManager:
                     
                     conn.execute("""
                         CREATE TABLE IF NOT EXISTS recycle_bin (
-                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            id TEXT PRIMARY KEY,
                             item_type TEXT NOT NULL,
                             item_id TEXT NOT NULL,
                             item_data TEXT NOT NULL,
@@ -445,7 +433,7 @@ class DatabaseManager:
 
     # --- Content Version & Summary Methods ---
     
-    def increment_content_version(self, project_id: int, content_type: str):
+    def increment_content_version(self, project_id: str, content_type: str):
         """Bump the version counter for a content type, marking summaries as stale."""
         try:
             with self.get_connection() as conn:
@@ -459,7 +447,7 @@ class DatabaseManager:
         except sqlite3.Error as e:
             logging.error(f"Increment content version error: {e}")
     
-    def get_content_version(self, project_id: int, content_type: str) -> int:
+    def get_content_version(self, project_id: str, content_type: str) -> int:
         """Get the current version number for a content type."""
         try:
             with self.get_connection() as conn:
@@ -473,7 +461,7 @@ class DatabaseManager:
             logging.error(f"Get content version error: {e}")
             return 0
     
-    def get_summary(self, project_id: int, content_type: str, token_tier: int) -> dict:
+    def get_summary(self, project_id: str, content_type: str, token_tier: int) -> dict:
         """Get a pre-computed summary for a content type and tier."""
         try:
             with self.get_connection() as conn:
@@ -489,7 +477,7 @@ class DatabaseManager:
             logging.error(f"Get summary error: {e}")
             return {'summary_text': '', 'source_version': 0}
     
-    def save_summary(self, project_id: int, content_type: str, token_tier: int, summary_text: str, source_version: int):
+    def save_summary(self, project_id: str, content_type: str, token_tier: int, summary_text: str, source_version: int):
         """Store a pre-computed summary for a content type and tier."""
         try:
             with self.get_connection() as conn:
@@ -504,7 +492,7 @@ class DatabaseManager:
         except sqlite3.Error as e:
             logging.error(f"Save summary error: {e}")
     
-    def get_raw_content_for_type(self, project_id: int, content_type: str) -> str:
+    def get_raw_content_for_type(self, project_id: str, content_type: str) -> str:
         """Get the full raw content for a content type to be summarized."""
         try:
             with self.get_connection() as conn:
@@ -606,7 +594,7 @@ class DatabaseManager:
             logging.error(f"Get raw content for type error: {e}")
             return ''
     
-    def get_context_health(self, project_id: int) -> dict:
+    def get_context_health(self, project_id: str) -> dict:
         """
         Check the health/freshness of all summarized context for a project.
         Returns a dict with status for each content type: 'fresh', 'stale', or 'missing'.
@@ -647,7 +635,7 @@ class DatabaseManager:
         
         return health
 
-    def get_summarized_memory(self, project_id: int, token_tier: int = 1000) -> str:
+    def get_summarized_memory(self, project_id: str, token_tier: int = 1000) -> str:
         """Get pre-computed summaries for all content types, assembled into a context string."""
         memory = []
         for content_type in ['characters', 'world_elements', 'synopsis', 'outline', 'chapters']:
@@ -664,7 +652,7 @@ class DatabaseManager:
         
         return "\n".join(memory)
     
-    def _get_fallback_memory(self, project_id: int) -> str:
+    def _get_fallback_memory(self, project_id: str) -> str:
         """Lightweight fallback when no summaries exist yet. Returns truncated raw content."""
         memory = []
         try:
@@ -734,13 +722,13 @@ class DatabaseManager:
             # Mark the relevant summary as stale (only for base fields, not summary fields)
             if field_name in base_fields and project_id:
                 if field_name == 'synopsis':
-                    self.increment_content_version(int(project_id), 'synopsis')
+                    self.increment_content_version(str(project_id), 'synopsis')
                 elif field_name == 'outline':
-                    self.increment_content_version(int(project_id), 'outline')
+                    self.increment_content_version(str(project_id), 'outline')
         except sqlite3.Error as e:
             logging.error(f"Failed to save story bible field {field_name}: {e}")
 
-    def get_story_bible(self, project_id: int):
+    def get_story_bible(self, project_id: str):
         """Fetch all story bible fields for a project."""
         try:
             with self.get_connection() as conn:
@@ -761,7 +749,7 @@ class DatabaseManager:
             logging.error(f"Error fetching story bible: {e}")
             return None
 
-    def get_bible_field(self, project_id: int, field_name: str) -> str:
+    def get_bible_field(self, project_id: str, field_name: str) -> str:
         """Fetch content of a specific bible field."""
         try:
             with self.get_connection() as conn:
@@ -772,7 +760,7 @@ class DatabaseManager:
             logging.error(f"Get bible field error: {e}")
             return ""
 
-    def dump_story_bible_contents(self, project_id: int):
+    def dump_story_bible_contents(self, project_id: str):
         """DIAGNOSTIC: Log all Story Bible contents for debugging persistence issues."""
         try:
             with self.get_connection() as conn:
@@ -794,8 +782,8 @@ class DatabaseManager:
         try:
             with self.get_connection() as conn:
                 cursor = conn.cursor()
-                cursor.execute("INSERT INTO projects (name, genre) VALUES (?, ?)", (name, genre))
-                project_id = cursor.lastrowid
+                project_id = generate_uuid()
+                cursor.execute("INSERT INTO projects (id, name, genre) VALUES (?, ?, ?)", (project_id, name, genre))
                 conn.commit()
                 return project_id
         except sqlite3.Error as e:
@@ -813,7 +801,7 @@ class DatabaseManager:
             logging.error(f"Get projects error: {e}")
             return []
 
-    def get_characters(self, project_id: int):
+    def get_characters(self, project_id: str):
         try:
             with self.get_connection() as conn:
                 cursor = conn.cursor()
@@ -823,7 +811,7 @@ class DatabaseManager:
             logging.error(f"Get characters error: {e}")
             return []
 
-    def get_project_settings(self, project_id: int):
+    def get_project_settings(self, project_id: str):
         """Fetch project settings including genre."""
         try:
             with self.get_connection() as conn:
@@ -836,7 +824,7 @@ class DatabaseManager:
             logging.error(f"Get settings error: {e}")
         return None
 
-    def rename_project(self, project_id: int, new_name: str):
+    def rename_project(self, project_id: str, new_name: str):
         """Rename a project."""
         try:
             with self.get_connection() as conn:
@@ -847,7 +835,7 @@ class DatabaseManager:
             logging.error(f"Rename project error: {e}")
             return False
 
-    def delete_project(self, project_id: int):
+    def delete_project(self, project_id: str):
         """Delete a project and all its related data (full cascade)."""
         try:
             with self.get_connection() as conn:
@@ -903,7 +891,7 @@ class DatabaseManager:
 
     # ==================== RECYCLE BIN METHODS ====================
     
-    def get_full_project_data(self, project_id: int):
+    def get_full_project_data(self, project_id: str):
         """Get complete project data for recycle bin storage."""
         try:
             with self.get_connection() as conn:
@@ -1003,7 +991,7 @@ class DatabaseManager:
             logging.error(f"Move to recycle bin error: {e}")
             return False
 
-    def move_project_to_recycle_bin(self, project_id: int):
+    def move_project_to_recycle_bin(self, project_id: str):
         """Soft delete a project by moving it to recycle bin."""
         try:
             # Get full project data first
@@ -1056,38 +1044,40 @@ class DatabaseManager:
             with self.get_connection() as conn:
                 cursor = conn.cursor()
                 
-                # Recreate project
+                # Recreate project with UUID
+                new_project_id = generate_uuid()
                 cursor.execute("""
-                    INSERT INTO projects (name, genre) VALUES (?, ?)
-                """, (project_data.get('name', 'Restored Project'), project_data.get('genre', '')))
-                new_project_id = cursor.lastrowid
+                    INSERT INTO projects (id, name, genre) VALUES (?, ?, ?)
+                """, (new_project_id, project_data.get('name', 'Restored Project'), project_data.get('genre', '')))
                 
                 # Map old chapter IDs to new ones for relationship restoration
                 chapter_id_map = {}
                 
                 # Restore chapters
                 for ch in project_data.get('chapters', []):
+                    new_chapter_id = generate_uuid()
                     cursor.execute("""
-                        INSERT INTO chapters (project_id, title, content, chapter_order, beats, 
+                        INSERT INTO chapters (id, project_id, title, content, chapter_order, beats, 
                                             summary_text, recent_chapter_summary, last_summarized_char_count)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """, (
-                        new_project_id, ch.get('title', 'Untitled'), ch.get('content', ''),
+                        new_chapter_id, new_project_id, ch.get('title', 'Untitled'), ch.get('content', ''),
                         ch.get('chapter_order', 0), ch.get('beats'), ch.get('summary_text'),
                         ch.get('recent_chapter_summary'), ch.get('last_summarized_char_count', 0)
                     ))
-                    chapter_id_map[ch.get('id')] = cursor.lastrowid
+                    chapter_id_map[ch.get('id')] = new_chapter_id
                 
                 # Restore characters
                 for char in project_data.get('characters', []):
+                    new_char_id = generate_uuid()
                     cursor.execute("""
-                        INSERT INTO characters (project_id, name, role, personality_traits, speech_pattern,
+                        INSERT INTO characters (id, project_id, name, role, personality_traits, speech_pattern,
                                               backstory, physical_description, pronouns, groups, other_names,
                                               motivations, internal_conflicts, strengths, weaknesses, 
                                               character_arc, is_visible)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """, (
-                        new_project_id, char.get('name', ''), char.get('role', ''),
+                        new_char_id, new_project_id, char.get('name', ''), char.get('role', ''),
                         char.get('personality_traits', ''), char.get('speech_pattern', ''),
                         char.get('backstory', ''), char.get('physical_description', ''),
                         char.get('pronouns', ''), char.get('groups', ''), char.get('other_names', ''),
@@ -1110,12 +1100,13 @@ class DatabaseManager:
                 
                 # Restore world elements
                 for we in project_data.get('world_elements', []):
+                    new_we_id = generate_uuid()
                     cursor.execute("""
-                        INSERT INTO world_elements (project_id, name, element_type, description,
+                        INSERT INTO world_elements (id, project_id, name, element_type, description,
                                                    sensory_details, significance, is_visible)
-                        VALUES (?, ?, ?, ?, ?, ?, ?)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                     """, (
-                        new_project_id, we.get('name', ''), we.get('element_type', 'other'),
+                        new_we_id, new_project_id, we.get('name', ''), we.get('element_type', 'other'),
                         we.get('description', ''), we.get('sensory_details', ''),
                         we.get('significance', ''), we.get('is_visible', 1)
                     ))
@@ -1126,7 +1117,7 @@ class DatabaseManager:
             logging.error(f"Restore project from data error: {e}")
             return None
 
-    def restore_from_recycle_bin(self, recycle_id: int):
+    def restore_from_recycle_bin(self, recycle_id: str):
         """Restore an item from the recycle bin."""
         try:
             import json
@@ -1198,7 +1189,7 @@ class DatabaseManager:
             logging.error(f"Restore from recycle bin error: {e}")
             return None
 
-    def permanent_delete_from_recycle_bin(self, recycle_id: int):
+    def permanent_delete_from_recycle_bin(self, recycle_id: str):
         """Permanently delete an item from the recycle bin."""
         try:
             with self.get_connection() as conn:
@@ -1241,7 +1232,7 @@ class DatabaseManager:
             logging.error(f"Get projects error: {e}")
             return []
 
-    def get_full_project_content(self, project_id: int):
+    def get_full_project_content(self, project_id: str):
         """Returns all chapters for a project in order."""
         try:
             with self.get_connection() as conn:
@@ -1257,7 +1248,7 @@ class DatabaseManager:
             logging.error(f"Get full project content error: {e}")
             return []
 
-    def get_context_window(self, project_id: int, chapter_id: int, char_limit: int = 3000):
+    def get_context_window(self, project_id: str, chapter_id: str, char_limit: int = 3000):
         """
         Retrieves context for RAG-enhanced writing:
         - Last N characters from current chapter
@@ -1326,7 +1317,7 @@ class DatabaseManager:
             logging.error(f"Get context window error: {e}")
             return None
 
-    def fetch_omni_context(self, project_id: int, chapter_id: int, beats_list: list):
+    def fetch_omni_context(self, project_id: str, chapter_id: str, beats_list: list):
         """
         Fetches comprehensive lore package for omniscient prose generation.
         Extracts proper nouns from beats, queries character DB, fetches chapter summaries.
@@ -1400,7 +1391,7 @@ class DatabaseManager:
             return None
 
     # --- Chapter Methods ---
-    def create_chapter(self, project_id: int, title: str, content: str = ""):
+    def create_chapter(self, project_id: str, title: str, content: str = ""):
         try:
             with self.get_connection() as conn:
                 cursor = conn.cursor()
@@ -1409,18 +1400,18 @@ class DatabaseManager:
                 res = cursor.fetchone()[0]
                 next_order = 1 if res is None else res + 1
                 
+                chapter_id = generate_uuid()
                 cursor.execute(
-                    "INSERT INTO chapters (project_id, title, content, chapter_order) VALUES (?, ?, ?, ?)",
-                    (project_id, title, content, next_order)
+                    "INSERT INTO chapters (id, project_id, title, content, chapter_order) VALUES (?, ?, ?, ?, ?)",
+                    (chapter_id, project_id, title, content, next_order)
                 )
-                chap_id = cursor.lastrowid
                 conn.commit()
-                return chap_id
+                return chapter_id
         except sqlite3.Error as e:
             logging.error(f"Create chapter error: {e}")
             return None
 
-    def update_chapter_content(self, chapter_id: int, content: str):
+    def update_chapter_content(self, chapter_id: str, content: str):
         try:
             # Defensive check: Don't accidentally wipe content if it was large before
             if not content:
@@ -1440,7 +1431,7 @@ class DatabaseManager:
             logging.error(f"Update chapter error: {e}")
             return False
 
-    def rename_chapter(self, chapter_id: int, new_title: str):
+    def rename_chapter(self, chapter_id: str, new_title: str):
         """Rename a chapter."""
         try:
             with self.get_connection() as conn:
@@ -1451,7 +1442,7 @@ class DatabaseManager:
             logging.error(f"Rename chapter error: {e}")
             return False
 
-    def delete_chapter(self, chapter_id: int):
+    def delete_chapter(self, chapter_id: str):
         """Delete a chapter."""
         try:
             with self.get_connection() as conn:
@@ -1462,7 +1453,7 @@ class DatabaseManager:
             logging.error(f"Delete chapter error: {e}")
             return False
 
-    def move_chapter_up(self, chapter_id: int):
+    def move_chapter_up(self, chapter_id: str):
         """Move a chapter up in order (swap with previous)."""
         try:
             with self.get_connection() as conn:
@@ -1497,7 +1488,7 @@ class DatabaseManager:
             logging.error(f"Move chapter up error: {e}")
             return False
 
-    def move_chapter_down(self, chapter_id: int):
+    def move_chapter_down(self, chapter_id: str):
         """Move a chapter down in order (swap with next)."""
         try:
             with self.get_connection() as conn:
@@ -1530,7 +1521,7 @@ class DatabaseManager:
             logging.error(f"Move chapter down error: {e}")
             return False
 
-    def update_chapter_beats(self, chapter_id: int, beats_text: str):
+    def update_chapter_beats(self, chapter_id: str, beats_text: str):
         """Save extracted or suggested beats for a chapter."""
         try:
             with self.get_connection() as conn:
@@ -1541,7 +1532,7 @@ class DatabaseManager:
             logging.error(f"Update chapter beats error: {e}")
             return False
 
-    def get_chapter_beats(self, chapter_id: int):
+    def get_chapter_beats(self, chapter_id: str):
         """Retrieve saved beats for a chapter."""
         try:
             with self.get_connection() as conn:
@@ -1554,7 +1545,7 @@ class DatabaseManager:
             return ""
 
     # --- Generation Chunk Methods ---
-    def save_generation_chunk(self, chapter_id: int, raw_text: str, summary: str):
+    def save_generation_chunk(self, chapter_id: str, raw_text: str, summary: str):
         """Save a raw generation chunk and its summary."""
         try:
             with self.get_connection() as conn:
@@ -1574,7 +1565,7 @@ class DatabaseManager:
             logging.error(f"Save generation chunk error: {e}")
             return False
 
-    def get_last_chunk_summary(self, chapter_id: int) -> str:
+    def get_last_chunk_summary(self, chapter_id: str) -> str:
         """Retrieve the summary of the most recent generation chunk for a chapter."""
         try:
             with self.get_connection() as conn:
@@ -1589,7 +1580,7 @@ class DatabaseManager:
             logging.error(f"Get last chunk summary error: {e}")
             return ""
 
-    def get_chapter_content(self, chapter_id: int):
+    def get_chapter_content(self, chapter_id: str):
         try:
             with self.get_connection() as conn:
                 cursor = conn.execute("SELECT content FROM chapters WHERE id = ?", (chapter_id,))
@@ -1599,7 +1590,7 @@ class DatabaseManager:
             logging.error(f"Get chapter content error: {e}")
             return ""
 
-    def save_beat(self, project_id: int, chapter_id: int, summary: str):
+    def save_beat(self, project_id: str, chapter_id: str, summary: str):
         try:
             with self.get_connection() as conn:
                 conn.execute("""
@@ -1610,7 +1601,7 @@ class DatabaseManager:
         except sqlite3.Error as e:
             logging.error(f"Save beat error: {e}")
 
-    def get_deep_memory(self, project_id: int, query: str) -> str:
+    def get_deep_memory(self, project_id: str, query: str) -> str:
         """
         Retrieves relevant context based on key terms in the query.
         Includes all characters from the project for full context.
@@ -1830,29 +1821,31 @@ class DatabaseManager:
                         SET {set_clause}
                         WHERE id = ?
                     """, values)
+                    new_id = character_id
                 else:
-                    # Insert new character
-                    placeholders = ", ".join(["?"] * len(keys))
-                    columns = ", ".join(keys)
+                    # Insert new character with UUID
+                    new_id = generate_uuid()
+                    placeholders = ", ".join(["?"] * (len(keys) + 1))
+                    columns = "id, " + ", ".join(keys)
                     cursor.execute(f"""
                         INSERT INTO characters 
                         ({columns})
                         VALUES ({placeholders})
-                    """, values)
+                    """, [new_id] + values)
                 
                 conn.commit()
                 
                 # Mark characters summary as stale
                 project_id = data.get('project_id')
                 if project_id:
-                    self.increment_content_version(int(project_id), 'characters')
+                    self.increment_content_version(str(project_id), 'characters')
                 
-                return True
+                return new_id  # Return the character ID (new or existing)
         except sqlite3.Error as e:
             logging.error(f"Save character error: {e}")
-            return False
+            return None
 
-    def delete_character(self, character_id: int):
+    def delete_character(self, character_id: str):
         """Delete a character by ID."""
         try:
             if not character_id:
@@ -1875,7 +1868,7 @@ class DatabaseManager:
             logging.error(traceback.format_exc())
             return False
 
-    def get_all_characters(self, project_id: int):
+    def get_all_characters(self, project_id: str):
         try:
             with self.get_connection() as conn:
                 cursor = conn.cursor()
@@ -1886,7 +1879,7 @@ class DatabaseManager:
             logging.error(f"Get characters error: {e}")
             return []
 
-    def get_character_details(self, name: str, project_id: int):
+    def get_character_details(self, name: str, project_id: str):
         try:
             with self.get_connection() as conn:
                 cursor = conn.cursor()
@@ -1899,7 +1892,7 @@ class DatabaseManager:
             logging.error(f"Get details error: {e}")
             return None
 
-    def get_chapters(self, project_id: int):
+    def get_chapters(self, project_id: str):
         """Get all chapters for a project."""
         try:
             with self.get_connection() as conn:
@@ -1913,7 +1906,7 @@ class DatabaseManager:
             logging.error(f"Get chapters error: {e}")
             return []
 
-    def update_chapter_progress(self, chapter_id: int, last_count: int):
+    def update_chapter_progress(self, chapter_id: str, last_count: int):
         """Update the last summarized character count."""
         try:
             with self.get_connection() as conn:
@@ -1924,7 +1917,7 @@ class DatabaseManager:
             logging.error(f"Update progress error: {e}")
             return False
 
-    def save_chapter_summary(self, chapter_id: int, summary: str, recent_summary: str = None):
+    def save_chapter_summary(self, chapter_id: str, summary: str, recent_summary: str = None):
         try:
             with self.get_connection() as conn:
                 if recent_summary:
@@ -1935,7 +1928,7 @@ class DatabaseManager:
         except sqlite3.Error as e:
             logging.error(f"Save summary error: {e}")
 
-    def get_chapter_summary(self, chapter_id: int):
+    def get_chapter_summary(self, chapter_id: str):
         try:
             with self.get_connection() as conn:
                 cursor = conn.execute("SELECT summary_text, recent_chapter_summary FROM chapters WHERE id = ?", (chapter_id,))
@@ -1949,10 +1942,10 @@ class DatabaseManager:
 
     # ==================== WORLD ELEMENTS METHODS ====================
     
-    def create_world_element(self, project_id: int, name: str, element_type: str = 'other',
+    def create_world_element(self, project_id: str, name: str, element_type: str = 'other',
                             description: str = '', sensory_details: str = '',
                             significance: str = '', custom_traits: str = '',
-                            series_id: int = None):
+                            series_id: str = None):
         """Create a new world building element."""
         try:
             # Convert any list/dict values to JSON strings
@@ -1963,26 +1956,27 @@ class DatabaseManager:
             
             with self.get_connection() as conn:
                 cursor = conn.cursor()
+                element_id = generate_uuid()
                 cursor.execute("""
                     INSERT INTO world_elements 
-                    (project_id, series_id, name, element_type, description, 
+                    (id, project_id, series_id, name, element_type, description, 
                      sensory_details, significance, custom_traits, source_project_id)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """, (project_id, series_id, to_string(name), to_string(element_type), 
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """, (element_id, project_id, series_id, to_string(name), to_string(element_type), 
                       to_string(description), to_string(sensory_details), 
                       to_string(significance), to_string(custom_traits), project_id))
                 conn.commit()
                 
                 # Mark world_elements summary as stale
                 if project_id:
-                    self.increment_content_version(int(project_id), 'world_elements')
+                    self.increment_content_version(str(project_id), 'world_elements')
                 
-                return cursor.lastrowid
+                return element_id
         except sqlite3.Error as e:
             logging.error(f"Create world element error: {e}")
             return None
     
-    def get_world_elements(self, project_id: int = None, series_id: int = None, 
+    def get_world_elements(self, project_id: str = None, series_id: str = None, 
                           element_type: str = None):
         """Get world elements with optional filtering."""
         try:
@@ -2008,7 +2002,7 @@ class DatabaseManager:
             logging.error(f"Get world elements error: {e}")
             return []
     
-    def update_world_element(self, element_id: int, data: dict):
+    def update_world_element(self, element_id: str, data: dict):
         """Update a world element."""
         try:
             allowed_fields = ['name', 'element_type', 'description', 'sensory_details',
@@ -2037,14 +2031,14 @@ class DatabaseManager:
                 
                 # Mark world_elements summary as stale
                 if project_id:
-                    self.increment_content_version(int(project_id), 'world_elements')
+                    self.increment_content_version(str(project_id), 'world_elements')
                 
                 return True
         except sqlite3.Error as e:
             logging.error(f"Update world element error: {e}")
             return False
     
-    def delete_world_element(self, element_id: int):
+    def delete_world_element(self, element_id: str):
         """Delete a world element."""
         try:
             with self.get_connection() as conn:
@@ -2055,7 +2049,7 @@ class DatabaseManager:
             logging.error(f"Delete world element error: {e}")
             return False
     
-    def get_world_element(self, element_id: int):
+    def get_world_element(self, element_id: str):
         """Get a single world element by ID."""
         try:
             with self.get_connection() as conn:
@@ -2074,12 +2068,13 @@ class DatabaseManager:
         try:
             with self.get_connection() as conn:
                 cursor = conn.cursor()
+                series_id = generate_uuid()
                 cursor.execute(
-                    "INSERT INTO series (name, description) VALUES (?, ?)",
-                    (name, description)
+                    "INSERT INTO series (id, name, description) VALUES (?, ?, ?)",
+                    (series_id, name, description)
                 )
                 conn.commit()
-                return cursor.lastrowid
+                return series_id
         except sqlite3.Error as e:
             logging.error(f"Create series error: {e}")
             return None
@@ -2105,7 +2100,7 @@ class DatabaseManager:
             logging.error(f"Get series list error: {e}")
             return []
     
-    def get_series(self, series_id: int):
+    def get_series(self, series_id: str):
         """Get a series with its projects."""
         try:
             with self.get_connection() as conn:
@@ -2132,7 +2127,7 @@ class DatabaseManager:
             logging.error(f"Get series error: {e}")
             return None
     
-    def update_series(self, series_id: int, name: str = None, description: str = None,
+    def update_series(self, series_id: str, name: str = None, description: str = None,
                      timeline_data: str = None):
         """Update series details."""
         try:
@@ -2162,7 +2157,7 @@ class DatabaseManager:
             logging.error(f"Update series error: {e}")
             return False
     
-    def delete_series(self, series_id: int):
+    def delete_series(self, series_id: str):
         """Delete a series (projects remain, just unlinked)."""
         try:
             with self.get_connection() as conn:
@@ -2174,7 +2169,7 @@ class DatabaseManager:
             logging.error(f"Delete series error: {e}")
             return False
     
-    def add_project_to_series(self, series_id: int, project_id: int, book_order: int = None):
+    def add_project_to_series(self, series_id: str, project_id: str, book_order: int = None):
         """Add a project to a series."""
         try:
             with self.get_connection() as conn:
@@ -2199,7 +2194,7 @@ class DatabaseManager:
             logging.error(f"Add project to series error: {e}")
             return False
     
-    def remove_project_from_series(self, series_id: int, project_id: int):
+    def remove_project_from_series(self, series_id: str, project_id: str):
         """Remove a project from a series."""
         try:
             with self.get_connection() as conn:
@@ -2213,7 +2208,7 @@ class DatabaseManager:
             logging.error(f"Remove project from series error: {e}")
             return False
     
-    def get_series_bible(self, series_id: int):
+    def get_series_bible(self, series_id: str):
         """Get merged story bible from all projects in a series."""
         try:
             series = self.get_series(series_id)
@@ -2245,7 +2240,7 @@ class DatabaseManager:
             logging.error(f"Get series bible error: {e}")
             return {}
     
-    def get_series_characters(self, series_id: int):
+    def get_series_characters(self, series_id: str):
         """Get all characters from all projects in a series."""
         try:
             series = self.get_series(series_id)
@@ -2265,7 +2260,7 @@ class DatabaseManager:
             logging.error(f"Get series characters error: {e}")
             return []
     
-    def get_series_world_elements(self, series_id: int):
+    def get_series_world_elements(self, series_id: str):
         """Get all world elements from all projects in a series."""
         try:
             series = self.get_series(series_id)
@@ -2288,7 +2283,7 @@ class DatabaseManager:
             logging.error(f"Get series world elements error: {e}")
             return []
     
-    def get_series_timeline(self, series_id: int):
+    def get_series_timeline(self, series_id: str):
         """Get the timeline data for a series."""
         try:
             with self.get_connection() as conn:
@@ -2303,7 +2298,7 @@ class DatabaseManager:
             logging.error(f"Get series timeline error: {e}")
             return []
     
-    def update_series_timeline(self, series_id: int, timeline_data: list):
+    def update_series_timeline(self, series_id: str, timeline_data: list):
         """Update the timeline data for a series."""
         try:
             import json
@@ -2320,7 +2315,7 @@ class DatabaseManager:
 
     # ==================== SCENE METHODS ====================
     
-    def create_scene(self, chapter_id: int, title: str = '', summary: str = '',
+    def create_scene(self, chapter_id: str, title: str = '', summary: str = '',
                     pov_character: str = '', location: str = ''):
         """Create a new scene in a chapter."""
         try:
@@ -2335,17 +2330,18 @@ class DatabaseManager:
                 max_order = cursor.fetchone()[0]
                 next_order = 1 if max_order is None else max_order + 1
                 
+                scene_id = generate_uuid()
                 cursor.execute("""
-                    INSERT INTO scenes (chapter_id, scene_order, title, summary, pov_character, location)
-                    VALUES (?, ?, ?, ?, ?, ?)
-                """, (chapter_id, next_order, title, summary, pov_character, location))
+                    INSERT INTO scenes (id, chapter_id, scene_order, title, summary, pov_character, location)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                """, (scene_id, chapter_id, next_order, title, summary, pov_character, location))
                 conn.commit()
-                return cursor.lastrowid
+                return scene_id
         except sqlite3.Error as e:
             logging.error(f"Create scene error: {e}")
             return None
     
-    def get_scenes(self, chapter_id: int):
+    def get_scenes(self, chapter_id: str):
         """Get all scenes for a chapter."""
         try:
             with self.get_connection() as conn:
@@ -2359,7 +2355,7 @@ class DatabaseManager:
             logging.error(f"Get scenes error: {e}")
             return []
     
-    def update_scene(self, scene_id: int, data: dict):
+    def update_scene(self, scene_id: str, data: dict):
         """Update a scene."""
         try:
             allowed_fields = ['title', 'summary', 'content', 'pov_character', 'location', 'scene_order']
@@ -2384,7 +2380,7 @@ class DatabaseManager:
             logging.error(f"Update scene error: {e}")
             return False
     
-    def delete_scene(self, scene_id: int):
+    def delete_scene(self, scene_id: str):
         """Delete a scene."""
         try:
             with self.get_connection() as conn:
@@ -2395,7 +2391,7 @@ class DatabaseManager:
             logging.error(f"Delete scene error: {e}")
             return False
     
-    def reorder_scenes(self, chapter_id: int, scene_ids: list):
+    def reorder_scenes(self, chapter_id: str, scene_ids: list):
         """Reorder scenes in a chapter."""
         try:
             with self.get_connection() as conn:
@@ -2410,7 +2406,7 @@ class DatabaseManager:
             logging.error(f"Reorder scenes error: {e}")
             return False
 
-    def get_scene_context(self, chapter_id: int):
+    def get_scene_context(self, chapter_id: str):
         """
         Get scene context for a chapter - returns all scenes with their metadata
         (POV character, location, summary) to inject into AI context.
@@ -2465,7 +2461,7 @@ class DatabaseManager:
             logging.error(f"Get scene context error: {e}")
             return None
 
-    def get_project_series_id(self, project_id: int):
+    def get_project_series_id(self, project_id: str):
         """Get the series ID for a project, if it belongs to one."""
         try:
             with self.get_connection() as conn:
@@ -2480,7 +2476,7 @@ class DatabaseManager:
             logging.error(f"Get project series ID error: {e}")
             return None
 
-    def get_series_context_for_project(self, project_id: int):
+    def get_series_context_for_project(self, project_id: str):
         """
         If this project belongs to a series, fetch shared characters and worldbuilding
         from sibling projects to provide cross-book context (Sudowrite-style series awareness).
@@ -2544,24 +2540,25 @@ class DatabaseManager:
 
     # ==================== CHARACTER VERSION METHODS ====================
     
-    def create_character_version(self, character_id: int, project_id: int, 
+    def create_character_version(self, character_id: str, project_id: str, 
                                  version_notes: str = '', trait_overrides: str = ''):
         """Create a version of a character for a specific project."""
         try:
             with self.get_connection() as conn:
                 cursor = conn.cursor()
+                version_id = generate_uuid()
                 cursor.execute("""
                     INSERT INTO character_versions 
-                    (character_id, project_id, version_notes, trait_overrides)
-                    VALUES (?, ?, ?, ?)
-                """, (character_id, project_id, version_notes, trait_overrides))
+                    (id, character_id, project_id, version_notes, trait_overrides)
+                    VALUES (?, ?, ?, ?, ?)
+                """, (version_id, character_id, project_id, version_notes, trait_overrides))
                 conn.commit()
-                return cursor.lastrowid
+                return version_id
         except sqlite3.Error as e:
             logging.error(f"Create character version error: {e}")
             return None
     
-    def get_character_versions(self, character_id: int):
+    def get_character_versions(self, character_id: str):
         """Get all versions of a character."""
         try:
             with self.get_connection() as conn:
@@ -2578,7 +2575,7 @@ class DatabaseManager:
             logging.error(f"Get character versions error: {e}")
             return []
     
-    def set_canonical_version(self, version_id: int, character_id: int):
+    def set_canonical_version(self, version_id: str, character_id: str):
         """Set a version as canonical (unsets others)."""
         try:
             with self.get_connection() as conn:
@@ -2611,7 +2608,7 @@ class DatabaseManager:
 
     # ==================== CHAPTER OUTLINE LINKING METHODS ====================
     
-    def link_chapter_to_outline(self, chapter_id: int, outline_section: str, outline_order: int = 0):
+    def link_chapter_to_outline(self, chapter_id: str, outline_section: str, outline_order: int = 0):
         """Link a chapter to an outline section."""
         try:
             with self.get_connection() as conn:
@@ -2627,7 +2624,7 @@ class DatabaseManager:
             logging.error(f"Link chapter to outline error: {e}")
             return False
     
-    def get_chapter_outline_links(self, project_id: int):
+    def get_chapter_outline_links(self, project_id: str):
         """Get all chapter-outline links for a project."""
         try:
             with self.get_connection() as conn:
@@ -2644,7 +2641,7 @@ class DatabaseManager:
             logging.error(f"Get chapter outline links error: {e}")
             return []
     
-    def unlink_chapter_from_outline(self, chapter_id: int):
+    def unlink_chapter_from_outline(self, chapter_id: str):
         """Remove chapter-outline link."""
         try:
             with self.get_connection() as conn:
@@ -2657,7 +2654,7 @@ class DatabaseManager:
 
     # ==================== CSV IMPORT/EXPORT METHODS ====================
     
-    def export_characters_csv(self, project_id: int) -> str:
+    def export_characters_csv(self, project_id: str) -> str:
         """Export characters to CSV format."""
         import csv
         import io
@@ -2684,7 +2681,7 @@ class DatabaseManager:
             logging.error(f"Export characters CSV error: {e}")
             return ""
     
-    def import_characters_csv(self, project_id: int, csv_data: str) -> dict:
+    def import_characters_csv(self, project_id: str, csv_data: str) -> dict:
         """Import characters from CSV format."""
         import csv
         import io
@@ -2726,7 +2723,7 @@ class DatabaseManager:
             logging.error(f"Import characters CSV error: {e}")
             return {'imported': 0, 'errors': [str(e)]}
     
-    def export_world_elements_csv(self, project_id: int) -> str:
+    def export_world_elements_csv(self, project_id: str) -> str:
         """Export world elements to CSV format."""
         import csv
         import io
@@ -2751,7 +2748,7 @@ class DatabaseManager:
             logging.error(f"Export world elements CSV error: {e}")
             return ""
     
-    def import_world_elements_csv(self, project_id: int, csv_data: str) -> dict:
+    def import_world_elements_csv(self, project_id: str, csv_data: str) -> dict:
         """Import world elements from CSV format."""
         import csv
         import io

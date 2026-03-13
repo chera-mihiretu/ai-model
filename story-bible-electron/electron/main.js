@@ -9,6 +9,12 @@ const path = require('path');
 const { spawn } = require('child_process');
 const fs = require('fs');
 
+// GPU stability flags - prevent black screen crashes
+app.commandLine.appendSwitch('disable-gpu-sandbox');
+app.commandLine.appendSwitch('disable-software-rasterizer');
+app.commandLine.appendSwitch('disable-gpu-compositing');
+app.commandLine.appendSwitch('ignore-gpu-blocklist');
+
 // Keep global reference to window and python process
 let mainWindow = null;
 let pythonProcess = null;

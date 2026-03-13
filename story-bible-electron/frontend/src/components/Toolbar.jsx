@@ -275,9 +275,6 @@ function Toolbar() {
   
   // Handle Write action - Sudowrite-style context-aware writing
   const handleWrite = async (mode) => {
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/99078eb2-d644-4fa5-9cbc-a0baa688e7c0',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'d3edd1'},body:JSON.stringify({sessionId:'d3edd1',location:'Toolbar.jsx:handleWrite:entry',message:'handleWrite called',data:{mode,currentChapterId,currentProjectId},timestamp:Date.now(),hypothesisId:'A'})}).catch(()=>{});
-    // #endregion
     setWriteMode(mode)
     
     // Check if we have a chapter selected
@@ -288,29 +285,26 @@ function Toolbar() {
     
     // Get cursor context and selection
     let cursorContext = { precedingText: '', cursorPosition: 0, fullText: '', textAfterCursor: '' }
-    if (editorCursorContextCallback) {
-      cursorContext = editorCursorContextCallback()
+    try {
+      if (editorCursorContextCallback) {
+        cursorContext = editorCursorContextCallback()
+      }
+    } catch (e) {
+      // Silently handle callback errors
     }
     
     const { precedingText, textAfterCursor, cursorPosition } = cursorContext
-    const hasExistingText = precedingText.trim().length > 0
+    const hasExistingText = precedingText?.trim()?.length > 0
     
     // Get current selection for Expand mode
     const hasSelection = currentEditorSelection?.hasSelection && currentEditorSelection?.selectedText?.trim()
     const selection = hasSelection ? currentEditorSelection : null
-    
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/99078eb2-d644-4fa5-9cbc-a0baa688e7c0',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'d3edd1'},body:JSON.stringify({sessionId:'d3edd1',location:'Toolbar.jsx:handleWrite:contextCheck',message:'Checking context',data:{mode,hasExistingText,hasSelection,precedingTextLength:precedingText?.length,hasCallback:!!editorCursorContextCallback},timestamp:Date.now(),hypothesisId:'G'})}).catch(()=>{});
-    // #endregion
     
     // === MODE-SPECIFIC VALIDATION ===
     
     // Expand: requires text selection
     if (mode === 'Expand') {
       if (!hasSelection) {
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/99078eb2-d644-4fa5-9cbc-a0baa688e7c0',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'d3edd1'},body:JSON.stringify({sessionId:'d3edd1',location:'Toolbar.jsx:handleWrite:expandNoSelection',message:'Expand failed - no selection',data:{},timestamp:Date.now(),hypothesisId:'G'})}).catch(()=>{});
-        // #endregion
         addNotification({ type: 'warning', message: 'Please select text first to expand' })
         return
       }
@@ -319,17 +313,10 @@ function Toolbar() {
     // Continue Writing: requires existing text
     if (mode === 'Continue Writing') {
       if (!hasExistingText) {
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/99078eb2-d644-4fa5-9cbc-a0baa688e7c0',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'d3edd1'},body:JSON.stringify({sessionId:'d3edd1',location:'Toolbar.jsx:handleWrite:continueNoText',message:'Continue Writing failed - no existing text',data:{},timestamp:Date.now(),hypothesisId:'G'})}).catch(()=>{});
-        // #endregion
         addNotification({ type: 'warning', message: 'Please write something first, then use Continue Writing to extend it' })
         return
       }
     }
-    
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/99078eb2-d644-4fa5-9cbc-a0baa688e7c0',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'d3edd1'},body:JSON.stringify({sessionId:'d3edd1',location:'Toolbar.jsx:handleWrite:validationPassed',message:'Validation passed, gathering context',data:{mode,hasExistingText,hasSelection},timestamp:Date.now(),hypothesisId:'F'})}).catch(()=>{});
-    // #endregion
     
     // === GATHER CONTEXT (with timeouts to prevent hanging) ===
     let outlineContext = ''
@@ -349,10 +336,6 @@ function Toolbar() {
         getStoryBible(currentProjectId),
         new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 5000))
       ]).catch(() => null)
-      
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/99078eb2-d644-4fa5-9cbc-a0baa688e7c0',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'d3edd1'},body:JSON.stringify({sessionId:'d3edd1',location:'Toolbar.jsx:handleWrite:gotBible',message:'Got story bible',data:{hasBible:!!bible,hasOutline:!!(bible?.outline),hasSynopsis:!!(bible?.synopsis),hasBraindump:!!(bible?.braindump)},timestamp:Date.now(),hypothesisId:'F'})}).catch(()=>{});
-      // #endregion
       
       if (bible) {
         // Extract outline
@@ -394,7 +377,7 @@ function Toolbar() {
         if (bible.genre) genreContext = bible.genre.substring(0, 100)
       }
       
-      // Get characters
+      // Get characters with full details
       const characters = await Promise.race([
         getCharacters(currentProjectId),
         new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 3000))
@@ -404,11 +387,14 @@ function Toolbar() {
         const visibleChars = characters.filter(c => c.is_visible !== 0)
         if (visibleChars.length > 0) {
           characterContext = visibleChars.slice(0, 8).map(c => {
-            let entry = `${c.name}${c.role ? ` (${c.role})` : ''}`
-            if (c.personality_traits) entry += `: ${c.personality_traits}`
-            if (c.speech_pattern) entry += ` | Speech: ${c.speech_pattern}`
+            let entry = `**${c.name}**${c.role ? ` (${c.role})` : ''}`
+            if (c.personality_traits) entry += `\n  Personality: ${c.personality_traits}`
+            if (c.motivations) entry += `\n  Motivations: ${c.motivations}`
+            if (c.backstory) entry += `\n  Background: ${c.backstory.substring(0, 200)}`
+            if (c.speech_pattern) entry += `\n  Speech style: ${c.speech_pattern}`
+            if (c.physical_description) entry += `\n  Appearance: ${c.physical_description.substring(0, 150)}`
             return entry
-          }).join('\n')
+          }).join('\n\n')
         }
       }
       
@@ -433,9 +419,7 @@ function Toolbar() {
       }
       
     } catch (e) {
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/99078eb2-d644-4fa5-9cbc-a0baa688e7c0',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'d3edd1'},body:JSON.stringify({sessionId:'d3edd1',location:'Toolbar.jsx:handleWrite:contextError',message:'Error gathering context',data:{error:e?.message||String(e)},timestamp:Date.now(),hypothesisId:'F'})}).catch(()=>{});
-      // #endregion
+      // Silently handle context gathering errors
     }
     
     // === CHECK IF WE HAVE ENOUGH CONTEXT FOR WRITE SCENE / GENERATE OPENING ===
@@ -451,10 +435,6 @@ function Toolbar() {
         return
       }
     }
-    
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/99078eb2-d644-4fa5-9cbc-a0baa688e7c0',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'d3edd1'},body:JSON.stringify({sessionId:'d3edd1',location:'Toolbar.jsx:handleWrite:buildingPrompt',message:'Building prompt',data:{mode,hasOutline:!!outlineContext,hasSynopsis:!!storyContext,hasBraindump:!!braindumpContext,hasCharacters:!!characterContext},timestamp:Date.now(),hypothesisId:'F'})}).catch(()=>{});
-    // #endregion
     
     // === BUILD INSTRUCTION BASED ON MODE ===
     let instruction = ''
@@ -477,28 +457,37 @@ function Toolbar() {
         instruction = 'Write creative narrative prose that continues the story.'
     }
     
-    // === BUILD FULL PROMPT WITH PRIORITIZED CONTEXT ===
+    // === BUILD FULL PROMPT WITH ALL AVAILABLE CONTEXT ===
     let fullPrompt = instruction + '\n\n'
     
-    // Primary context (outline > synopsis > braindump)
+    // Story structure context (outline is primary guide)
     if (outlineContext) {
       fullPrompt += `=== CHAPTER OUTLINE (follow this structure) ===\n${outlineContext}\n\n`
     }
+    
+    // Synopsis provides overall story direction
     if (storyContext) {
       fullPrompt += `=== STORY SYNOPSIS ===\n${storyContext}\n\n`
     }
-    if (!outlineContext && !storyContext && braindumpContext) {
-      fullPrompt += `=== STORY IDEAS (braindump) ===\n${braindumpContext}\n\n`
+    
+    // Braindump contains additional story ideas and notes
+    if (braindumpContext) {
+      fullPrompt += `=== STORY IDEAS & NOTES ===\n${braindumpContext}\n\n`
     }
     
-    // Characters
+    // Characters - ALWAYS include for consistent characterization
     if (characterContext) {
-      fullPrompt += `=== KEY CHARACTERS ===\n${characterContext}\n\n`
+      fullPrompt += `=== KEY CHARACTERS (use these names, traits, and speech patterns) ===\n${characterContext}\n\n`
     }
     
-    // Scene context
+    // Scene context for this specific chapter
     if (sceneContext) {
       fullPrompt += `=== SCENE BLUEPRINT ===\n${sceneContext}\n\n`
+    }
+    
+    // Worldbuilding - ALWAYS include for consistent setting
+    if (worldbuildingContext) {
+      fullPrompt += `=== WORLDBUILDING (setting, rules, atmosphere) ===\n${worldbuildingContext}\n\n`
     }
     
     // Genre & Style
@@ -509,12 +498,7 @@ function Toolbar() {
       fullPrompt += `=== WRITING STYLE ===\n${styleContext}\n\n`
     }
     
-    // Worldbuilding
-    if (worldbuildingContext) {
-      fullPrompt += `=== WORLDBUILDING ===\n${worldbuildingContext}\n\n`
-    }
-    
-    // Chapter continuity
+    // Chapter continuity for story flow
     if (chapterContinuity) {
       fullPrompt += `=== PREVIOUS CHAPTER SUMMARY ===\n${chapterContinuity}\n\n`
     }
@@ -524,10 +508,6 @@ function Toolbar() {
       fullPrompt += `=== TEXT TO CONTINUE FROM ===\n${precedingText}\n\n`
       fullPrompt += `Continue from here, matching the style and voice exactly. DO NOT repeat the existing text.`
     }
-    
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/99078eb2-d644-4fa5-9cbc-a0baa688e7c0',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'d3edd1'},body:JSON.stringify({sessionId:'d3edd1',location:'Toolbar.jsx:handleWrite:sendingRequest',message:'Sending to AssistantPanel',data:{mode,promptLength:fullPrompt.length},timestamp:Date.now(),hypothesisId:'B'})}).catch(()=>{});
-    // #endregion
     
     // Send to AssistantPanel for generation
     setPendingAiRequest({
@@ -554,10 +534,6 @@ function Toolbar() {
         genreContext,
       }
     })
-    
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/99078eb2-d644-4fa5-9cbc-a0baa688e7c0',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'d3edd1'},body:JSON.stringify({sessionId:'d3edd1',location:'Toolbar.jsx:handleWrite:requestSent',message:'Request sent successfully',data:{mode},timestamp:Date.now(),hypothesisId:'B'})}).catch(()=>{});
-    // #endregion
     
     addNotification({ type: 'info', message: `AI is generating ${mode.toLowerCase()}...` })
   }

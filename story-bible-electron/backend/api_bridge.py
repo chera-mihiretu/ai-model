@@ -93,7 +93,7 @@ class APIBridge:
         
         logging.info("API Bridge initialized successfully")
     
-    def _trigger_bg_summary(self, project_id: int = None, content_type: str = '', chapter_id: int = None, element_id: int = None):
+    def _trigger_bg_summary(self, project_id: str = None, content_type: str = '', chapter_id: str = None, element_id: str = None):
         """Trigger background summarization with debouncing and busy-check."""
         import time
         
@@ -152,7 +152,7 @@ class APIBridge:
             
             threading.Thread(
                 target=_bg_summarize,
-                args=(int(project_id), content_type),
+                args=(str(project_id), content_type),
                 daemon=True
             ).start()
         except Exception as e:
@@ -225,11 +225,11 @@ class APIBridge:
             return self.db.create_project(name, genre)
         
         elif method == 'delete_project':
-            project_id = self._validate_int(params.get('project_id'), 'project_id', required=True)
+            project_id = self._validate_string(params.get('project_id'), 'project_id', required=True)
             return self.db.delete_project(project_id)
         
         elif method == 'rename_project':
-            project_id = self._validate_int(params.get('project_id'), 'project_id', required=True)
+            project_id = self._validate_string(params.get('project_id'), 'project_id', required=True)
             new_name = self._validate_string(params.get('new_name'), 'new_name', max_length=500, required=True)
             return self.db.rename_project(project_id, new_name)
         
@@ -268,7 +268,7 @@ class APIBridge:
         
         # ==================== CHAPTER METHODS ====================
         elif method == 'create_chapter':
-            project_id = self._validate_int(params.get('project_id'), 'project_id', required=True)
+            project_id = self._validate_string(params.get('project_id'), 'project_id', required=True)
             title = self._validate_string(params.get('title', 'New Chapter'), 'title', max_length=500)
             content = params.get('content', '')  # Content can be very large, no limit
             return self.db.create_chapter(project_id, title, content)
@@ -341,7 +341,7 @@ class APIBridge:
             # Trigger background summary update for characters
             project_id = data.get('project_id') if data else None
             if result and project_id:
-                self._trigger_bg_summary(project_id=int(project_id), content_type='characters')
+                self._trigger_bg_summary(project_id=str(project_id), content_type='characters')
             return result
         
         elif method == 'delete_character':
@@ -371,7 +371,7 @@ class APIBridge:
                     'genre': 'synopsis',
                 }
                 ctype = content_type_map.get(field_name, field_name)
-                self._trigger_bg_summary(project_id=int(project_id), content_type=ctype)
+                self._trigger_bg_summary(project_id=str(project_id), content_type=ctype)
             return True
         
         elif method == 'get_bible_field':
@@ -768,7 +768,7 @@ class APIBridge:
             )
             # Trigger background summary update for world_elements
             if result and project_id:
-                self._trigger_bg_summary(project_id=int(project_id), content_type='world_elements')
+                self._trigger_bg_summary(project_id=str(project_id), content_type='world_elements')
             return result
         
         elif method == 'get_world_elements':
@@ -1007,17 +1007,22 @@ class APIBridge:
             return self.ai.generate_synopsis(story_elements, genre, target_words)
         
         elif method == 'generate_outline_from_synopsis':
-            synopsis = params.get('synopsis')
+            synopsis = params.get('synopsis', '')
             chapter_count = params.get('chapter_count', 10)
             genre = params.get('genre', 'fiction')
-            return self.ai.generate_outline_from_synopsis(synopsis, chapter_count, genre)
+            characters = params.get('characters', '')
+            worldbuilding = params.get('worldbuilding', '')
+            braindump = params.get('braindump', '')
+            return self.ai.generate_outline_from_synopsis(
+                synopsis, chapter_count, genre, characters, worldbuilding, braindump
+            )
         
         elif method == 'update_chapter_summary_ai':
             chapter_content = params.get('chapter_content')
             return self.ai.update_chapter_summary(chapter_content)
         
         elif method == 'generate_chapter_summary':
-            chapter_number = self._validate_int(params.get('chapter_number'), 'chapter_number', required=True)
+            chapter_number = params.get('chapter_number', 1)
             chapter_title = params.get('chapter_title', f'Chapter {chapter_number}')
             synopsis = params.get('synopsis', '')
             genre = params.get('genre', 'fiction')
@@ -1048,7 +1053,7 @@ class APIBridge:
         
         elif method == 'generate_bible_section':
             section_key = params.get('section_key')
-            project_id = self._validate_int(params.get('project_id'), 'project_id', required=True)
+            project_id = self._validate_string(params.get('project_id'), 'project_id', required=True)
             return self.ai.generate_bible_section(section_key, project_id, self.db)
         
         elif method == 'import_manuscript_to_project':

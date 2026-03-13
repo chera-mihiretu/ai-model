@@ -1693,7 +1693,8 @@ IMPORTANT: Write the synopsis as smooth, flowing prose paragraphs. No headers, n
             logging.error(f"Synopsis generation error: {e}")
             return {"error": f"Failed to generate synopsis: {e}"}
 
-    def generate_outline_from_synopsis(self, synopsis: str, chapter_count: int = 10, genre: str = "fiction") -> list:
+    def generate_outline_from_synopsis(self, synopsis: str, chapter_count: int = 10, genre: str = "fiction",
+                                        characters: str = "", worldbuilding: str = "", braindump: str = "") -> list:
         """Generate a chapter outline from a synopsis as structured JSON array."""
         if not self.llm:
             return []
@@ -1701,9 +1702,31 @@ IMPORTANT: Write the synopsis as smooth, flowing prose paragraphs. No headers, n
         max_output_tokens = 3500
         total_budget = self.context_size - max_output_tokens - 250
         
+        # Build context sections
+        context_parts = []
+        
+        # Primary source: synopsis or braindump
+        source_content = synopsis.strip() if synopsis.strip() else braindump.strip()
+        if source_content:
+            context_parts.append(f"STORY SYNOPSIS:\n{self.smart_trim(source_content, total_budget // 2)}")
+        
+        # Add character context if available
+        if characters and characters.strip():
+            context_parts.append(f"CHARACTERS TO USE:\n{self.smart_trim(characters, total_budget // 4)}")
+        
+        # Add worldbuilding context if available
+        if worldbuilding and worldbuilding.strip():
+            context_parts.append(f"WORLD/SETTING:\n{self.smart_trim(worldbuilding, total_budget // 4)}")
+        
+        combined_context = "\n\n".join(context_parts)
+        
+        if not combined_context.strip():
+            logging.warning("No synopsis, characters, worldbuilding, or braindump provided for outline generation")
+            return []
+        
         system_prompt = """<|begin_of_text|><|start_header_id|>system<|end_header_id|>
 You are a story structure expert creating detailed chapter outlines.
-Given a synopsis, break it down into a logical chapter structure with rich, detailed summaries.
+Given story information (synopsis, characters, setting), break it down into a logical chapter structure with rich, detailed summaries.
 You MUST output ONLY a valid JSON array. No prose, no explanations, no markdown.
 
 STRICT OUTPUT RULES:
@@ -1716,31 +1739,33 @@ STRICT OUTPUT RULES:
 7. Each chapter object has EXACTLY three keys: chapter_number, title, summary
 8. IMPORTANT: The summary must be a DETAILED paragraph (5-8 sentences) that serves as a complete blueprint for writing the chapter. Include: opening scene setup, all major plot events in order, character motivations and emotional arcs, important dialogue or confrontations, key decisions or turning points, and how the chapter ends or transitions to the next
 9. Group related story beats into the same chapter so the outline flows logically
+10. CRITICAL: Use ONLY the character names provided in the story information. Do NOT invent new characters or use any names not mentioned in the input.
 <|eot_id|>"""
 
         user_prompt = f"""<|start_header_id|>user<|end_header_id|>
-Based on this {genre} story synopsis, create a {chapter_count}-chapter outline as a JSON array:
+CRITICAL INSTRUCTION: Create an outline using ONLY the characters, locations, and plot elements from the story information below. Do NOT use any names, characters, or events that are not explicitly mentioned below.
 
-SYNOPSIS:
-{self.smart_trim(synopsis, total_budget - 800)}
+{combined_context}
+
+Create a {chapter_count}-chapter outline as a JSON array for this {genre} story.
 
 Each chapter object must have EXACTLY these 3 keys:
 - "chapter_number": integer (1, 2, 3, etc.)
 - "title": string (a compelling chapter title)
-- "summary": string (a DETAILED paragraph of 5-8 sentences that covers EVERYTHING needed to write this chapter)
+- "summary": string (a DETAILED paragraph of 5-8 sentences)
 
 The summary for each chapter MUST include:
 - The opening scene or situation
 - Every major plot event that occurs, in order
-- Which characters are involved and what drives them
+- Which characters are involved and what drives them (USE ONLY CHARACTERS FROM THE STORY INFORMATION ABOVE)
 - Key conflicts, confrontations, or revelations
 - Emotional beats and character development
 - How the chapter concludes and connects to the next
 
-Group related story beats together so chapters flow logically from one to the next.
+REMINDER: Use ONLY the character names listed above. If characters are named (like specific names), use those exact names. Do NOT substitute with generic terms or invent new names.
 
-EXAMPLE of correct format:
-[{{"chapter_number": 1, "title": "The Awakening", "summary": "The chapter opens with Elena cleaning out her late grandmother's house on a rainy autumn afternoon, reflecting on childhood memories. While sorting through boxes in the attic, she discovers a sealed envelope hidden behind a loose floorboard, addressed to her in her grandmother's handwriting. The letter reveals that Elena's grandfather was not who the family believed him to be, and that a second family exists across the country. Shocked and angry, Elena drives to her mother's house and confronts her, demanding the truth. Her mother breaks down and confirms the secret, explaining she kept it hidden to protect Elena from the pain. Elena feels betrayed by the years of silence but also begins to feel a deep curiosity about the relatives she never knew existed. The chapter ends with Elena booking a flight, determined to find her grandfather's other family and piece together the full story."}}]
+JSON FORMAT (structure only):
+[{{"chapter_number": 1, "title": "Chapter Title Here", "summary": "Detailed 5-8 sentence summary using characters and events from the story information above..."}}]
 
 Return the JSON array now:
 <|eot_id|><|start_header_id|>assistant<|end_header_id|>

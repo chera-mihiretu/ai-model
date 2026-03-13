@@ -262,10 +262,13 @@ contextBridge.exposeInMainWorld('api', {
     genre,
     target_words: targetWords
   }),
-  generateOutlineFromSynopsis: (synopsis, chapterCount, genre) => ipcRenderer.invoke('python-call', 'generate_outline_from_synopsis', {
+  generateOutlineFromSynopsis: (synopsis, chapterCount, genre, characters, worldbuilding, braindump) => ipcRenderer.invoke('python-call', 'generate_outline_from_synopsis', {
     synopsis,
     chapter_count: chapterCount,
-    genre
+    genre,
+    characters: characters || '',
+    worldbuilding: worldbuilding || '',
+    braindump: braindump || ''
   }),
   updateChapterSummaryAi: (chapterContent) => ipcRenderer.invoke('python-call', 'update_chapter_summary_ai', {
     chapter_content: chapterContent

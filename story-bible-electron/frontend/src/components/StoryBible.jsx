@@ -637,6 +637,7 @@ function StoryBible() {
     currentProjectId,
     setCurrentBibleTab,
     updateBibleField,
+    setStoryBibleData,
     addNotification,
     setCharacters,
     setProjects,
@@ -672,15 +673,18 @@ function StoryBible() {
   useEffect(() => {
     async function loadBibleData() {
       if (!currentProjectId) return
+      
+      // Clear existing story bible data first to prevent data from other projects mixing in
+      setStoryBibleData({})
+      
       const data = await getStoryBible(currentProjectId)
       if (data) {
-        Object.keys(data).forEach(key => {
-          updateBibleField(key, data[key])
-        })
+        // Set all the data at once for the current project
+        setStoryBibleData(data)
       }
     }
     loadBibleData()
-  }, [currentProjectId])
+  }, [currentProjectId, getStoryBible, setStoryBibleData])
   
   // Refresh projects list (for chapter list updates)
   const refreshProjects = async () => {
@@ -853,8 +857,14 @@ function StoryBible() {
   }
   
   const handleGenerateOutline = async () => {
-    const sourceContent = synopsisContent.trim() || braindumpContent.trim()
-    if (!sourceContent) {
+    // Get all available story context from the current project's storyBibleData
+    const synopsis = storyBibleData['synopsis']?.trim() || ''
+    const braindump = storyBibleData['braindump']?.trim() || ''
+    const worldbuilding = storyBibleData['worldbuilding']?.trim() || ''
+    const genre = storyBibleData['genre']?.trim() || 'fiction'
+    
+    // Need at least synopsis or braindump
+    if (!synopsis && !braindump) {
       addNotification({ type: 'warning', message: 'Please write a Synopsis or Braindump first to generate an outline.' })
       return
     }
@@ -868,7 +878,33 @@ function StoryBible() {
     setGeneratingAction('outline')
     
     try {
-      const result = await window.api.generateOutlineFromSynopsis(sourceContent, 10, genreContent)
+      // Also fetch characters for this project to include in outline generation
+      let characterContext = ''
+      if (currentProjectId) {
+        try {
+          const chars = await getCharacters(currentProjectId)
+          if (chars && chars.length > 0) {
+            characterContext = chars.map(c => {
+              let desc = c.name
+              if (c.role) desc += ` (${c.role})`
+              if (c.personality_traits) desc += ` - ${c.personality_traits}`
+              return desc
+            }).join('\n')
+          }
+        } catch (e) {
+          console.warn('Could not fetch characters for outline:', e)
+        }
+      }
+      
+      // Pass all context to the outline generation
+      const result = await window.api.generateOutlineFromSynopsis(
+        synopsis,
+        10,
+        genre,
+        characterContext,
+        worldbuilding,
+        braindump
+      )
       
       if (result && (Array.isArray(result) ? result.length > 0 : result)) {
         const outlineData = Array.isArray(result) ? JSON.stringify(result) : result

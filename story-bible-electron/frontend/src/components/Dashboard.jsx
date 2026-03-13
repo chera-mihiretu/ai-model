@@ -2206,7 +2206,7 @@ function Dashboard() {
       }
     } else if (type === 'folder') {
       const newFolder = {
-        id: Date.now().toString(),
+        id: crypto.randomUUID(),
         name,
         projects: [],
         created_at: new Date().toISOString(),
@@ -2220,7 +2220,7 @@ function Dashboard() {
       addNotification({ type: 'success', message: `Folder "${name}" created!` })
     } else if (type === 'series') {
       const newSeries = {
-        id: Date.now().toString(),
+        id: crypto.randomUUID(),
         name,
         projects: [],
         created_at: new Date().toISOString(),

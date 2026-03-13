@@ -18,7 +18,10 @@ export const useStore = create((set, get) => ({
   
   setProjects: (projects) => set({ projects }),
   
-  setCurrentProject: (projectId) => set({ currentProjectId: projectId }),
+  setCurrentProject: (projectId) => set({ 
+    currentProjectId: projectId,
+    storyBibleData: {},  // Clear story bible data when switching projects
+  }),
   
   setCurrentChapter: (chapterId) => set({ currentChapterId: chapterId }),
   
