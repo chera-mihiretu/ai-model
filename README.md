@@ -210,27 +210,64 @@ lsof -ti:5173 | xargs kill -9
 Get-Process -Id (Get-NetTCPConnection -LocalPort 5173).OwningProcess | Stop-Process -Force
 ```
 
+### Fresh Start / Database Reset
+
+If you experience issues with project IDs or data mixing between projects, you can reset the database:
+
+```bash
+# Delete the database file to start fresh
+# Linux/macOS
+rm -f data/database/app.db
+
+# Windows PowerShell
+Remove-Item data\database\app.db -Force
+```
+
+Also clear browser localStorage for the app (in DevTools > Application > Local Storage):
+- Delete `exelsias_folders`
+- Delete `exelsias_series`
+
+The app will create a new database with proper UUIDs on next launch.
+
 ---
 
 ## Building for Production
 
-### Build Windows NSIS Installer
+### Build Windows NSIS Installer (Universal - Recommended)
 
-**See [WINDOWS_BUILD_GUIDE.md](WINDOWS_BUILD_GUIDE.md) for complete instructions.**
+The **universal build** creates an installer compatible with ALL Windows PCs, including older gaming PCs and budget processors that lack AVX2 support.
 
-Quick build:
 ```powershell
-# Setup (first time)
-python -m venv venv
-.\venv\Scripts\Activate.ps1
-pip install -r requirements.txt
-pip install pyinstaller
+# Open PowerShell and navigate to the project root
+cd ricardoo
 
-# Build
-.\build-windows.ps1
+# Run the universal build script
+.\build-universal.ps1
 ```
 
-⚠️ **Important**: Use Python 3.10 or 3.11 (NOT 3.14). See [BUILD_README.md](BUILD_README.md) for details.
+**Build Options:**
+```powershell
+.\build-universal.ps1                  # Full build
+.\build-universal.ps1 -SkipBackend     # Skip Python backend rebuild
+.\build-universal.ps1 -SkipFrontend    # Skip frontend rebuild  
+.\build-universal.ps1 -Clean           # Clean all previous builds first
+.\build-universal.ps1 -ReinstallLlama  # Force reinstall llama-cpp-python with basic CPU
+```
+
+**Output:** `story-bible-electron\dist\Exelsias Setup X.X.X.exe`
+
+⚠️ **Important**: 
+- Use Python 3.10 or 3.11 (NOT 3.12+) for best compatibility
+- The universal build disables AVX2/AVX optimizations for maximum compatibility
+- Build time: ~5-10 minutes depending on your system
+
+### Build Windows (Standard - AVX2 Required)
+
+For modern PCs with AVX2 support (better performance):
+
+```powershell
+.\build-windows.ps1
+```
 
 ### Build Linux AppImage
 
@@ -245,6 +282,17 @@ npm run build:linux
 cd story-bible-electron/electron
 npm run build:mac
 ```
+
+### After Building
+
+The installer will be in `story-bible-electron\dist\`. You can:
+
+1. **Test locally** - Run the installer on your machine
+2. **Copy to Documents** - Move installer to a convenient location:
+   ```powershell
+   Move-Item "story-bible-electron\dist\Exelsias Setup*.exe" "$env:USERPROFILE\Documents\"
+   ```
+3. **Distribute** - Share the installer with others
 
 ---
 

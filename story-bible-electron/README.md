@@ -105,26 +105,50 @@ npm run dev
 
 ## Building for Production (Windows)
 
-### Method 1: Using the Build Script (Recommended)
+### Method 1: Universal Build Script (Recommended)
+
+The **universal build** creates an installer compatible with ALL Windows PCs, including older gaming PCs and budget processors without AVX2 support.
 
 ```powershell
-# Open PowerShell as Administrator
-cd story-bible-electron\build
+# Navigate to project root (one level up from story-bible-electron)
+cd ..
 
-# Run the build script
-.\build.ps1
+# Run the universal build script
+.\build-universal.ps1
+```
+
+**Build Options:**
+```powershell
+.\build-universal.ps1                  # Full build
+.\build-universal.ps1 -SkipBackend     # Skip Python backend rebuild
+.\build-universal.ps1 -SkipFrontend    # Skip frontend rebuild  
+.\build-universal.ps1 -Clean           # Clean all previous builds first
+.\build-universal.ps1 -ReinstallLlama  # Force reinstall llama-cpp-python
 ```
 
 The script will:
-1. Set up Python virtual environment
-2. Install all Python dependencies
-3. Build the Python backend with PyInstaller
-4. Build the React frontend with Vite
-5. Package everything with electron-builder
+1. Check prerequisites (Python, Node.js, npm)
+2. Clean up unused folders to reduce build size
+3. Set up Python virtual environment
+4. Install llama-cpp-python with **basic CPU support** (no AVX2)
+5. Install all Python dependencies
+6. Build the Python backend with PyInstaller
+7. Build the React frontend with Vite
+8. Set up application icon
+9. Package everything with electron-builder (NSIS installer)
 
 **Output:** `story-bible-electron\dist\Exelsias Setup X.X.X.exe`
 
-### Method 2: Manual Build
+### Method 2: Standard Build (AVX2 Required)
+
+For modern PCs with AVX2 support (better AI performance):
+
+```powershell
+cd ..
+.\build-windows.ps1
+```
+
+### Method 3: Manual Build
 
 ```powershell
 # 1. Activate Python environment
@@ -157,20 +181,28 @@ npm run build:win
 
 ---
 
-## Moving Build Output to Documents
+## After Building
 
-After building, you can move the installer to your Documents folder:
+Move the installer to your Documents folder:
 
 ```powershell
-# PowerShell
 Move-Item "story-bible-electron\dist\Exelsias Setup*.exe" "$env:USERPROFILE\Documents\"
 ```
 
-Or simply copy the entire `dist` folder:
+Or copy the entire dist folder:
 
 ```powershell
 Copy-Item -Recurse "story-bible-electron\dist" "$env:USERPROFILE\Documents\Exelsias-Build"
 ```
+
+### Testing the Build
+
+After building, verify these features work:
+1. **Model loading** - No CPU instruction errors
+2. **AI text generation** - Writing assistance works
+3. **Text-to-speech** - Requires internet connection
+4. **Home screen animations** - Smooth transitions
+5. **Application icon** - Custom icon visible in taskbar
 
 ---
 
