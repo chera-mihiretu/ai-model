@@ -38,7 +38,7 @@ const Icons = {
 }
 
 // Outline Chapter Row Component
-function OutlineChapterRow({ chapter, index, onUpdate, onDelete, onDuplicate, onGenerate, isGeneratingThis, onGenerateChapter, isGeneratingChapter }) {
+function OutlineChapterRow({ chapter, index, onUpdate, onDelete, onDuplicate, onGenerate, isGeneratingThis, onGenerateChapter, isGeneratingChapter, isSelected = false, onToggleSelect = null, isSelectionMode = false }) {
   const [isExpanded, setIsExpanded] = useState(false)
   const [editData, setEditData] = useState(chapter)
   const [isDirty, setIsDirty] = useState(false)
@@ -83,13 +83,27 @@ function OutlineChapterRow({ chapter, index, onUpdate, onDelete, onDuplicate, on
   }
   
   return (
-    <div className="bg-dark-800 rounded-xl border border-gold-rich/10 shadow-sm mb-3 overflow-hidden">
+    <div className={clsx(
+      "bg-dark-800 rounded-xl border border-gold-rich/10 shadow-sm mb-3 overflow-hidden",
+      isSelected && "ring-2 ring-gold-rich/50 bg-gold-rich/5"
+    )}>
       {/* Collapsed Row: "Chapter N: Title" */}
       <div
         className="flex items-center gap-3 px-4 py-3 hover:bg-dark-750 transition-colors cursor-pointer group"
         onClick={() => setIsExpanded(!isExpanded)}
       >
-        <span className="text-gray-600 cursor-grab text-sm" onClick={(e) => e.stopPropagation()}>{Icons.DRAG}</span>
+        {/* Selection Checkbox */}
+        {isSelectionMode && onToggleSelect && (
+          <input
+            type="checkbox"
+            checked={isSelected}
+            onChange={() => onToggleSelect(index)}
+            className="w-4 h-4 rounded border-gold-rich/30 bg-dark-700 text-gold-rich focus:ring-gold-rich/50 cursor-pointer"
+            onClick={(e) => e.stopPropagation()}
+          />
+        )}
+        
+        {!isSelectionMode && <span className="text-gray-600 cursor-grab text-sm" onClick={(e) => e.stopPropagation()}>{Icons.DRAG}</span>}
         
         <span className="text-gray-500 text-sm w-4 text-center flex-shrink-0">
           {isExpanded ? Icons.ARROW_COLLAPSE : Icons.ARROW_EXPAND}
@@ -278,6 +292,8 @@ function OutlineEditor({
   const [outlineChapters, setOutlineChapters] = useState([])
   const [generatingChapterIdx, setGeneratingChapterIdx] = useState(null)
   const [generatingChapterForIdx, setGeneratingChapterForIdx] = useState(null)
+  const [selectedIndices, setSelectedIndices] = useState(new Set()) // Multi-select state
+  const [isSelectionMode, setIsSelectionMode] = useState(false) // Toggle selection mode
   
   useEffect(() => {
     if (typeof chapters === 'string') {
@@ -308,6 +324,55 @@ function OutlineEditor({
       setOutlineChapters(newChapters)
       onSave(JSON.stringify(newChapters))
     }
+  }
+  
+  // Toggle selection for a single chapter
+  const handleToggleSelect = (index) => {
+    setSelectedIndices(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(index)) {
+        newSet.delete(index)
+      } else {
+        newSet.add(index)
+      }
+      return newSet
+    })
+  }
+  
+  // Select all chapters
+  const handleSelectAll = () => {
+    if (selectedIndices.size === outlineChapters.length) {
+      setSelectedIndices(new Set())
+    } else {
+      setSelectedIndices(new Set(outlineChapters.map((_, i) => i)))
+    }
+  }
+  
+  // Cancel selection mode
+  const handleCancelSelection = () => {
+    setIsSelectionMode(false)
+    setSelectedIndices(new Set())
+  }
+  
+  // Bulk delete selected chapters
+  const handleBulkDelete = () => {
+    if (selectedIndices.size === 0) return
+    
+    const count = selectedIndices.size
+    if (!confirm(`Delete ${count} selected chapter${count > 1 ? 's' : ''} from the outline? This cannot be undone.`)) return
+    
+    // Filter out selected indices and renumber
+    const newChapters = outlineChapters.filter((_, i) => !selectedIndices.has(i))
+    newChapters.forEach((ch, i) => ch.chapter_number = i + 1)
+    
+    setOutlineChapters(newChapters)
+    onSave(JSON.stringify(newChapters))
+    
+    // Clear selection
+    setSelectedIndices(new Set())
+    setIsSelectionMode(false)
+    
+    addNotification?.({ type: 'success', message: `Deleted ${count} chapter${count > 1 ? 's' : ''} from outline` })
   }
   
   const handleDuplicateChapter = (index) => {
@@ -467,7 +532,19 @@ function OutlineEditor({
             </div>
             
             <div className="flex items-center gap-2">
-              {hasSource && (
+              {/* Selection Mode Toggle */}
+              {outlineChapters.length > 0 && !isSelectionMode && (
+                <button
+                  className="flex items-center gap-1 text-gray-400 hover:text-gold-rich text-sm transition-colors"
+                  onClick={() => setIsSelectionMode(true)}
+                  title="Select multiple chapters"
+                >
+                  <span>☑</span>
+                  <span>Select</span>
+                </button>
+              )}
+              
+              {!isSelectionMode && hasSource && (
                 <button
                   className="flex items-center gap-1.5 text-gray-400 hover:text-gold-rich font-medium text-sm border border-gold-rich/20 rounded-lg px-3 py-1.5 hover:bg-gold-rich/10 transition-colors"
                   onClick={hasSynopsis ? onGenerateFromSynopsis : onGenerateFromContext}
@@ -481,12 +558,44 @@ function OutlineEditor({
                   )}
                 </button>
               )}
-              <button
-                className="flex items-center gap-1.5 text-gold-rich hover:text-gold-amber font-medium text-sm border border-gold-rich/30 rounded-lg px-3 py-1.5 hover:bg-gold-rich/10 transition-colors"
-                onClick={handleAddChapter}
-              >
-                <span>+</span> Add Chapter
-              </button>
+              {!isSelectionMode && (
+                <button
+                  className="flex items-center gap-1.5 text-gold-rich hover:text-gold-amber font-medium text-sm border border-gold-rich/30 rounded-lg px-3 py-1.5 hover:bg-gold-rich/10 transition-colors"
+                  onClick={handleAddChapter}
+                >
+                  <span>+</span> Add Chapter
+                </button>
+              )}
+              
+              {/* Selection Mode Actions */}
+              {isSelectionMode && (
+                <div className="flex items-center gap-2">
+                  <button
+                    className="flex items-center gap-1 text-gray-400 hover:text-gold-rich text-sm transition-colors"
+                    onClick={handleSelectAll}
+                  >
+                    <span>{selectedIndices.size === outlineChapters.length ? '☑' : '☐'}</span>
+                    <span>{selectedIndices.size === outlineChapters.length ? 'Deselect All' : 'Select All'}</span>
+                  </button>
+                  <span className="text-gray-500 text-sm">|</span>
+                  <span className="text-sm text-gray-400">{selectedIndices.size} selected</span>
+                  <button
+                    className="flex items-center gap-1 text-red-400 hover:text-red-300 text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    onClick={handleBulkDelete}
+                    disabled={selectedIndices.size === 0}
+                  >
+                    <span>{Icons.DELETE}</span>
+                    <span>Delete</span>
+                  </button>
+                  <button
+                    className="flex items-center gap-1 text-gray-400 hover:text-gold-rich text-sm transition-colors"
+                    onClick={handleCancelSelection}
+                  >
+                    <span>{Icons.CLOSE}</span>
+                    <span>Cancel</span>
+                  </button>
+                </div>
+              )}
             </div>
           </div>
           {!hasSource && (
@@ -539,6 +648,9 @@ function OutlineEditor({
                 isGeneratingThis={generatingChapterIdx === index}
                 onGenerateChapter={handleGenerateChapterFromOutline}
                 isGeneratingChapter={generatingChapterForIdx === index}
+                isSelected={selectedIndices.has(index)}
+                onToggleSelect={handleToggleSelect}
+                isSelectionMode={isSelectionMode}
               />
             ))
           )}

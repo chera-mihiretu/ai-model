@@ -6,6 +6,7 @@
  */
 
 import { useState, useEffect, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import useStore from '../hooks/useStore'
 import { usePythonBridge } from '../hooks/usePythonBridge'
 import { clsx } from 'clsx'
@@ -222,15 +223,15 @@ function EditableField({ label, value, onChange, onSave, onRewrite, placeholder,
   )
 }
 
-function CharacterRow({ character, onToggleVisibility, onDuplicate, onDelete, onRoleChange, onSave, onRewriteField, isFromSeries = false, sourceProjectName = '' }) {
+function CharacterRow({ character, onToggleVisibility, onDuplicate, onDelete, onRoleChange, onSave, onRewriteField, isFromSeries = false, sourceProjectName = '', isSelected = false, onToggleSelect = null, isSelectionMode = false }) {
   const [isExpanded, setIsExpanded] = useState(false)
   const [showMenu, setShowMenu] = useState(false)
-  const [menuPosition, setMenuPosition] = useState({ top: 0, right: 0 })
+  const [menuPosition, setMenuPosition] = useState({ top: 0, left: 0 })
   const [editData, setEditData] = useState(character)
   const [isDirty, setIsDirty] = useState(false)
   const [rewritingField, setRewritingField] = useState(null)
-  const menuRef = useRef(null)
   const menuButtonRef = useRef(null)
+  const portalMenuRef = useRef(null)
   const saveTimeoutRef = useRef(null)
   const isVisible = character.is_visible !== 0
   
@@ -240,16 +241,19 @@ function CharacterRow({ character, onToggleVisibility, onDuplicate, onDelete, on
     setIsDirty(false)
   }, [character])
   
-  // Close menu when clicking outside
+  // Close portal menu when clicking outside
   useEffect(() => {
+    if (!showMenu) return
     function handleClickOutside(event) {
-      if (menuRef.current && !menuRef.current.contains(event.target)) {
+      const clickedInsidePortalMenu = portalMenuRef.current && portalMenuRef.current.contains(event.target)
+      const clickedInsideButton = menuButtonRef.current && menuButtonRef.current.contains(event.target)
+      if (!clickedInsidePortalMenu && !clickedInsideButton) {
         setShowMenu(false)
       }
     }
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [])
+  }, [showMenu])
   
   // Cleanup save timeout on unmount
   useEffect(() => {
@@ -332,11 +336,25 @@ function CharacterRow({ character, onToggleVisibility, onDuplicate, onDelete, on
   ]
   
   return (
-    <div className="border-b border-gold-rich/10 last:border-b-0">
+    <div className={clsx(
+      "border-b border-gold-rich/10 last:border-b-0",
+      isSelected && "bg-gold-rich/10"
+    )}>
       {/* Main Row */}
       <div className="flex items-center gap-3 px-4 py-3 hover:bg-gold-rich/5 transition-colors group">
+        {/* Selection Checkbox */}
+        {isSelectionMode && onToggleSelect && (
+          <input
+            type="checkbox"
+            checked={isSelected}
+            onChange={() => onToggleSelect(character.id)}
+            className="w-4 h-4 rounded border-gold-rich/30 bg-dark-700 text-gold-rich focus:ring-gold-rich/50 cursor-pointer"
+            onClick={(e) => e.stopPropagation()}
+          />
+        )}
+        
         {/* Drag Handle */}
-        <span className="text-text-muted cursor-grab text-sm">{Icons.DRAG}</span>
+        {!isSelectionMode && <span className="text-text-muted cursor-grab text-sm">{Icons.DRAG}</span>}
         
         {/* Expand Arrow */}
         <button
@@ -419,36 +437,29 @@ function CharacterRow({ character, onToggleVisibility, onDuplicate, onDelete, on
           </button>
           
           {/* More Menu */}
-          <div className="relative" ref={menuRef}>
+          <div>
             <button
               ref={menuButtonRef}
               className="w-8 h-8 flex items-center justify-center rounded-lg text-text-muted hover:text-gold-rich hover:bg-gold-rich/10 transition-colors"
               onClick={() => {
-                // #region agent log
                 if (!showMenu && menuButtonRef.current) {
                   const rect = menuButtonRef.current.getBoundingClientRect()
-                  const scrollContainer = menuButtonRef.current.closest('.overflow-y-auto')
-                  const scrollTop = scrollContainer ? scrollContainer.scrollTop : 0
-                  const scrollContainerRect = scrollContainer ? scrollContainer.getBoundingClientRect() : null
-                  const calculatedPosition = {
+                  setMenuPosition({
                     top: rect.bottom + 4,
-                    right: window.innerWidth - rect.right
-                  }
-                  const logData = {characterName:character?.name,buttonRect:{top:rect.top,bottom:rect.bottom,left:rect.left,right:rect.right},calculatedMenuPosition:calculatedPosition,windowInnerWidth:window.innerWidth,windowInnerHeight:window.innerHeight,scrollContainerInfo:{found:!!scrollContainer,scrollTop,containerRect:scrollContainerRect?{top:scrollContainerRect.top,bottom:scrollContainerRect.bottom,height:scrollContainerRect.height}:null}}
-                  fetch('http://127.0.0.1:7242/ingest/99078eb2-d644-4fa5-9cbc-a0baa688e7c0',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'232279'},body:JSON.stringify({sessionId:'232279',location:'CharacterManager.jsx:427',message:'More button clicked',data:logData,runId:'run1',hypothesisId:'A,B,C',timestamp:Date.now()})}).catch(()=>{});
-                  setMenuPosition(calculatedPosition)
+                    left: rect.right - 140
+                  })
                 }
-                // #endregion
                 setShowMenu(!showMenu)
               }}
             >
               {Icons.MORE}
             </button>
             
-            {showMenu && (
-              <div 
+            {showMenu && createPortal(
+              <div
+                ref={portalMenuRef}
                 className="fixed bg-dark-800 rounded-xl shadow-lg shadow-black/50 border border-gold-rich/20 min-w-[140px] py-2 z-[9999]"
-                style={{ top: menuPosition.top, right: menuPosition.right }}
+                style={{ top: menuPosition.top, left: menuPosition.left }}
               >
                 <button
                   className="w-full px-4 py-2 text-left text-sm text-text-secondary hover:bg-gold-rich/10 hover:text-gold-rich flex items-center gap-2"
@@ -468,7 +479,8 @@ function CharacterRow({ character, onToggleVisibility, onDuplicate, onDelete, on
                 >
                   {Icons.DELETE} Delete
                 </button>
-              </div>
+              </div>,
+              document.body
             )}
           </div>
         </div>
@@ -862,6 +874,8 @@ function CharacterManager() {
   const [isSectionExpanded, setIsSectionExpanded] = useState(true)
   const [showSectionMenu, setShowSectionMenu] = useState(false)
   const [seriesCharacters, setSeriesCharacters] = useState([]) // Characters from other projects in series
+  const [selectedIds, setSelectedIds] = useState(new Set()) // Multi-select state
+  const [isSelectionMode, setIsSelectionMode] = useState(false) // Toggle selection mode
   const sectionMenuRef = useRef(null)
   
   // Check if current project is part of a series
@@ -1107,6 +1121,77 @@ function CharacterManager() {
     }
   }
   
+  // Toggle selection for a single character
+  const handleToggleSelect = (characterId) => {
+    setSelectedIds(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(characterId)) {
+        newSet.delete(characterId)
+      } else {
+        newSet.add(characterId)
+      }
+      return newSet
+    })
+  }
+  
+  // Select all characters in current project
+  const handleSelectAll = () => {
+    if (selectedIds.size === characters.length) {
+      setSelectedIds(new Set())
+    } else {
+      setSelectedIds(new Set(characters.map(c => c.id).filter(Boolean)))
+    }
+  }
+  
+  // Cancel selection mode
+  const handleCancelSelection = () => {
+    setIsSelectionMode(false)
+    setSelectedIds(new Set())
+  }
+  
+  // Bulk delete selected characters
+  const handleBulkDelete = async () => {
+    if (selectedIds.size === 0) return
+    
+    const count = selectedIds.size
+    if (!confirm(`Delete ${count} selected character${count > 1 ? 's' : ''}? This cannot be undone.`)) return
+    
+    let deletedCount = 0
+    let errors = []
+    
+    for (const id of selectedIds) {
+      try {
+        if (deleteCharacter) {
+          const result = await deleteCharacter(id)
+          if (result !== false) {
+            deletedCount++
+          } else {
+            const char = characters.find(c => c.id === id)
+            errors.push(char?.name || id)
+          }
+        }
+      } catch (error) {
+        const char = characters.find(c => c.id === id)
+        errors.push(char?.name || id)
+      }
+    }
+    
+    // Refresh characters list
+    const chars = await getCharacters(currentProjectId)
+    setCharacters(chars)
+    
+    // Clear selection
+    setSelectedIds(new Set())
+    setIsSelectionMode(false)
+    
+    if (deletedCount > 0) {
+      addNotification({ type: 'success', message: `Deleted ${deletedCount} character${deletedCount > 1 ? 's' : ''}` })
+    }
+    if (errors.length > 0) {
+      addNotification({ type: 'error', message: `Failed to delete: ${errors.join(', ')}` })
+    }
+  }
+  
   // Handle AI rewrite for a field
   const handleRewriteField = async (fieldId, currentValue, instruction, characterName) => {
     if (!isElectronApi) {
@@ -1242,16 +1327,31 @@ Please rewrite the ${fieldLabel} following the user's instruction. Keep it conci
           </button>
           
           <div className="flex items-center gap-2">
+            {/* Selection Mode Toggle */}
+            {characters.length > 0 && !isSelectionMode && (
+              <button
+                className="flex items-center gap-1 text-text-muted hover:text-gold-rich text-sm transition-colors"
+                onClick={() => setIsSelectionMode(true)}
+                title="Select multiple characters"
+              >
+                <span>☑</span>
+                <span>Select</span>
+              </button>
+            )}
+            
             {/* Add Character Button */}
-            <button
-              className="flex items-center gap-1 text-gold-rich hover:text-gold-amber font-medium text-sm transition-colors"
-              onClick={handleCreateBlankCharacter}
-            >
-              <span>+</span>
-              <span>Add Character</span>
-            </button>
+            {!isSelectionMode && (
+              <button
+                className="flex items-center gap-1 text-gold-rich hover:text-gold-amber font-medium text-sm transition-colors"
+                onClick={handleCreateBlankCharacter}
+              >
+                <span>+</span>
+                <span>Add Character</span>
+              </button>
+            )}
             
             {/* Section Menu */}
+            {!isSelectionMode && (
             <div className="relative" ref={sectionMenuRef}>
               <button
                 className="w-8 h-8 flex items-center justify-center rounded-lg text-text-muted hover:text-gold-rich hover:bg-gold-rich/10 transition-colors"
@@ -1302,6 +1402,37 @@ Please rewrite the ${fieldLabel} following the user's instruction. Keep it conci
                 </div>
               )}
             </div>
+            )}
+            
+            {/* Selection Mode Actions */}
+            {isSelectionMode && (
+              <div className="flex items-center gap-2">
+                <button
+                  className="flex items-center gap-1 text-text-muted hover:text-gold-rich text-sm transition-colors"
+                  onClick={handleSelectAll}
+                >
+                  <span>{selectedIds.size === characters.length ? '☑' : '☐'}</span>
+                  <span>{selectedIds.size === characters.length ? 'Deselect All' : 'Select All'}</span>
+                </button>
+                <span className="text-text-muted text-sm">|</span>
+                <span className="text-sm text-text-muted">{selectedIds.size} selected</span>
+                <button
+                  className="flex items-center gap-1 text-red-400 hover:text-red-300 text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  onClick={handleBulkDelete}
+                  disabled={selectedIds.size === 0}
+                >
+                  <span>{Icons.DELETE}</span>
+                  <span>Delete</span>
+                </button>
+                <button
+                  className="flex items-center gap-1 text-text-muted hover:text-gold-rich text-sm transition-colors"
+                  onClick={handleCancelSelection}
+                >
+                  <span>{Icons.CLOSE}</span>
+                  <span>Cancel</span>
+                </button>
+              </div>
+            )}
           </div>
         </div>
         
@@ -1362,6 +1493,9 @@ Please rewrite the ${fieldLabel} following the user's instruction. Keep it conci
                         onRoleChange={handleRoleChange}
                         onSave={handleSaveCharacter}
                         onRewriteField={handleRewriteField}
+                        isSelected={selectedIds.has(character.id)}
+                        onToggleSelect={handleToggleSelect}
+                        isSelectionMode={isSelectionMode}
                       />
                     ))}
                   </>
@@ -1386,6 +1520,7 @@ Please rewrite the ${fieldLabel} following the user's instruction. Keep it conci
                         onRewriteField={handleRewriteField}
                         isFromSeries={true}
                         sourceProjectName={character._sourceProjectName}
+                        isSelectionMode={false}
                       />
                     ))}
                   </>

@@ -17,6 +17,17 @@ from .prompts import get_bible_prompt, PROMPTS
 import re
 
 
+def sanitize_text_for_encoding(text: str) -> str:
+    """Remove invalid Unicode surrogates that can't be encoded in UTF-8.
+    
+    This handles corrupted text that contains lone surrogate characters
+    (U+D800 to U+DFFF) which are invalid in UTF-8 encoding.
+    """
+    if not text:
+        return text
+    return text.encode('utf-8', errors='surrogatepass').decode('utf-8', errors='replace')
+
+
 def strip_markdown(text: str) -> str:
     """Remove markdown formatting from text while preserving content."""
     if not text:
@@ -136,7 +147,6 @@ def safe_parse_json(raw_text: str, expected_type: str = "array", prepend: str = 
         if objects:
             return objects
     
-    logging.warning(f"safe_parse_json: all parse attempts failed. Text preview: {text[:300]}")
     return [] if expected_type == "array" else None
 
 
@@ -164,8 +174,7 @@ def check_cpu_features():
             return 'avx2' in cpu_info
         else:
             return None  # Unknown, assume supported
-    except Exception as e:
-        logging.warning(f"Could not check CPU features: {e}")
+    except Exception:
         return None  # Unknown, proceed anyway
 
 MIMIC_SYSTEM_PROMPT = """<|begin_of_text|><|start_header_id|>system<|end_header_id|>
@@ -361,16 +370,13 @@ class AIEngine:
         
         if not valid:
             self.status_message = f"Error: {message}"
-            logging.error(f"Model initialization failed: {message}")
             return
 
         if Llama is None:
             self.status_message = "Error: llama_cpp not installed"
-            logging.error("llama_cpp library not installed.")
             return
 
         try:
-            logging.info(f"Loading model from {config.model_path} with n_gpu_layers={config.n_gpu_layers}, n_ctx={config.n_ctx}")
             self.llm = Llama(
                 model_path=config.model_path,
                 n_gpu_layers=config.n_gpu_layers,
@@ -381,15 +387,12 @@ class AIEngine:
             # Read the actual context size from the loaded model, but cap it
             try:
                 raw_ctx = self.llm.n_ctx()
-                if raw_ctx > self.MAX_SAFE_CONTEXT:
-                    logging.warning(f"Model reports n_ctx={raw_ctx}, capping to {self.MAX_SAFE_CONTEXT} to prevent OOM")
                 self.context_size = min(raw_ctx, self.MAX_SAFE_CONTEXT)
             except Exception:
                 self.context_size = 4096  # Fallback
             
             model_name = os.path.basename(config.model_path).replace('.gguf', '')
             self.status_message = f"Model Loaded: {model_name} ({self.context_size} ctx)"
-            logging.info(f"Model loaded successfully. Context size: {self.context_size}")
         except OSError as e:
             # Check for CPU compatibility issues (illegal instruction)
             error_str = str(e).lower()
@@ -403,13 +406,10 @@ class AIEngine:
                 cpu_info = check_cpu_features()
                 if cpu_info is False:
                     self.status_message = "Error: Your CPU does not support AVX2 instructions required by this build. Please contact support for a compatible version."
-                    logging.error(f"CPU compatibility error: AVX2 not supported. Error: {e}")
                 else:
                     self.status_message = "Error: CPU instruction error. Your processor may not support the required instruction set (AVX2). Please contact support."
-                    logging.error(f"CPU compatibility error: {e}. This CPU may not support AVX2 instructions.")
             else:
                 self.status_message = f"Error: Failed to load model ({e})"
-                logging.error(f"Failed to load model: {e}")
             self.llm = None
         except Exception as e:
             error_str = str(e).lower()
@@ -420,10 +420,8 @@ class AIEngine:
             )
             if is_cpu_error:
                 self.status_message = "Error: Your CPU does not support the required instruction set (AVX2). Please contact support for a compatible version."
-                logging.error(f"CPU compatibility error during model load: {e}")
             else:
                 self.status_message = f"Error: Failed to load model ({e})"
-                logging.error(f"Failed to load model: {e}")
             self.llm = None
 
     def count_tokens(self, text: str) -> int:
@@ -431,12 +429,13 @@ class AIEngine:
         if not self.llm or not text:
             return 0
         try:
+            # Sanitize text to remove invalid Unicode surrogates before encoding
+            sanitized_text = sanitize_text_for_encoding(text)
             # We use add_bos=True to account for the implicit BOS token 
             # now that we stripped it from templates. This prevents off-by-one errors.
-            tokens = self.llm.tokenize(text.encode("utf-8"), add_bos=True)
+            tokens = self.llm.tokenize(sanitized_text.encode("utf-8"), add_bos=True)
             return len(tokens)
-        except Exception as e:
-            logging.error(f"Token counting failed: {e}")
+        except Exception:
             return len(text) // 4
 
     def smart_trim(self, text: str, token_limit: int, keep_start: bool = False) -> str:
@@ -489,11 +488,13 @@ class AIEngine:
         )
 
         try:
+            logging.debug(f"AI_PROMPT [compress_text]:\n{prompt}")
             with self.lock:
                 output = self.llm(prompt, max_tokens=available_output, stop=["<|eot_id|>"], echo=False, temperature=0.2)
-            return output['choices'][0]['text'].strip()
-        except Exception as e:
-            logging.error(f"Compression error: {e}")
+            response = output['choices'][0]['text'].strip()
+            logging.debug(f"AI_RESPONSE [compress_text]:\n{response}")
+            return response
+        except Exception:
             return self.smart_trim(text, max_tokens) # Fallback to strict trim
 
     def assemble_context(self, instruction: str, chapter_summary: str, bible_summaries: list, recent_summary: str, recent_text: str, long_form: bool = False) -> str:
@@ -524,11 +525,9 @@ class AIEngine:
         
         if mandatory_tokens > TOTAL_LIMIT:
              # Emergency trim of recent text
-             logging.warning("Context Assembly: Mandatory tokens exceed limit. Trimming recent text.")
              available = TOTAL_LIMIT - (instruction_tokens + recent_summary_tokens)
              recent_text = self.smart_trim(recent_text, max(50, available))
              recent_text_tokens = self.count_tokens(recent_text)
-             # If still over, we have a problem, but proceed with strict trimming
         
         remaining = TOTAL_LIMIT - (instruction_tokens + recent_summary_tokens + recent_text_tokens)
         
@@ -679,14 +678,6 @@ class AIEngine:
         )
 
         max_output_tokens = 4000 if long_form else 800
-        # Verify total
-        total_input = self.count_tokens(full_prompt)
-        if total_input + max_output_tokens > self.context_size:
-             logging.warning(f"Final prompt over budget ({total_input}). Trimming...")
-             # Last ditch safety check is inside generate_stream but strictly we should handle it here
-             pass
-
-        logging.info(f"Budget Check: {total_input} input + {max_output_tokens} output = {total_input + max_output_tokens} / {self.context_size}")
         self.generate_stream(full_prompt, response_queue, max_tokens=max_output_tokens)
 
     def generate_beat_summary(self, text: str) -> str:
@@ -709,11 +700,13 @@ class AIEngine:
         )
 
         try:
+            logging.debug(f"AI_PROMPT [generate_beat_summary]:\n{prompt}")
             with self.lock:
                 output = self.llm(prompt, max_tokens=max_output_tokens, stop=["<|eot_id|>"], echo=False, temperature=0.3)
-            return output['choices'][0]['text'].strip()
-        except Exception as e:
-            logging.error(f"Summary generation error: {e}")
+            response = output['choices'][0]['text'].strip()
+            logging.debug(f"AI_RESPONSE [generate_beat_summary]:\n{response}")
+            return response
+        except Exception:
             return "Error generating summary."
 
     def generate_summary(self, text: str, mode: str = "incremental") -> str:
@@ -742,11 +735,13 @@ class AIEngine:
         )
 
         try:
+            logging.debug(f"AI_PROMPT [generate_summary]:\n{full_prompt}")
             with self.lock:
                 output = self.llm(full_prompt, max_tokens=max_output, stop=["<|eot_id|>"], echo=False, temperature=0.3)
-            return output['choices'][0]['text'].strip()
-        except Exception as e:
-            logging.error(f"Generate summary error: {e}")
+            response = output['choices'][0]['text'].strip()
+            logging.debug(f"AI_RESPONSE [generate_summary]:\n{response}")
+            return response
+        except Exception:
             return "Error."
 
     def assemble_structured_context(self, structured_context: dict, total_budget: int) -> str:
@@ -825,7 +820,7 @@ class AIEngine:
             return
 
         max_output_tokens = 1800  # Supports First Draft (800-1000+ words ~= 1300+ tokens)
-        total_budget = self.context_size - max_output_tokens - 250
+        total_budget = self.context_size - max_output_tokens - 400  # Increased buffer to avoid token limit errors
         
         sys_prefix = f"""<|begin_of_text|><|start_header_id|>system<|end_header_id|>
 You are the OMNISCIENT LORE KEEPER and WRITING ASSISTANT for the story '{project_name}'.
@@ -872,6 +867,8 @@ WRITING RULES:
                  return
 
             # EMERGENCY SAFEGUARD: Verify exact token count of the final prompt
+            # Sanitize prompt to remove invalid Unicode surrogates before encoding
+            prompt = sanitize_text_for_encoding(prompt)
             # We use add_bos=False because templates already have <|begin_of_text|>
             prompt_tokens = self.llm.tokenize(prompt.encode("utf-8"), add_bos=False)
             input_len = len(prompt_tokens)
@@ -879,7 +876,6 @@ WRITING RULES:
             # Context Window Overflow Protection
             if input_len + max_tokens > self.context_size:
                 adjusted_max = self.context_size - input_len - 5  # 5 token safety margin
-                logging.warning(f"Context limit imminent! Adjusting max_tokens from {max_tokens} to {adjusted_max} (Input: {input_len}, Context: {self.context_size})")
                 if adjusted_max < 50:
                     response_queue.put(f"\n[Your text is too long for this model's context window ({self.context_size:,} tokens). Please select less text or use a model with a larger context window.]")
                     response_queue.put("[[END]]")
@@ -887,15 +883,15 @@ WRITING RULES:
                 max_tokens = max(1, adjusted_max)
             
             if input_len >= self.context_size:
-                logging.error(f"CRITICAL: Final prompt exceeds hard {self.context_size} limit ({input_len}). Emergency truncating input.")
                 # Last resort: truncate the literal string to hopefully fit
                 chars_per_token = max(len(prompt) / max(input_len, 1), 3)
                 target_chars = int((self.context_size * 0.75) * chars_per_token)
                 prompt = prompt[-target_chars:]
                 max_tokens = min(500, self.context_size // 4)
 
-            logging.info(f"Generating AI response (Input: {input_len}, max_tokens={max_tokens})...")
+            logging.debug(f"AI_PROMPT [generate_stream]:\n{prompt}")
             
+            accumulated_response = []
             with self.lock:
                 stream = self.llm(
                     prompt,
@@ -908,13 +904,14 @@ WRITING RULES:
                 
                 for output in stream:
                     token = output['choices'][0]['text']
+                    accumulated_response.append(token)
                     response_queue.put(token)
             
+            logging.debug(f"AI_RESPONSE [generate_stream]:\n{''.join(accumulated_response)}")
             response_queue.put("[[END]]")
 
         except Exception as e:
             error_msg = str(e)
-            logging.error(f"Generation error: {error_msg}")
             if "context window" in error_msg.lower():
                 response_queue.put("\n[Error: The story context is too large for the current model. I've automatically trimmed it, but please try selecting a smaller section of text or shortening your instruction.]")
             else:
@@ -934,7 +931,6 @@ WRITING RULES:
     def summarize_for_tier(self, existing_summary: str, new_content: str, content_type: str, target_tokens: int) -> str:
         """Core incremental summarization: merge existing summary with new content, then compress to target tokens."""
         if not self.llm:
-            logging.warning("summarize_for_tier: LLM not loaded, returning empty")
             return ''
         
         if not new_content or not new_content.strip():
@@ -955,7 +951,6 @@ WRITING RULES:
         available_input = self.context_size - max_output_tokens - prompt_overhead - 50
         
         if available_input < 100:
-            logging.warning(f"summarize_for_tier: Not enough context budget for {content_type} (available_input={available_input})")
             return self.smart_trim(new_content, target_tokens, keep_start=True)
         
         # Trim input if needed
@@ -972,6 +967,7 @@ WRITING RULES:
         )
         
         try:
+            logging.debug(f"AI_PROMPT [summarize_for_tier]:\n{full_prompt}")
             with self.lock:
                 output = self.llm(
                     full_prompt,
@@ -981,10 +977,9 @@ WRITING RULES:
                     temperature=0.3
                 )
             result = output['choices'][0]['text'].strip()
-            logging.info(f"summarize_for_tier({content_type}, tier={target_tokens}): produced {self.count_tokens(result)} tokens")
+            logging.debug(f"AI_RESPONSE [summarize_for_tier]:\n{result}")
             return result
-        except Exception as e:
-            logging.error(f"summarize_for_tier error ({content_type}): {e}")
+        except Exception:
             # Fallback: just trim the content
             return self.smart_trim(new_content, target_tokens, keep_start=True)
     
@@ -994,7 +989,6 @@ WRITING RULES:
         try:
             # Bail out early if the model is currently busy with user-facing work
             if self.lock.locked():
-                logging.info(f"Skipping summary generation for {content_type}: AI model is busy")
                 return False
             
             current_version = db_manager.get_content_version(project_id, content_type)
@@ -1006,24 +1000,19 @@ WRITING RULES:
             for tier in tiers:
                 # Re-check if model got busy between tiers
                 if self.lock.locked():
-                    logging.info(f"Aborting summary generation mid-tier for {content_type}: AI model became busy")
                     break
                 
                 summary_data = db_manager.get_summary(project_id, content_type, tier)
                 summarized_version = summary_data.get('source_version', 0)
                 
                 if summarized_version >= current_version:
-                    logging.debug(f"Summary for {content_type} tier={tier} is up to date (v{summarized_version} >= v{current_version})")
                     continue
-                
-                logging.info(f"Regenerating summary for {content_type} tier={tier} (v{summarized_version} -> v{current_version})")
                 
                 # Get existing summary and full current content
                 existing_summary = summary_data.get('summary_text', '')
                 full_content = db_manager.get_raw_content_for_type(project_id, content_type)
                 
                 if not full_content or not full_content.strip():
-                    logging.info(f"No content for {content_type}, clearing summary")
                     db_manager.save_summary(project_id, content_type, tier, '', current_version)
                     continue
                 
@@ -1033,11 +1022,9 @@ WRITING RULES:
                 # Store it
                 db_manager.save_summary(project_id, content_type, tier, new_summary, current_version)
                 any_updated = True
-                logging.info(f"Summary updated for {content_type} tier={tier}")
             
             return any_updated
-        except Exception as e:
-            logging.error(f"generate_content_summaries error ({content_type}): {e}", exc_info=True)
+        except Exception:
             return False
     
     def unload_model(self):
@@ -1046,24 +1033,21 @@ WRITING RULES:
         import ctypes
         
         if self.llm:
-            logging.info("Unloading model - waiting for AI lock...")
             # Wait for any in-progress generation to finish (up to 30s)
             acquired = self.lock.acquire(timeout=30)
             try:
-                logging.info("Unloading model - destroying Llama instance...")
-                
                 # Try to close/reset the llama-cpp model explicitly
                 try:
                     if hasattr(self.llm, 'close'):
                         self.llm.close()
-                except Exception as e:
-                    logging.warning(f"Model close() failed (non-fatal): {e}")
+                except Exception:
+                    pass
                 
                 try:
                     if hasattr(self.llm, 'reset'):
                         self.llm.reset()
-                except Exception as e:
-                    logging.warning(f"Model reset() failed (non-fatal): {e}")
+                except Exception:
+                    pass
                 
                 # Try to free the underlying C model if accessible
                 try:
@@ -1071,8 +1055,8 @@ WRITING RULES:
                         self.llm._model = None
                     if hasattr(self.llm, '_ctx') and self.llm._ctx is not None:
                         self.llm._ctx = None
-                except Exception as e:
-                    logging.warning(f"Model internal cleanup failed (non-fatal): {e}")
+                except Exception:
+                    pass
                 
                 # Remove our reference
                 self.llm = None
@@ -1091,13 +1075,9 @@ WRITING RULES:
             ctypes.CDLL("libc.so.6").malloc_trim(0)
         except Exception:
             pass  # Not on Linux or libc not available
-        
-        logging.info("Model unloaded, memory freed")
 
     def reload_model(self, model_path: str) -> dict:
         """Fully kill the current model first, then load the new one."""
-        logging.info(f"Reload model requested: {model_path}")
-        
         # Update config first (validation only, no loading yet)
         valid, message = self.config_manager.set_model_path(model_path)
         if not valid:
@@ -1106,7 +1086,6 @@ WRITING RULES:
         
         # Step 1: Fully unload and free the current model BEFORE loading the new one
         self.status_message = "Unloading current model..."
-        logging.info("Step 1: Killing current model to free memory...")
         self.unload_model()
         
         # Give the OS a moment to reclaim memory
@@ -1115,7 +1094,6 @@ WRITING RULES:
         
         # Step 2: Now load the new model into the freed memory
         self.status_message = "Loading new model..."
-        logging.info("Step 2: Loading new model...")
         self._initialize_model()
         
         return {
@@ -1197,13 +1175,14 @@ WRITING RULES:
         )
         
         try:
+            logging.debug(f"AI_PROMPT [check_continuity]:\n{prompt}")
             with self.lock:
                 output = self.llm(prompt, max_tokens=200, stop=["<|eot_id|>"], echo=False, temperature=0.3)
             result = output['choices'][0]['text'].strip()
+            logging.debug(f"AI_RESPONSE [check_continuity]:\n{result}")
             if result.startswith("CONFLICT"): return (False, result.replace("CONFLICT:", "").strip())
             return (True, "")
-        except Exception as e:
-            logging.error(f"Continuity check error: {e}")
+        except Exception:
             return (True, "")
 
     def generate_omniscient_prose(self, beats: list, lore_package: dict, response_queue: queue.Queue):
@@ -1251,11 +1230,13 @@ WRITING RULES:
         )
         
         try:
+            logging.debug(f"AI_PROMPT [generate_beats_from_prose]:\n{full_prompt}")
             with self.lock:
                 output = self.llm(full_prompt, max_tokens=max_output_tokens, stop=["<|eot_id|>"], echo=False, temperature=0.5)
-            return output['choices'][0]['text'].strip()
+            response = output['choices'][0]['text'].strip()
+            logging.debug(f"AI_RESPONSE [generate_beats_from_prose]:\n{response}")
+            return response
         except Exception as e:
-            logging.error(f"Beat extraction error: {e}")
             return f"Error: {e}"
 
     def suggest_next_beats(self, prev_beats: str, lore_package: dict) -> str:
@@ -1283,11 +1264,13 @@ WRITING RULES:
         )
         
         try:
+            logging.debug(f"AI_PROMPT [suggest_next_beats]:\n{full_prompt}")
             with self.lock:
                 output = self.llm(full_prompt, max_tokens=max_output_tokens, stop=["<|eot_id|>"], echo=False, temperature=0.7)
-            return output['choices'][0]['text'].strip()
+            response = output['choices'][0]['text'].strip()
+            logging.debug(f"AI_RESPONSE [suggest_next_beats]:\n{response}")
+            return response
         except Exception as e:
-            logging.error(f"Beat suggestion error: {e}")
             return f"Error: {e}"
 
     def generate_characters_from_synopsis(self, synopsis: str, genre: str = "fiction") -> list:
@@ -1295,12 +1278,31 @@ WRITING RULES:
         if not self.llm:
             return []
         
-        max_output_tokens = 2000
-        total_budget = self.context_size - max_output_tokens - 250
+        max_output_tokens = min(2000, self.context_size // 2)
+        prompt_overhead = 600
+        total_budget = self.context_size - max_output_tokens - prompt_overhead
+        
+        trimmed_synopsis = self.smart_trim(synopsis, max(total_budget, 200))
         
         system_prompt = """<|begin_of_text|><|start_header_id|>system<|end_header_id|>
-You are a literary analyst creating character profiles from a story synopsis.
+You are a literary analyst who EXTRACTS characters from a story synopsis.
 You MUST output ONLY a valid JSON array. No prose, no explanations, no markdown.
+
+CRITICAL EXTRACTION RULES:
+1. ONLY extract characters that are EXPLICITLY NAMED or CLEARLY DESCRIBED in the synopsis
+2. Do NOT invent or create new characters that are not mentioned in the synopsis
+3. If a character is mentioned by name (e.g., "Sarah", "Dr. Wilson", "The King"), include them
+4. If a character is described by role (e.g., "the detective", "her mother"), include them with that description as their name
+5. Do NOT add generic characters like "villagers", "soldiers", or "townspeople" unless specifically named
+
+GENDER/PRONOUNS ACCURACY - THIS IS CRITICAL:
+- Pay CAREFUL attention to pronouns used in the synopsis (he, she, they, him, her, his, hers)
+- If the synopsis says "she went" or "her journey", the character is female (she/her)
+- If the synopsis says "he fought" or "his quest", the character is male (he/him)
+- If the synopsis uses "they" for a single person, use they/them
+- Look for gender indicators: "the woman", "the man", "daughter", "son", "mother", "father", "king", "queen", "prince", "princess"
+- Do NOT guess gender randomly - base it ONLY on evidence in the synopsis
+- If gender is truly unclear, use "they/them"
 
 STRICT OUTPUT RULES:
 1. Your entire response must be a valid JSON array starting with [ and ending with ]
@@ -1312,37 +1314,55 @@ STRICT OUTPUT RULES:
 <|eot_id|>"""
 
         user_prompt = f"""<|start_header_id|>user<|end_header_id|>
-Based on this {genre} story synopsis, identify all characters and create profiles for each:
+EXTRACT all characters from this {genre} story synopsis and create profiles for each.
 
-SYNOPSIS:
-{self.smart_trim(synopsis, total_budget - 400)}
+CRITICAL INSTRUCTIONS:
+1. ONLY include characters that are EXPLICITLY MENTIONED in the synopsis below
+2. Do NOT invent or add any characters that are not in the synopsis
+3. Use the EXACT names mentioned in the synopsis
+4. For unnamed characters described by role (e.g., "the old wizard", "her sister"), use that description as their name
+5. PAY CLOSE ATTENTION to pronouns (he/she/they) and gender words (man/woman, king/queen, son/daughter) in the synopsis to determine correct pronouns
 
-For each character, return a JSON object with EXACTLY these keys:
-- "name": string (full name)
-- "role": string (one of: "protagonist", "antagonist", "supporting", "minor")
-- "personality_traits": string (2-3 sentences, plain text)
-- "physical_description": string (1-2 sentences, plain text)
-- "backstory": string (1-2 sentences, plain text)
-- "motivations": string (what drives them, plain text)
-- "speech_pattern": string (how they talk, plain text)
+SYNOPSIS TO ANALYZE:
+---
+{trimmed_synopsis}
+---
 
-EXAMPLE of correct format:
-[{{"name": "John Smith", "role": "protagonist", "personality_traits": "Brave and determined.", "physical_description": "Tall with dark hair.", "backstory": "Grew up on a farm.", "motivations": "Wants to save his family.", "speech_pattern": "Direct and blunt."}}]
+For each character FOUND IN THE SYNOPSIS ABOVE, return a JSON object with ALL of these keys:
+- "name": string (the exact name or description used in the synopsis)
+- "role": string (one of: "protagonist", "antagonist", "supporting", "minor", "mentor", "love interest", "sidekick", "villain")
+- "pronouns": string (MUST match what the synopsis indicates - look for he/she/they pronouns and gender words like man/woman/king/queen)
+- "personality_traits": string (2-3 sentences based on what the synopsis reveals about their character)
+- "physical_description": string (1-2 sentences based on synopsis details)
+- "backstory": string (1-2 sentences based on what the synopsis mentions about their history)
+- "motivations": string (what drives this character based on the synopsis)
+- "internal_conflicts": string (their inner struggles as shown or implied in the synopsis)
+- "strengths": string (their abilities or qualities shown in the synopsis)
+- "weaknesses": string (their flaws or vulnerabilities shown in the synopsis)
+- "speech_pattern": string (how they might talk based on their character in the synopsis)
+- "character_arc": string (how they change based on the story described in the synopsis)
 
-Return the JSON array now:
+REMEMBER: 
+- Only extract characters that EXIST in the synopsis
+- Get the pronouns RIGHT based on the synopsis text
+- Do NOT create random characters
+
+Return the JSON array:
 <|eot_id|><|start_header_id|>assistant<|end_header_id|>
 ["""
         
+        full_prompt = system_prompt + user_prompt
+        
         try:
             with self.lock:
-                output = self.llm(system_prompt + user_prompt, max_tokens=max_output_tokens, 
-                                 stop=["<|eot_id|>"], echo=False, temperature=0.7)
+                output = self.llm(full_prompt, max_tokens=max_output_tokens, 
+                                 stop=["<|eot_id|>"], echo=False, temperature=0.3)
             
             raw_text = output['choices'][0]['text'].strip()
+            
             characters = safe_parse_json(raw_text, expected_type="array", prepend="[")
             
             if not characters or not isinstance(characters, list):
-                logging.warning(f"Character generation returned no parseable data. Raw: {raw_text[:300]}")
                 return []
             
             def ensure_string(val):
@@ -1353,27 +1373,30 @@ Return the JSON array now:
             cleaned = []
             for char in characters:
                 if isinstance(char, dict) and char.get('name'):
-                    cleaned.append({
+                    char_data = {
                         'name': ensure_string(char.get('name', '')),
                         'role': ensure_string(char.get('role', 'supporting')),
+                        'pronouns': ensure_string(char.get('pronouns', '')),
                         'personality_traits': ensure_string(char.get('personality_traits', '')),
                         'physical_description': ensure_string(char.get('physical_description', '')),
                         'backstory': ensure_string(char.get('backstory', '')),
                         'motivations': ensure_string(char.get('motivations', '')),
+                        'internal_conflicts': ensure_string(char.get('internal_conflicts', '')),
+                        'strengths': ensure_string(char.get('strengths', '')),
+                        'weaknesses': ensure_string(char.get('weaknesses', '')),
                         'speech_pattern': ensure_string(char.get('speech_pattern', '')),
+                        'character_arc': ensure_string(char.get('character_arc', '')),
                         'is_visible': 1
-                    })
+                    }
+                    cleaned.append(char_data)
             
-            logging.info(f"Generated {len(cleaned)} characters from synopsis")
             return cleaned
-        except Exception as e:
-            logging.error(f"Character generation error: {e}", exc_info=True)
+        except Exception:
             return []
 
     def generate_single_character(self, description: str, genre: str = "fiction") -> dict:
         """Generate a complete character profile from a simple description prompt."""
         if not self.llm:
-            logging.error("LLM not loaded for character generation")
             return {"error": "AI model not loaded"}
         
         if not description or not description.strip():
@@ -1414,20 +1437,19 @@ Return ONLY a JSON object with these exact keys:
 {{"""
         
         try:
-            logging.info(f"Generating character from description: {description[:50]}...")
+            logging.debug(f"AI_PROMPT [generate_single_character]:\n{full_prompt}")
             
             with self.lock:
                 output = self.llm(full_prompt, max_tokens=max_output_tokens, 
                                  stop=["<|eot_id|>", "```"], echo=False, temperature=0.7)
             
             raw_text = output['choices'][0]['text'].strip()
-            logging.info(f"Raw AI output (first 200 chars): {raw_text[:200]}")
+            logging.debug(f"AI_RESPONSE [generate_single_character]:\n{raw_text}")
             
             character = safe_parse_json(raw_text, expected_type="object", prepend="{")
             
             # Regex fallback if safe_parse_json failed
             if not character or not isinstance(character, dict):
-                logging.warning("safe_parse_json failed for single character, trying regex fallback")
                 json_str = "{" + raw_text
                 character = {}
                 
@@ -1443,7 +1465,6 @@ Return ONLY a JSON object with these exact keys:
                         character[field] = match.group(1).replace('\\n', ' ').replace('\\"', '"')
             
             if not character.get('name'):
-                logging.error("No name found in generated character")
                 return {"error": "AI did not generate a valid character name"}
             
             def to_string(val):
@@ -1467,11 +1488,9 @@ Return ONLY a JSON object with these exact keys:
                 'is_visible': 1
             }
             
-            logging.info(f"Successfully generated character: {result['name']}")
             return result
             
         except Exception as e:
-            logging.error(f"Single character generation error: {e}", exc_info=True)
             return {"error": f"Generation failed: {str(e)}"}
 
     def generate_world_from_synopsis(self, synopsis: str, genre: str = "fiction") -> list:
@@ -1517,15 +1536,17 @@ Return the JSON array now:
 ["""
         
         try:
+            full_prompt = system_prompt + user_prompt
+            logging.debug(f"AI_PROMPT [generate_world_from_synopsis]:\n{full_prompt}")
             with self.lock:
-                output = self.llm(system_prompt + user_prompt, max_tokens=max_output_tokens, 
+                output = self.llm(full_prompt, max_tokens=max_output_tokens, 
                                  stop=["<|eot_id|>"], echo=False, temperature=0.7)
             
             raw_text = output['choices'][0]['text'].strip()
+            logging.debug(f"AI_RESPONSE [generate_world_from_synopsis]:\n{raw_text}")
             elements = safe_parse_json(raw_text, expected_type="array", prepend="[")
             
             if not elements or not isinstance(elements, list):
-                logging.warning(f"World generation returned no parseable data. Raw: {raw_text[:300]}")
                 return []
             
             def to_str(val):
@@ -1545,10 +1566,8 @@ Return the JSON array now:
                         'is_visible': 1
                     })
             
-            logging.info(f"Generated {len(cleaned)} world elements from synopsis")
             return cleaned
-        except Exception as e:
-            logging.error(f"World generation error: {e}", exc_info=True)
+        except Exception:
             return []
 
     def generate_single_world_element(self, description: str, element_type: str = "location", genre: str = "fiction") -> dict:
@@ -1602,18 +1621,18 @@ Return ONLY a JSON object with these exact keys:
 {{"""
         
         try:
-            logging.info(f"Generating single world element for: {description}")
+            full_prompt = system_prompt + user_prompt
+            logging.debug(f"AI_PROMPT [generate_single_world_element]:\n{full_prompt}")
             with self.lock:
-                output = self.llm(system_prompt + user_prompt, max_tokens=max_output_tokens, 
+                output = self.llm(full_prompt, max_tokens=max_output_tokens, 
                                  stop=["<|eot_id|>", "```"], echo=False, temperature=0.8)
             
             raw_text = output['choices'][0]['text'].strip()
-            logging.debug(f"Raw AI output for single world element: {raw_text}")
+            logging.debug(f"AI_RESPONSE [generate_single_world_element]:\n{raw_text}")
 
             element = safe_parse_json(raw_text, expected_type="object", prepend="{")
             
             if not element or not isinstance(element, dict):
-                logging.error(f"Failed to parse world element JSON. Raw: {raw_text[:300]}")
                 return {"error": "Failed to parse AI response as JSON"}
             
             def to_str(val):
@@ -1631,7 +1650,6 @@ Return ONLY a JSON object with these exact keys:
                 'is_visible': 1
             }
         except Exception as e:
-            logging.error(f"Single world element generation error: {e}", exc_info=True)
             return {"error": f"An unexpected error occurred: {e}"}
 
     def generate_synopsis(self, story_elements: str, genre: str = "fiction", target_words: str = "300-500") -> str:
@@ -1678,19 +1696,18 @@ IMPORTANT: Write the synopsis as smooth, flowing prose paragraphs. No headers, n
 """
         
         try:
-            logging.info(f"Generating synopsis for genre: {genre}, target words: {target_words}")
+            full_prompt = system_prompt + user_prompt
+            logging.debug(f"AI_PROMPT [generate_synopsis]:\n{full_prompt}")
             with self.lock:
-                output = self.llm(system_prompt + user_prompt, max_tokens=max_output_tokens, 
+                output = self.llm(full_prompt, max_tokens=max_output_tokens, 
                                  stop=["<|eot_id|>"], echo=False, temperature=0.7)
             
             synopsis = output['choices'][0]['text'].strip()
+            logging.debug(f"AI_RESPONSE [generate_synopsis]:\n{synopsis}")
             synopsis = strip_markdown(synopsis)
-            
-            logging.debug(f"Generated synopsis: {synopsis[:200]}...")
             
             return synopsis
         except Exception as e:
-            logging.error(f"Synopsis generation error: {e}")
             return {"error": f"Failed to generate synopsis: {e}"}
 
     def generate_outline_from_synopsis(self, synopsis: str, chapter_count: int = 10, genre: str = "fiction",
@@ -1721,13 +1738,17 @@ IMPORTANT: Write the synopsis as smooth, flowing prose paragraphs. No headers, n
         combined_context = "\n\n".join(context_parts)
         
         if not combined_context.strip():
-            logging.warning("No synopsis, characters, worldbuilding, or braindump provided for outline generation")
             return []
         
         system_prompt = """<|begin_of_text|><|start_header_id|>system<|end_header_id|>
 You are a story structure expert creating detailed chapter outlines.
 Given story information (synopsis, characters, setting), break it down into a logical chapter structure with rich, detailed summaries.
 You MUST output ONLY a valid JSON array. No prose, no explanations, no markdown.
+
+NARRATIVE CONTINUITY RULES:
+- Each chapter must build upon the previous one. Characters should grow and change, plot threads must carry forward, and events in earlier chapters must have consequences in later ones.
+- Structure the chapters as a cohesive journey with setup, rising action, climax, and resolution spread across all chapters - not as isolated episodes.
+- The story must feel like ONE evolving narrative where each chapter is a necessary step in the overall arc.
 
 STRICT OUTPUT RULES:
 1. Your entire response must be a valid JSON array starting with [ and ending with ]
@@ -1749,18 +1770,25 @@ CRITICAL INSTRUCTION: Create an outline using ONLY the characters, locations, an
 
 Create a {chapter_count}-chapter outline as a JSON array for this {genre} story.
 
+CRITICAL - CHAPTER CONNECTIVITY (THE CHAPTERS MUST FORM ONE EVOLVING STORY):
+- Each chapter summary must explicitly show how it connects to and builds upon the previous chapter
+- Character arcs must show clear progression from chapter to chapter (e.g., "After the confrontation in Chapter 2, Marcus now struggles with...")
+- Plot threads introduced in earlier chapters must be acknowledged and advanced in later ones
+- Consequences of earlier events must ripple through subsequent chapters
+- The chapters should read as ONE evolving story, not separate disconnected episodes
+
 Each chapter object must have EXACTLY these 3 keys:
 - "chapter_number": integer (1, 2, 3, etc.)
 - "title": string (a compelling chapter title)
 - "summary": string (a DETAILED paragraph of 5-8 sentences)
 
 The summary for each chapter MUST include:
-- The opening scene or situation
+- The opening scene or situation (showing connection to previous chapter's ending)
 - Every major plot event that occurs, in order
 - Which characters are involved and what drives them (USE ONLY CHARACTERS FROM THE STORY INFORMATION ABOVE)
 - Key conflicts, confrontations, or revelations
-- Emotional beats and character development
-- How the chapter concludes and connects to the next
+- Emotional beats and character development that build on previous chapters
+- How the chapter concludes and sets up the next
 
 REMINDER: Use ONLY the character names listed above. If characters are named (like specific names), use those exact names. Do NOT substitute with generic terms or invent new names.
 
@@ -1772,15 +1800,17 @@ Return the JSON array now:
 ["""
         
         try:
+            full_prompt = system_prompt + user_prompt
+            logging.debug(f"AI_PROMPT [generate_outline_from_synopsis]:\n{full_prompt}")
             with self.lock:
-                output = self.llm(system_prompt + user_prompt, max_tokens=max_output_tokens, 
+                output = self.llm(full_prompt, max_tokens=max_output_tokens, 
                                  stop=["<|eot_id|>"], echo=False, temperature=0.7)
             
             raw_output = output['choices'][0]['text'].strip()
+            logging.debug(f"AI_RESPONSE [generate_outline_from_synopsis]:\n{raw_output}")
             chapters = safe_parse_json(raw_output, expected_type="array", prepend="[")
             
             if not chapters or not isinstance(chapters, list):
-                logging.warning(f"Outline JSON parse failed, trying text fallback. Raw: {raw_output[:300]}")
                 return self._parse_outline_text_to_json(raw_output, chapter_count)
             
             def to_str(val):
@@ -1798,8 +1828,7 @@ Return the JSON array now:
                     })
             
             return cleaned
-        except Exception as e:
-            logging.error(f"Outline generation error: {e}", exc_info=True)
+        except Exception:
             if 'raw_output' in locals():
                 return self._parse_outline_text_to_json(raw_output, chapter_count)
             return []
@@ -1857,12 +1886,15 @@ CHAPTER CONTENT:
 """
         
         try:
+            full_prompt = system_prompt + user_prompt
+            logging.debug(f"AI_PROMPT [generate_chapter_summary_from_content]:\n{full_prompt}")
             with self.lock:
-                output = self.llm(system_prompt + user_prompt, max_tokens=max_output_tokens, 
+                output = self.llm(full_prompt, max_tokens=max_output_tokens, 
                                  stop=["<|eot_id|>"], echo=False, temperature=0.5)
-            return output['choices'][0]['text'].strip()
-        except Exception as e:
-            logging.error(f"Chapter summary error: {e}")
+            response = output['choices'][0]['text'].strip()
+            logging.debug(f"AI_RESPONSE [generate_chapter_summary_from_content]:\n{response}")
+            return response
+        except Exception:
             return ""
 
     def generate_chapter_summary(self, chapter_number: int, chapter_title: str, 
@@ -1921,16 +1953,17 @@ The summary must be a rich, detailed paragraph (5-8 sentences) that covers every
 """
         
         try:
-            logging.info(f"Generating summary for Chapter {chapter_number}: {chapter_title}")
+            full_prompt = system_prompt + user_prompt
+            logging.debug(f"AI_PROMPT [generate_chapter_summary]:\n{full_prompt}")
             with self.lock:
-                output = self.llm(system_prompt + user_prompt, max_tokens=max_output_tokens, 
+                output = self.llm(full_prompt, max_tokens=max_output_tokens, 
                                  stop=["<|eot_id|>"], echo=False, temperature=0.7)
             
             result = output['choices'][0]['text'].strip()
+            logging.debug(f"AI_RESPONSE [generate_chapter_summary]:\n{result}")
             result = strip_markdown(result)
             return {"summary": result}
         except Exception as e:
-            logging.error(f"Chapter summary generation error: {e}", exc_info=True)
             return {"error": f"Failed to generate chapter summary: {str(e)}"}
 
     def expand_scene_from_summary(self, scene_summary: str, context: str = "", genre: str = "fiction") -> str:
@@ -1962,12 +1995,15 @@ Write 3-4 paragraphs of vivid narrative prose:
 """
         
         try:
+            full_prompt = system_prompt + user_prompt
+            logging.debug(f"AI_PROMPT [expand_scene_from_summary]:\n{full_prompt}")
             with self.lock:
-                output = self.llm(system_prompt + user_prompt, max_tokens=max_output_tokens, 
+                output = self.llm(full_prompt, max_tokens=max_output_tokens, 
                                  stop=["<|eot_id|>"], echo=False, temperature=0.8)
-            return output['choices'][0]['text'].strip()
-        except Exception as e:
-            logging.error(f"Scene expansion error: {e}")
+            response = output['choices'][0]['text'].strip()
+            logging.debug(f"AI_RESPONSE [expand_scene_from_summary]:\n{response}")
+            return response
+        except Exception:
             return ""
 
     def expand_scene_with_context(self, scene_summary: str, context: str = "",
@@ -2051,16 +2087,15 @@ Expand the scene into vivid narrative prose:
 """
 
         try:
-            logging.info(f"Expanding scene with context (budget={total_budget}, "
-                         f"style={len(trimmed_style)}t, chars={len(trimmed_characters)}t, "
-                         f"world={len(trimmed_world)}t, outline={len(trimmed_outline)}t)")
+            full_prompt = system_prompt + user_prompt
+            logging.debug(f"AI_PROMPT [expand_scene_with_context]:\n{full_prompt}")
             with self.lock:
-                output = self.llm(system_prompt + user_prompt, max_tokens=max_output_tokens,
+                output = self.llm(full_prompt, max_tokens=max_output_tokens,
                                   stop=["<|eot_id|>"], echo=False, temperature=0.8)
             result = output['choices'][0]['text'].strip()
+            logging.debug(f"AI_RESPONSE [expand_scene_with_context]:\n{result}")
             return strip_markdown(result)
-        except Exception as e:
-            logging.error(f"Scene expansion with context error: {e}", exc_info=True)
+        except Exception:
             return ""
 
     def generate_bible_section(self, section_key: str, project_id: int, db_manager) -> str:
@@ -2173,8 +2208,8 @@ Expand the scene into vivid narrative prose:
                         if ch_content and ch_content.strip():
                             canvas_content = ch_content[:1000] + "..." if len(ch_content) > 1000 else ch_content
                             break
-            except Exception as e:
-                logging.warning(f"Could not fetch chapter content for bible generation: {e}")
+            except Exception:
+                pass
             
             if not canvas_content:
                 canvas_content = "No chapter content written yet."
@@ -2203,19 +2238,17 @@ Expand the scene into vivid narrative prose:
             elif section_key == 'outline':
                 max_output_tokens = 1500
             
-            logging.info(f"Generating bible section '{section_key}' for project {project_id} (primary: {primary_source_label})")
+            logging.debug(f"AI_PROMPT [generate_bible_section]:\n{full_prompt}")
             
             with self.lock:
                 output = self.llm(full_prompt, max_tokens=max_output_tokens, 
                                  stop=["<|eot_id|>"], echo=False, temperature=0.7)
             
             result = output['choices'][0]['text'].strip()
+            logging.debug(f"AI_RESPONSE [generate_bible_section]:\n{result}")
             result = strip_markdown(result)
-            
-            logging.info(f"Generated {len(result)} chars for bible section '{section_key}'")
             
             return result
             
         except Exception as e:
-            logging.error(f"Bible section generation error ({section_key}): {e}", exc_info=True)
             return {"error": f"Failed to generate {section_key}: {str(e)}"}

@@ -207,7 +207,7 @@ function EditableField({ label, value, onChange, onSave, onRewrite, placeholder,
 }
 
 // World Element Row Component
-function WorldElementRow({ element, onToggleVisibility, onDuplicate, onDelete, onSave, onRewriteField, isFromSeries = false, sourceProjectName = '' }) {
+function WorldElementRow({ element, onToggleVisibility, onDuplicate, onDelete, onSave, onRewriteField, isFromSeries = false, sourceProjectName = '', isSelected = false, onToggleSelect = null, isSelectionMode = false }) {
   const [isExpanded, setIsExpanded] = useState(false)
   const [showMenu, setShowMenu] = useState(false)
   const [menuPosition, setMenuPosition] = useState({ top: 0, right: 0 })
@@ -299,11 +299,25 @@ function WorldElementRow({ element, onToggleVisibility, onDuplicate, onDelete, o
   }
   
   return (
-    <div className="bg-dark-800 rounded-xl border border-gold-rich/10 shadow-sm mb-3 overflow-hidden">
+    <div className={clsx(
+      "bg-dark-800 rounded-xl border border-gold-rich/10 shadow-sm mb-3 overflow-hidden",
+      isSelected && "ring-2 ring-gold-rich/50 bg-gold-rich/5"
+    )}>
       {/* Main Row */}
       <div className="flex items-center gap-3 px-4 py-3 hover:bg-dark-750 transition-colors group">
+        {/* Selection Checkbox */}
+        {isSelectionMode && onToggleSelect && (
+          <input
+            type="checkbox"
+            checked={isSelected}
+            onChange={() => onToggleSelect(element.id)}
+            className="w-4 h-4 rounded border-gold-rich/30 bg-dark-700 text-gold-rich focus:ring-gold-rich/50 cursor-pointer"
+            onClick={(e) => e.stopPropagation()}
+          />
+        )}
+        
         {/* Drag Handle */}
-        <span className="text-gray-600 cursor-grab text-sm">{Icons.DRAG}</span>
+        {!isSelectionMode && <span className="text-gray-600 cursor-grab text-sm">{Icons.DRAG}</span>}
         
         {/* Expand Arrow */}
         <button
@@ -699,6 +713,8 @@ function WorldBuilding() {
   const [showSectionMenu, setShowSectionMenu] = useState(false)
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [isGenerating, setIsGenerating] = useState(false)
+  const [selectedIds, setSelectedIds] = useState(new Set()) // Multi-select state
+  const [isSelectionMode, setIsSelectionMode] = useState(false) // Toggle selection mode
   const sectionMenuRef = useRef(null)
   
   // Check if current project is part of a series
@@ -843,6 +859,70 @@ function WorldBuilding() {
     }
   }
   
+  // Toggle selection for a single element
+  const handleToggleSelect = (elementId) => {
+    setSelectedIds(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(elementId)) {
+        newSet.delete(elementId)
+      } else {
+        newSet.add(elementId)
+      }
+      return newSet
+    })
+  }
+  
+  // Select all elements in current project
+  const handleSelectAll = () => {
+    if (selectedIds.size === elements.length) {
+      setSelectedIds(new Set())
+    } else {
+      setSelectedIds(new Set(elements.map(e => e.id).filter(Boolean)))
+    }
+  }
+  
+  // Cancel selection mode
+  const handleCancelSelection = () => {
+    setIsSelectionMode(false)
+    setSelectedIds(new Set())
+  }
+  
+  // Bulk delete selected elements
+  const handleBulkDelete = async () => {
+    if (selectedIds.size === 0) return
+    
+    const count = selectedIds.size
+    if (!confirm(`Delete ${count} selected element${count > 1 ? 's' : ''}? This cannot be undone.`)) return
+    
+    let deletedCount = 0
+    let errors = []
+    
+    for (const id of selectedIds) {
+      try {
+        await deleteWorldElement(id)
+        deletedCount++
+      } catch (error) {
+        const elem = elements.find(e => e.id === id)
+        errors.push(elem?.name || id)
+      }
+    }
+    
+    // Refresh elements list
+    const updated = await getWorldElements(currentProjectId, null, null)
+    setElements(updated || [])
+    
+    // Clear selection
+    setSelectedIds(new Set())
+    setIsSelectionMode(false)
+    
+    if (deletedCount > 0) {
+      addNotification({ type: 'success', message: `Deleted ${deletedCount} element${deletedCount > 1 ? 's' : ''}` })
+    }
+    if (errors.length > 0) {
+      addNotification({ type: 'error', message: `Failed to delete: ${errors.join(', ')}` })
+    }
+  }
+  
   // AI rewrite field
   const handleRewriteField = async (fieldId, currentValue, instruction, elementName) => {
     if (!isElectronApi) {
@@ -948,14 +1028,29 @@ Please rewrite following the instruction. Only output the rewritten content.`
           </button>
           
           <div className="flex items-center gap-2">
-            <button
-              className="flex items-center gap-1 text-gold-rich hover:text-gold-amber font-medium text-sm"
-              onClick={() => setShowCreateModal(true)}
-            >
-              <span>+</span>
-              <span>Add Element</span>
-            </button>
+            {/* Selection Mode Toggle */}
+            {elements.length > 0 && !isSelectionMode && (
+              <button
+                className="flex items-center gap-1 text-gray-400 hover:text-gold-rich text-sm transition-colors"
+                onClick={() => setIsSelectionMode(true)}
+                title="Select multiple elements"
+              >
+                <span>☑</span>
+                <span>Select</span>
+              </button>
+            )}
             
+            {!isSelectionMode && (
+              <button
+                className="flex items-center gap-1 text-gold-rich hover:text-gold-amber font-medium text-sm"
+                onClick={() => setShowCreateModal(true)}
+              >
+                <span>+</span>
+                <span>Add Element</span>
+              </button>
+            )}
+            
+            {!isSelectionMode && (
             <div className="relative" ref={sectionMenuRef}>
               <button
                 className="w-8 h-8 flex items-center justify-center rounded-lg text-gray-500 hover:text-gold-rich hover:bg-gold-rich/10 transition-colors"
@@ -988,6 +1083,37 @@ Please rewrite following the instruction. Only output the rewritten content.`
                 </div>
               )}
             </div>
+            )}
+            
+            {/* Selection Mode Actions */}
+            {isSelectionMode && (
+              <div className="flex items-center gap-2">
+                <button
+                  className="flex items-center gap-1 text-gray-400 hover:text-gold-rich text-sm transition-colors"
+                  onClick={handleSelectAll}
+                >
+                  <span>{selectedIds.size === elements.length ? '☑' : '☐'}</span>
+                  <span>{selectedIds.size === elements.length ? 'Deselect All' : 'Select All'}</span>
+                </button>
+                <span className="text-gray-500 text-sm">|</span>
+                <span className="text-sm text-gray-400">{selectedIds.size} selected</span>
+                <button
+                  className="flex items-center gap-1 text-red-400 hover:text-red-300 text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  onClick={handleBulkDelete}
+                  disabled={selectedIds.size === 0}
+                >
+                  <span>{Icons.DELETE}</span>
+                  <span>Delete</span>
+                </button>
+                <button
+                  className="flex items-center gap-1 text-gray-400 hover:text-gold-rich text-sm transition-colors"
+                  onClick={handleCancelSelection}
+                >
+                  <span>{Icons.CLOSE}</span>
+                  <span>Cancel</span>
+                </button>
+              </div>
+            )}
           </div>
         </div>
         
@@ -1050,6 +1176,9 @@ Please rewrite following the instruction. Only output the rewritten content.`
                         onDelete={handleDeleteElement}
                         onSave={handleSaveElement}
                         onRewriteField={handleRewriteField}
+                        isSelected={selectedIds.has(element.id)}
+                        onToggleSelect={handleToggleSelect}
+                        isSelectionMode={isSelectionMode}
                       />
                     ))}
                   </>
@@ -1073,6 +1202,7 @@ Please rewrite following the instruction. Only output the rewritten content.`
                         onRewriteField={handleRewriteField}
                         isFromSeries={true}
                         sourceProjectName={element._sourceProjectName}
+                        isSelectionMode={false}
                       />
                     ))}
                   </>
