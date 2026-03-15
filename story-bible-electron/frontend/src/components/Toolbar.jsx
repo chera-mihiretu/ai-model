@@ -283,19 +283,6 @@ function Toolbar() {
       return
     }
     
-    // Get cursor context and selection
-    let cursorContext = { precedingText: '', cursorPosition: 0, fullText: '', textAfterCursor: '' }
-    try {
-      if (editorCursorContextCallback) {
-        cursorContext = editorCursorContextCallback()
-      }
-    } catch (e) {
-      // Silently handle callback errors
-    }
-    
-    const { precedingText, textAfterCursor, cursorPosition } = cursorContext
-    const hasExistingText = precedingText?.trim()?.length > 0
-    
     // Get current selection for Expand mode
     const hasSelection = currentEditorSelection?.hasSelection && currentEditorSelection?.selectedText?.trim()
     const selection = hasSelection ? currentEditorSelection : null
@@ -306,14 +293,6 @@ function Toolbar() {
     if (mode === 'Expand') {
       if (!hasSelection) {
         addNotification({ type: 'warning', message: 'Please select text first to expand' })
-        return
-      }
-    }
-    
-    // Continue Writing: requires existing text
-    if (mode === 'Continue Writing') {
-      if (!hasExistingText) {
-        addNotification({ type: 'warning', message: 'Please write something first, then use Continue Writing to extend it' })
         return
       }
     }
@@ -504,9 +483,22 @@ function Toolbar() {
     }
     
     // Text context for continuation (only for Continue Writing)
-    if (mode === 'Continue Writing' && precedingText) {
-      fullPrompt += `=== TEXT TO CONTINUE FROM ===\n${precedingText}\n\n`
-      fullPrompt += `Continue from here, matching the style and voice exactly. DO NOT repeat the existing text.`
+    if (mode === 'Continue Writing') {
+      // Get the current chapter content from editor
+      const currentText = editorContent || ''
+      
+      // Trim to last ~3000 chars to stay within token limits
+      const maxPrecedingChars = 3000
+      const trimmedText = currentText.length > maxPrecedingChars 
+        ? currentText.slice(-maxPrecedingChars) 
+        : currentText
+      
+      if (trimmedText.trim()) {
+        fullPrompt += `=== EXISTING CHAPTER TEXT ===\n${trimmedText}\n\n`
+        fullPrompt += `Continue the story from where it left off. Match the style, voice, and tone exactly. DO NOT repeat the existing text. Generate new content that naturally follows what came before and advances the plot.`
+      } else {
+        fullPrompt += `Generate the opening of this chapter. Match the style and voice from the story context provided above.`
+      }
     }
     
     // Send to AssistantPanel for generation
@@ -514,15 +506,12 @@ function Toolbar() {
       type: 'write',
       instruction: fullPrompt,
       mode: mode,
-      cursorPosition: cursorPosition,
-      insertAtCursor: true,
+      insertAtCursor: mode === 'Continue Writing', // Continue Writing inserts at end
       replaceSelection: mode === 'Expand',
       originalText: mode === 'Expand' ? selection?.selectedText : undefined,
       selectionStart: mode === 'Expand' ? selection?.selectionStart : undefined,
       selectionEnd: mode === 'Expand' ? selection?.selectionEnd : undefined,
       context: {
-        precedingText,
-        textAfterCursor,
         chapterContinuity,
         characterContext,
         storyContext,
