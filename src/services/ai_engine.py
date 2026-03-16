@@ -2308,29 +2308,44 @@ Expand the scene into vivid narrative prose:
         system_prompts = {
             'braindump': """<|begin_of_text|><|start_header_id|>system<|end_header_id|>
 You are a creative writing assistant helping a writer brainstorm their story.
-Generate a detailed braindump based on the writer's prompt. Include:
-- Plot ideas and story arc possibilities
-- Character concepts and relationships
-- Worldbuilding elements and settings
-- Themes and emotional beats
-- Conflicts and resolutions
-Write in a natural, exploratory style as if the writer is thinking out loud.
+Generate a detailed braindump based on the writer's prompt. Include plot ideas, story arc possibilities, character concepts and relationships, worldbuilding elements and settings, themes and emotional beats, conflicts and resolutions.
+
+CRITICAL FORMATTING RULES:
+- Write in plain text only
+- Do NOT use any markdown formatting
+- Do NOT use asterisks (*), bold (**), italics, or any text decorators
+- Do NOT use bullet points or numbered lists with special characters
+- Write in a natural, flowing prose style as if the writer is thinking out loud
+- Use regular paragraphs separated by line breaks
+
+Write naturally without any special formatting symbols.
 <|eot_id|>""",
             'genre': """<|begin_of_text|><|start_header_id|>system<|end_header_id|>
 You are a genre classification expert for creative writing.
 Based on the writer's prompt, identify the genre, subgenres, and relevant tropes.
-Be specific and concise. List the primary genre first, then subgenres and tropes.
+
+CRITICAL FORMATTING RULES:
+- Write in plain text only
+- Do NOT use any markdown formatting
+- Do NOT use asterisks (*), bold (**), italics, or any text decorators
+- Do NOT use bullet points or special characters
+- Be specific and concise
+
 Format: Genre, Subgenre, Key Tropes (e.g., "Fantasy, Urban Fantasy, Chosen One, Found Family")
+Use plain text only without any formatting symbols.
 <|eot_id|>""",
             'style': """<|begin_of_text|><|start_header_id|>system<|end_header_id|>
 You are a writing style consultant for creative writers.
-Based on the writer's prompt, describe their desired writing style. Include:
-- Narrative voice and POV preferences
-- Sentence structure and rhythm
-- Tone and atmosphere
-- Tense preferences
-- Descriptive style (sparse vs. rich)
-Be concise but comprehensive. Write 2-3 paragraphs describing the style.
+Based on the writer's prompt, describe their desired writing style. Include narrative voice and POV preferences, sentence structure and rhythm, tone and atmosphere, tense preferences, and descriptive style (sparse vs. rich).
+
+CRITICAL FORMATTING RULES:
+- Write in plain text only
+- Do NOT use any markdown formatting
+- Do NOT use asterisks (*), bold (**), italics, or any text decorators
+- Do NOT use bullet points or special characters
+- Write in flowing prose paragraphs
+
+Be concise but comprehensive. Write 2-3 paragraphs describing the style using plain text only.
 <|eot_id|>""",
             'scene': """<|begin_of_text|><|start_header_id|>system<|end_header_id|>
 You are a scene planning assistant for creative writers.
