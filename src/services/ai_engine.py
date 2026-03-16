@@ -2289,14 +2289,10 @@ Expand the scene into vivid narrative prose:
         Returns:
             Generated content as string
         """
-        # #region agent log
-        import json,time;open('/home/chera/Public/my_stuffs/work/fiverr/ricardoo/.cursor/debug-4f372f.log','a').write(json.dumps({'sessionId':'4f372f','location':'ai_engine.py:2300','message':'generate_from_prompt called','data':{'prompt_length':len(prompt),'field_type':field_type,'has_llm':bool(self.llm)},'timestamp':int(time.time()*1000),'hypothesisId':'C'})+'\n')
-        # #endregion
+        logging.info(f"generate_from_prompt called: field_type={field_type}, prompt_length={len(prompt)}, has_llm={bool(self.llm)}")
         
         if not self.llm or not prompt.strip():
-            # #region agent log
-            import json,time;open('/home/chera/Public/my_stuffs/work/fiverr/ricardoo/.cursor/debug-4f372f.log','a').write(json.dumps({'sessionId':'4f372f','location':'ai_engine.py:2308','message':'Early return - no llm or empty prompt','data':{'has_llm':bool(self.llm),'has_prompt':bool(prompt.strip())},'timestamp':int(time.time()*1000),'hypothesisId':'D'})+'\n')
-            # #endregion
+            logging.warning(f"Early return - no llm or empty prompt: has_llm={bool(self.llm)}, has_prompt={bool(prompt.strip())}")
             return ""
         
         # Set token limits based on field type
@@ -2365,21 +2361,18 @@ Write 2-3 paragraphs that serve as a blueprint for writing the scene.
         )
         
         try:
-            # #region agent log
-            import json,time;open('/home/chera/Public/my_stuffs/work/fiverr/ricardoo/.cursor/debug-4f372f.log','a').write(json.dumps({'sessionId':'4f372f','location':'ai_engine.py:2365','message':'About to call LLM','data':{'max_output_tokens':max_output_tokens,'prompt_length':len(full_prompt)},'timestamp':int(time.time()*1000),'hypothesisId':'E'})+'\n')
-            # #endregion
-            
+            logging.info(f"About to call LLM: max_tokens={max_output_tokens}, prompt_length={len(full_prompt)}, context_size={self.context_size}")
             logging.debug(f"AI_PROMPT [generate_from_prompt:{field_type}]:\n{full_prompt}")
+            
             with self.lock:
                 output = self.llm(full_prompt, max_tokens=max_output_tokens, 
                                  stop=["<|eot_id|>"], echo=False, temperature=0.7)
             
+            logging.info(f"LLM call completed: has_output={bool(output)}, has_choices={bool(output.get('choices') if output else False)}")
+            
             result = output['choices'][0]['text'].strip()
             logging.debug(f"AI_RESPONSE [generate_from_prompt:{field_type}]:\n{result}")
-            
-            # #region agent log
-            import json,time;open('/home/chera/Public/my_stuffs/work/fiverr/ricardoo/.cursor/debug-4f372f.log','a').write(json.dumps({'sessionId':'4f372f','location':'ai_engine.py:2377','message':'LLM returned result','data':{'result_length':len(result),'field_type':field_type},'timestamp':int(time.time()*1000),'hypothesisId':'F'})+'\n')
-            # #endregion
+            logging.info(f"LLM returned result: length={len(result)}, field_type={field_type}")
             
             # Clean up markdown for genre and style (keep it simple)
             if field_type in ['genre', 'style']:
@@ -2388,8 +2381,5 @@ Write 2-3 paragraphs that serve as a blueprint for writing the scene.
             return result
             
         except Exception as e:
-            # #region agent log
-            import json,time;open('/home/chera/Public/my_stuffs/work/fiverr/ricardoo/.cursor/debug-4f372f.log','a').write(json.dumps({'sessionId':'4f372f','location':'ai_engine.py:2388','message':'Exception in generate_from_prompt','data':{'error':str(e),'error_type':str(type(e))},'timestamp':int(time.time()*1000),'hypothesisId':'G'})+'\n')
-            # #endregion
-            logging.error(f"Generate from prompt error: {e}")
+            logging.error(f"Generate from prompt error: {e}", exc_info=True)
             return ""
