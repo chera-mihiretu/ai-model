@@ -23,6 +23,85 @@ const Icons = {
   AI: '🤖',
   MERGE: '📋',
   SAVE: '💾',
+  MAGIC: '🪄',
+}
+
+// Prompt Modal Component for Scene AI Generation
+function PromptModal({ isOpen, onClose, onGenerate, hasExistingContent }) {
+  const [prompt, setPrompt] = useState('')
+  
+  if (!isOpen) return null
+  
+  const handleGenerate = () => {
+    if (prompt.trim()) {
+      onGenerate(prompt.trim())
+      setPrompt('')
+    }
+  }
+  
+  return (
+    <div 
+      className="fixed inset-0 bg-black/60 flex items-center justify-center z-[10000]"
+      style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0 }}
+      onClick={onClose}
+    >
+      <div 
+        className="bg-dark-800 border border-gold-rich/30 rounded-xl shadow-2xl w-full max-w-lg mx-4"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="p-6">
+          <h3 className="text-lg font-semibold text-gold-rich mb-2">
+            Generate Scene Summary
+          </h3>
+          <p className="text-sm text-text-muted mb-4">
+            Describe what should happen in this scene
+          </p>
+          
+          {hasExistingContent && (
+            <div className="mb-4 p-3 rounded-lg bg-amber-500/10 border border-amber-500/30">
+              <div className="flex items-start gap-2">
+                <span className="text-lg">⚠️</span>
+                <p className="text-sm text-amber-200/90">
+                  This will replace your existing scene summary.
+                </p>
+              </div>
+            </div>
+          )}
+          
+          <textarea
+            className="w-full h-32 px-4 py-3 bg-dark-700 border border-gold-rich/20 rounded-lg text-text-primary placeholder-text-muted focus:outline-none focus:border-gold-rich/50 resize-none"
+            placeholder="Example: A tense confrontation where the protagonist discovers the truth..."
+            value={prompt}
+            onChange={(e) => setPrompt(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && e.ctrlKey) {
+                handleGenerate()
+              }
+            }}
+            autoFocus
+          />
+          <div className="flex justify-end gap-3 mt-4">
+            <button
+              className="px-4 py-2 rounded-lg text-sm text-text-secondary hover:bg-dark-700 transition-colors"
+              onClick={() => {
+                onClose()
+                setPrompt('')
+              }}
+            >
+              Cancel
+            </button>
+            <button
+              className="px-4 py-2 rounded-lg text-sm bg-gold-rich/20 text-gold-rich hover:bg-gold-rich/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              onClick={handleGenerate}
+              disabled={!prompt.trim()}
+            >
+              Generate (Ctrl+Enter)
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
 }
 
 function SceneCard({ scene, index, onEdit, onDelete, onExpand, isExpanding }) {
@@ -149,6 +228,9 @@ function SceneCard({ scene, index, onEdit, onDelete, onExpand, isExpanding }) {
 }
 
 function SceneEditModal({ scene, onSave, onClose }) {
+  const { addNotification } = useStore()
+  const { generateFromPrompt, isElectronApi } = usePythonBridge()
+  
   const [formData, setFormData] = useState(scene || {
     title: '',
     summary: '',
@@ -156,6 +238,8 @@ function SceneEditModal({ scene, onSave, onClose }) {
     location: ''
   })
   const [isSaving, setIsSaving] = useState(false)
+  const [isGenerating, setIsGenerating] = useState(false)
+  const [showPromptModal, setShowPromptModal] = useState(false)
   const saveTimeoutRef = useRef(null)
   
   // Cleanup save timeout on unmount
@@ -191,6 +275,33 @@ function SceneEditModal({ scene, onSave, onClose }) {
       clearTimeout(saveTimeoutRef.current)
     }
     await onSave(formData, false) // false = close after save
+  }
+  
+  // Handle AI generation from prompt
+  const handleGenerateFromPrompt = async (prompt) => {
+    if (!isElectronApi) {
+      addNotification({ type: 'warning', message: 'AI generation requires the Python backend' })
+      return
+    }
+    
+    setShowPromptModal(false)
+    setIsGenerating(true)
+    
+    try {
+      const result = await generateFromPrompt(prompt, 'scene')
+      
+      if (result && result.trim()) {
+        handleChange('summary', result)
+        addNotification({ type: 'success', message: 'Scene summary generated successfully!' })
+      } else {
+        addNotification({ type: 'error', message: 'Failed to generate scene summary' })
+      }
+    } catch (error) {
+      console.error('Generate scene error:', error)
+      addNotification({ type: 'error', message: `Failed to generate scene summary: ${error.message}` })
+    } finally {
+      setIsGenerating(false)
+    }
   }
   
   return (
@@ -242,9 +353,23 @@ function SceneEditModal({ scene, onSave, onClose }) {
           </div>
           
           <div>
-            <label className="block text-sm font-medium text-text-secondary mb-1">
-              Scene Summary *
-            </label>
+            <div className="flex items-center justify-between mb-1">
+              <label className="block text-sm font-medium text-text-secondary">
+                Scene Summary *
+              </label>
+              <button
+                className="flex items-center gap-1 text-xs text-gray-400 hover:text-gold-rich border border-gold-rich/20 rounded-lg px-2 py-1 hover:bg-gold-rich/10 transition-colors"
+                onClick={() => setShowPromptModal(true)}
+                disabled={isGenerating}
+                title="Generate scene summary with AI"
+              >
+                {isGenerating ? (
+                  <><div className="spinner !w-3 !h-3" /> Generating...</>
+                ) : (
+                  <><span>{Icons.MAGIC}</span> AI Generate</>
+                )}
+              </button>
+            </div>
             <textarea
               className="input-textarea min-h-[100px]"
               placeholder="What happens in this scene? (Used for AI expansion)"
@@ -283,6 +408,14 @@ function SceneEditModal({ scene, onSave, onClose }) {
             {Icons.SAVE} {scene?.id ? 'Save & Close' : 'Create Scene'}
           </button>
         </div>
+        
+        {/* Prompt Modal */}
+        <PromptModal
+          isOpen={showPromptModal}
+          onClose={() => setShowPromptModal(false)}
+          onGenerate={handleGenerateFromPrompt}
+          hasExistingContent={!!formData.summary?.trim()}
+        />
       </div>
     </div>
   )

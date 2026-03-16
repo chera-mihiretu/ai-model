@@ -518,6 +518,7 @@ class APIBridge:
                 if token == '[[END]]':
                     break
                 result.append(token)
+            
             return ''.join(result)
         
         elif method == 'ask_lore_assistant':
@@ -1056,6 +1057,18 @@ class APIBridge:
             project_id = self._validate_string(params.get('project_id'), 'project_id', required=True)
             return self.ai.generate_bible_section(section_key, project_id, self.db)
         
+        elif method == 'generate_from_prompt':
+            prompt = params.get('prompt', '')
+            field_type = params.get('field_type', 'braindump')
+            # #region agent log
+            import json,time;open('/home/chera/Public/my_stuffs/work/fiverr/ricardoo/.cursor/debug-4f372f.log','a').write(json.dumps({'sessionId':'4f372f','location':'api_bridge.py:1069','message':'generate_from_prompt API called','data':{'prompt_length':len(prompt),'field_type':field_type},'timestamp':int(time.time()*1000),'hypothesisId':'A'})+'\n')
+            # #endregion
+            result = self.ai.generate_from_prompt(prompt, field_type)
+            # #region agent log
+            import json,time;open('/home/chera/Public/my_stuffs/work/fiverr/ricardoo/.cursor/debug-4f372f.log','a').write(json.dumps({'sessionId':'4f372f','location':'api_bridge.py:1074','message':'generate_from_prompt result','data':{'has_result':bool(result),'result_length':len(result) if result else 0,'result_type':str(type(result))},'timestamp':int(time.time()*1000),'hypothesisId':'B'})+'\n')
+            # #endregion
+            return result
+        
         elif method == 'import_manuscript_to_project':
             # Full import flow: create project, add chapters, extract story bible
             content = params.get('content')
@@ -1072,9 +1085,15 @@ class APIBridge:
             if not project_id:
                 return {'error': 'Failed to create project'}
             
-            # Add chapters
+            # Add chapters and generate summaries for imported content
             for chapter in parsed.get('chapters', []):
-                self.db.create_chapter(project_id, chapter['title'], chapter['content'])
+                chapter_id = self.db.create_chapter(project_id, chapter['title'], chapter['content'])
+                
+                # Generate summary for imported chapter to align with generation modes
+                if chapter_id and chapter.get('content'):
+                    summary = self.ai.update_chapter_summary(chapter['content'])
+                    if summary:
+                        self.db.save_chapter_summary(chapter_id, summary)
             
             # Save story bible data
             if parsed.get('synopsis'):
@@ -1121,6 +1140,7 @@ class APIBridge:
         'generate_single_world_element',
         'generate_synopsis',
         'generate_bible_section',
+        'generate_from_prompt',
         'generate_beat_summary',
         'generate_beats_from_prose',
         'suggest_next_beats',

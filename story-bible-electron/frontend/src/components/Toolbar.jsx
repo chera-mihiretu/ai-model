@@ -273,6 +273,67 @@ function Toolbar() {
     Metaphor: false,
   })
   
+  // Guided Generation state
+  const [showGuidedPrompt, setShowGuidedPrompt] = useState(false)
+  const [guidedPrompt, setGuidedPrompt] = useState('')
+  
+  // Handle Guided Generation - show prompt dialog
+  const handleGuidedGeneration = () => {
+    if (!currentChapterId) {
+      addNotification({ type: 'warning', message: 'Please select a chapter first' })
+      return
+    }
+    setShowGuidedPrompt(true)
+  }
+  
+  // Execute guided generation with user prompt
+  const executeGuidedGeneration = async () => {
+    if (!guidedPrompt.trim()) {
+      addNotification({ type: 'warning', message: 'Please enter a prompt' })
+      return
+    }
+    
+    setShowGuidedPrompt(false)
+    setWriteMode('Guided Generation')
+    
+    // Get cursor position context from editor
+    const editorText = currentEditorSelection?.fullText || ''
+    const cursorPos = currentEditorSelection?.cursorPosition || 0
+    
+    // Extract context around cursor (last 1000 chars before cursor)
+    const contextStart = Math.max(0, cursorPos - 1000)
+    const chapterContext = editorText.substring(contextStart, cursorPos)
+    
+    // Get genre from story bible
+    let genre = 'fiction'
+    try {
+      const bible = await getStoryBible(currentProjectId)
+      if (bible?.genre) genre = bible.genre
+    } catch (e) {
+      // Use default
+    }
+    
+    // Send request to AI via setPendingAiRequest (same as other write modes)
+    const request = {
+      type: 'guided_generation',
+      instruction: guidedPrompt.trim(),
+      chapterContext: chapterContext,
+      genre: genre,
+      chapterId: currentChapterId,
+      cursorPosition: cursorPos,
+      insertAtCursor: true
+    }
+    
+    // Open assistant panel if not already open
+    if (!useStore.getState().isAssistantOpen) {
+      toggleAssistant()
+    }
+    
+    setPendingAiRequest(request)
+    
+    setGuidedPrompt('')
+  }
+  
   // Handle Write action - Sudowrite-style context-aware writing
   const handleWrite = async (mode) => {
     setWriteMode(mode)
@@ -989,6 +1050,7 @@ function Toolbar() {
     : ttsVoices
   
   return (
+    <>
     <header className="h-toolbar flex items-center px-4 gap-4 glass drag-region overflow-visible">
       {/* Left: Navigation */}
       <div className="flex items-center gap-2 no-drag shrink-0">
@@ -1024,6 +1086,7 @@ function Toolbar() {
           <MenuItem label="Write Scene" onClick={() => handleWrite('Write Scene')} />
           <MenuItem label="Generate Opening" onClick={() => handleWrite('Generate Opening')} />
           <MenuItem label="Expand" onClick={() => handleWrite('Expand')} />
+          <MenuItem label="Guided Generation" onClick={handleGuidedGeneration} />
         </ToolbarButton>
         
         {/* Rewrite Button */}
@@ -1537,6 +1600,58 @@ function Toolbar() {
         </div>
       </div>
     </header>
+    
+    {/* Guided Generation Prompt Modal - Rendered outside header for proper centering */}
+    {showGuidedPrompt && (
+      <div 
+        className="fixed inset-0 bg-black/60 flex items-center justify-center z-[10000]" 
+        style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0 }}
+        onClick={() => setShowGuidedPrompt(false)}
+      >
+        <div 
+          className="bg-dark-800 border border-gold-rich/30 rounded-xl shadow-2xl w-full max-w-lg mx-4" 
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="p-6">
+            <h3 className="text-lg font-semibold text-gold-rich mb-2">Guided Generation</h3>
+            <p className="text-sm text-text-muted mb-4">
+              Describe what you want to write. The AI will use the context around your cursor position to generate relevant content.
+            </p>
+            <textarea
+              className="w-full h-32 px-4 py-3 bg-dark-700 border border-gold-rich/20 rounded-lg text-text-primary placeholder-text-muted focus:outline-none focus:border-gold-rich/50 resize-none"
+              placeholder="Example: Write a tense dialogue between the protagonist and antagonist where secrets are revealed..."
+              value={guidedPrompt}
+              onChange={(e) => setGuidedPrompt(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && e.ctrlKey) {
+                  executeGuidedGeneration()
+                }
+              }}
+              autoFocus
+            />
+            <div className="flex justify-end gap-3 mt-4">
+              <button
+                className="px-4 py-2 rounded-lg text-sm text-text-secondary hover:bg-dark-700 transition-colors"
+                onClick={() => {
+                  setShowGuidedPrompt(false)
+                  setGuidedPrompt('')
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                className="px-4 py-2 rounded-lg text-sm bg-gold-rich/20 text-gold-rich hover:bg-gold-rich/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                onClick={executeGuidedGeneration}
+                disabled={!guidedPrompt.trim()}
+              >
+                Generate (Ctrl+Enter)
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    )}
+  </>
   )
 }
 

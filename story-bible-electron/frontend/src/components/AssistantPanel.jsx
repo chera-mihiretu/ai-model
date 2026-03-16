@@ -383,6 +383,7 @@ function AssistantPanel() {
       visualize: 'Visualize',
       twist: 'Plot Twists',
       poem: 'Poem',
+      guided_generation: 'Guided Generation',
     }
     const label = typeLabels[meta?.type] || 'AI Generated'
 
@@ -558,6 +559,7 @@ function AssistantPanel() {
       brainstorm: 'Brainstorming...',
       rewrite: 'Rewriting...',
       describe: 'Describing...',
+      guided_generation: 'Generating...',
     }
     useStore.getState().clearGeneratedResults()
     useStore.setState({
@@ -579,6 +581,8 @@ function AssistantPanel() {
     } else if (request.type === 'brainstorm') {
       const cat = request.formData?.category || 'general'
       userMessage = `💡 Brainstorm: ${cat}`
+    } else if (request.type === 'guided_generation') {
+      userMessage = `🎯 Guided Generation: "${request.instruction?.substring(0, 100)}${request.instruction?.length > 100 ? '...' : ''}"`
     }
 
     setMessages(prev => [...prev, {
@@ -688,6 +692,43 @@ function AssistantPanel() {
         }
       }
 
+      // Handle guided generation specially using plugin response
+      if (request.type === 'guided_generation') {
+        try {
+          const result = await generatePluginResponse('', 'guided_generation', {
+            user_prompt: request.instruction,
+            chapter_context: request.chapterContext || '',
+            genre: request.genre || 'fiction'
+          })
+          
+          if (result && result.trim()) {
+            setMessages(prev => [...prev, {
+              role: 'assistant',
+              content: result,
+              type: 'guided_generation',
+              insertAtCursor: true,
+              cursorPosition: request.cursorPosition
+            }])
+          } else {
+            setMessages(prev => [...prev, {
+              role: 'assistant',
+              content: 'Failed to generate content. Please try again.',
+              type: 'guided_generation'
+            }])
+          }
+        } catch (error) {
+          console.error('[AssistantPanel] Error in guided generation:', error)
+          setMessages(prev => [...prev, {
+            role: 'assistant',
+            content: `Error: ${error.message || 'Unknown error'}`,
+            type: 'guided_generation'
+          }])
+        }
+        
+        setIsLoading(false)
+        return
+      }
+      
       // Start streamed response with structured context
       await startStreamedRequest(request.instruction, projectMemory, {
         type: request.type,

@@ -642,7 +642,7 @@ class AIEngine:
 
         # Unpack context
         chapter_summary = rag_context.get('prev_summary', '') if rag_context else ''
-        recent_summary = rag_context.get('recent_summary', '') if rag_context else '' # Renamed from char_summary concept
+        recent_summary = rag_context.get('recent_summary', '') if rag_context else ''
         bible_summaries = []
         if bible_data:
             for k, v in bible_data.items():
@@ -1112,6 +1112,7 @@ WRITING RULES:
         max_output_tokens = 300
         if "rewrite" in plugin_type: max_output_tokens = 400
         elif plugin_type == "sensory_lab": max_output_tokens = 200
+        elif plugin_type == "guided_generation": max_output_tokens = 800
 
         # Increased safety buffer to 250
         total_budget = self.context_size - max_output_tokens - 250
@@ -1130,6 +1131,31 @@ WRITING RULES:
             system_prompt = PROMPT_REWRITE_MASTER.format(style=style, genre=genre)
         elif plugin_type == 'sensory_lab':
             system_prompt = PROMPT_SENSORY_LAB
+        elif plugin_type == 'guided_generation':
+            # Guided generation uses user prompt + chapter context
+            user_prompt = context_data.get('user_prompt', '') if context_data else ''
+            chapter_context = context_data.get('chapter_context', '') if context_data else ''
+            
+            system_prompt = f"""<|begin_of_text|><|start_header_id|>system<|end_header_id|>
+You are a creative writing assistant helping to continue a {genre} story.
+Write naturally flowing prose that matches the tone and style of the existing text.
+<|eot_id|>"""
+            
+            # Build context-aware prompt
+            context_budget = int(total_budget * 0.6)
+            prompt_budget = int(total_budget * 0.4)
+            
+            trimmed_context = self.smart_trim(chapter_context, context_budget, keep_start=False)
+            trimmed_prompt = self.smart_trim(user_prompt, prompt_budget)
+            
+            full_prompt = (
+                f"{system_prompt}<|start_header_id|>user<|end_header_id|>\n"
+                f"CONTEXT (what's happening in the chapter):\n{trimmed_context}\n\n"
+                f"INSTRUCTION: {trimmed_prompt}\n"
+                f"<|eot_id|><|start_header_id|>assistant<|end_header_id|>"
+            )
+            self.generate_stream(full_prompt, response_queue, max_tokens=max_output_tokens)
+            return
 
         instruction_tokens = self.count_tokens(system_prompt)
         trimmed_input = self.smart_trim(text, total_budget - instruction_tokens)
@@ -2252,3 +2278,118 @@ Expand the scene into vivid narrative prose:
             
         except Exception as e:
             return {"error": f"Failed to generate {section_key}: {str(e)}"}
+    
+    def generate_from_prompt(self, prompt: str, field_type: str) -> str:
+        """Generate content from user prompt only, without story context.
+        
+        Args:
+            prompt: User's short prompt describing what to generate
+            field_type: Type of field ('braindump', 'genre', 'scene', 'style')
+        
+        Returns:
+            Generated content as string
+        """
+        # #region agent log
+        import json,time;open('/home/chera/Public/my_stuffs/work/fiverr/ricardoo/.cursor/debug-4f372f.log','a').write(json.dumps({'sessionId':'4f372f','location':'ai_engine.py:2300','message':'generate_from_prompt called','data':{'prompt_length':len(prompt),'field_type':field_type,'has_llm':bool(self.llm)},'timestamp':int(time.time()*1000),'hypothesisId':'C'})+'\n')
+        # #endregion
+        
+        if not self.llm or not prompt.strip():
+            # #region agent log
+            import json,time;open('/home/chera/Public/my_stuffs/work/fiverr/ricardoo/.cursor/debug-4f372f.log','a').write(json.dumps({'sessionId':'4f372f','location':'ai_engine.py:2308','message':'Early return - no llm or empty prompt','data':{'has_llm':bool(self.llm),'has_prompt':bool(prompt.strip())},'timestamp':int(time.time()*1000),'hypothesisId':'D'})+'\n')
+            # #endregion
+            return ""
+        
+        # Set token limits based on field type
+        token_limits = {
+            'braindump': 800,
+            'genre': 100,
+            'style': 300,
+            'scene': 300
+        }
+        max_output_tokens = token_limits.get(field_type, 500)
+        
+        # Field-specific system prompts
+        system_prompts = {
+            'braindump': """<|begin_of_text|><|start_header_id|>system<|end_header_id|>
+You are a creative writing assistant helping a writer brainstorm their story.
+Generate a detailed braindump based on the writer's prompt. Include:
+- Plot ideas and story arc possibilities
+- Character concepts and relationships
+- Worldbuilding elements and settings
+- Themes and emotional beats
+- Conflicts and resolutions
+Write in a natural, exploratory style as if the writer is thinking out loud.
+<|eot_id|>""",
+            'genre': """<|begin_of_text|><|start_header_id|>system<|end_header_id|>
+You are a genre classification expert for creative writing.
+Based on the writer's prompt, identify the genre, subgenres, and relevant tropes.
+Be specific and concise. List the primary genre first, then subgenres and tropes.
+Format: Genre, Subgenre, Key Tropes (e.g., "Fantasy, Urban Fantasy, Chosen One, Found Family")
+<|eot_id|>""",
+            'style': """<|begin_of_text|><|start_header_id|>system<|end_header_id|>
+You are a writing style consultant for creative writers.
+Based on the writer's prompt, describe their desired writing style. Include:
+- Narrative voice and POV preferences
+- Sentence structure and rhythm
+- Tone and atmosphere
+- Tense preferences
+- Descriptive style (sparse vs. rich)
+Be concise but comprehensive. Write 2-3 paragraphs describing the style.
+<|eot_id|>""",
+            'scene': """<|begin_of_text|><|start_header_id|>system<|end_header_id|>
+You are a scene planning assistant for creative writers.
+Generate a detailed scene summary based on the writer's prompt. Include:
+- The scene's purpose and emotional arc
+- Key actions and events that occur
+- Character dynamics and conflicts
+- Setting and atmosphere
+- How the scene advances the story
+Write 2-3 paragraphs that serve as a blueprint for writing the scene.
+<|eot_id|>"""
+        }
+        
+        system_prompt = system_prompts.get(field_type, system_prompts['braindump'])
+        
+        # Calculate token budget
+        total_budget = self.context_size - max_output_tokens - 250
+        instruction_tokens = self.count_tokens(system_prompt)
+        prompt_budget = total_budget - instruction_tokens
+        
+        # Trim prompt if needed
+        trimmed_prompt = self.smart_trim(prompt, prompt_budget)
+        
+        full_prompt = (
+            f"{system_prompt}<|start_header_id|>user<|end_header_id|>\n"
+            f"{trimmed_prompt}\n"
+            f"<|eot_id|><|start_header_id|>assistant<|end_header_id|>"
+        )
+        
+        try:
+            # #region agent log
+            import json,time;open('/home/chera/Public/my_stuffs/work/fiverr/ricardoo/.cursor/debug-4f372f.log','a').write(json.dumps({'sessionId':'4f372f','location':'ai_engine.py:2365','message':'About to call LLM','data':{'max_output_tokens':max_output_tokens,'prompt_length':len(full_prompt)},'timestamp':int(time.time()*1000),'hypothesisId':'E'})+'\n')
+            # #endregion
+            
+            logging.debug(f"AI_PROMPT [generate_from_prompt:{field_type}]:\n{full_prompt}")
+            with self.lock:
+                output = self.llm(full_prompt, max_tokens=max_output_tokens, 
+                                 stop=["<|eot_id|>"], echo=False, temperature=0.7)
+            
+            result = output['choices'][0]['text'].strip()
+            logging.debug(f"AI_RESPONSE [generate_from_prompt:{field_type}]:\n{result}")
+            
+            # #region agent log
+            import json,time;open('/home/chera/Public/my_stuffs/work/fiverr/ricardoo/.cursor/debug-4f372f.log','a').write(json.dumps({'sessionId':'4f372f','location':'ai_engine.py:2377','message':'LLM returned result','data':{'result_length':len(result),'field_type':field_type},'timestamp':int(time.time()*1000),'hypothesisId':'F'})+'\n')
+            # #endregion
+            
+            # Clean up markdown for genre and style (keep it simple)
+            if field_type in ['genre', 'style']:
+                result = strip_markdown(result)
+            
+            return result
+            
+        except Exception as e:
+            # #region agent log
+            import json,time;open('/home/chera/Public/my_stuffs/work/fiverr/ricardoo/.cursor/debug-4f372f.log','a').write(json.dumps({'sessionId':'4f372f','location':'ai_engine.py:2388','message':'Exception in generate_from_prompt','data':{'error':str(e),'error_type':str(type(e))},'timestamp':int(time.time()*1000),'hypothesisId':'G'})+'\n')
+            # #endregion
+            logging.error(f"Generate from prompt error: {e}")
+            return ""

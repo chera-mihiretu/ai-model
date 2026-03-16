@@ -295,6 +295,10 @@ contextBridge.exposeInMainWorld('api', {
     section_key: sectionKey,
     project_id: projectId
   }),
+  generateFromPrompt: (prompt, fieldType) => ipcRenderer.invoke('python-call', 'generate_from_prompt', {
+    prompt: prompt,
+    field_type: fieldType
+  }),
 
   // ==================== TTS METHODS ====================
 

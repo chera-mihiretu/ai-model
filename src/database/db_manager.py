@@ -1273,20 +1273,24 @@ class DatabaseManager:
                 prev_summary = ""
                 if current_order and current_order > 1:
                     cursor.execute("""
-                        SELECT c.id FROM chapters c 
+                        SELECT c.id, c.summary_text FROM chapters c 
                         WHERE c.project_id = ? AND c.chapter_order = ?
                     """, (project_id, current_order - 1))
                     prev_chapter = cursor.fetchone()
                     
                     if prev_chapter:
+                        # First try story_beats (for beat-by-beat mode)
                         cursor.execute("""
                             SELECT summary FROM story_beats 
                             WHERE project_id = ? AND chapter_id = ?
                             ORDER BY id DESC LIMIT 1
                         """, (project_id, prev_chapter[0]))
                         beat = cursor.fetchone()
-                        if beat:
+                        if beat and beat[0]:
                             prev_summary = beat[0]
+                        # Fallback to chapter summary_text (for imported chapters)
+                        elif prev_chapter[1]:
+                            prev_summary = prev_chapter[1]
                 
                 # 3. Get all character names and check which appear in recent text
                 cursor.execute("SELECT name FROM characters")

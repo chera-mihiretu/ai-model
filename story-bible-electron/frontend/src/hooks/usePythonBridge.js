@@ -806,6 +806,28 @@ export function usePythonBridge() {
     }
   }, [checkModelLoaded, api])
 
+  const generateFromPrompt = useCallback(async (prompt, fieldType) => {
+    console.log('[PythonBridge] generateFromPrompt called:', { prompt, fieldType })
+    
+    // Check if model is loaded
+    const canProceed = await checkModelLoaded('AI Generation')
+    if (!canProceed) {
+      console.log('[PythonBridge] Model not loaded, aborting')
+      return null
+    }
+
+    try {
+      console.log('[PythonBridge] Calling api.generateFromPrompt...')
+      const result = await api.generateFromPrompt(prompt, fieldType)
+      console.log('[PythonBridge] Result received:', { hasResult: !!result, type: typeof result })
+      return result
+    } catch (error) {
+      console.error('[PythonBridge] Generate from prompt failed:', error)
+      addNotification({ type: 'error', message: 'AI generation failed' })
+      return null
+    }
+  }, [checkModelLoaded, api, addNotification])
+
   const generateSingleWorldElement = useCallback(async (description, elementType, genre) => {
     // Check if model is loaded
     const canProceed = await checkModelLoaded('Generate World Element')
@@ -1521,6 +1543,7 @@ export function usePythonBridge() {
     startLoreStream,
     stopAiStream,
     generatePluginResponse,
+    generateFromPrompt,
     askLoreAssistant,
     generateSingleCharacter,
     generateSingleWorldElement,

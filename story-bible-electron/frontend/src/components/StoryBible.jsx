@@ -670,7 +670,7 @@ const TABS = [
     description: 'Write a braindump of everything you know about the story. You can include information about plot, characters, worldbuilding, theme - anything!',
     affects: 'Synopsis',
     wordLimit: 4000,
-    aiGenerate: false,
+    aiGenerate: true,
     requires: [],
   },
   { 
@@ -681,7 +681,7 @@ const TABS = [
     description: 'What genre are you writing in? Feel free to include sub-genres and tropes.',
     affects: 'Synopsis, Outline, Scenes, and Draft',
     wordLimit: 40,
-    aiGenerate: false,
+    aiGenerate: true,
     requires: [],
   },
   { 
@@ -691,7 +691,7 @@ const TABS = [
     placeholder: 'Describe your writing style, tone, POV, tense preferences... e.g. "moody and atmospheric, written in short, sharp sentences"',
     description: 'Define your writing style, tone, and voice. You can type a description or paste a writing sample.',
     affects: 'Scenes and Draft',
-    aiGenerate: false,
+    aiGenerate: true,
     requires: [],
   },
   { 
@@ -716,6 +716,98 @@ const TABS = [
     requires: ['synopsis', 'braindump'],
   },
 ]
+
+// Prompt Modal Component for AI Generation
+function PromptModal({ isOpen, onClose, onGenerate, fieldType, hasExistingContent }) {
+  const [prompt, setPrompt] = useState('')
+  
+  if (!isOpen) return null
+  
+  const fieldLabels = {
+    braindump: 'Braindump',
+    genre: 'Genre',
+    style: 'Style',
+    scene: 'Scene Summary'
+  }
+  
+  const fieldDescriptions = {
+    braindump: 'Describe what you want to brainstorm about your story (plot, characters, themes, etc.)',
+    genre: 'Describe the type of story you\'re writing (e.g., "dark fantasy with romance elements")',
+    style: 'Describe the writing style you want (e.g., "lyrical and poetic with long flowing sentences")',
+    scene: 'Describe what should happen in this scene'
+  }
+  
+  const handleGenerate = () => {
+    if (prompt.trim()) {
+      onGenerate(prompt.trim())
+      setPrompt('')
+    }
+  }
+  
+  return (
+    <div 
+      className="fixed inset-0 bg-black/60 flex items-center justify-center z-[10000]"
+      style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0 }}
+      onClick={onClose}
+    >
+      <div 
+        className="bg-dark-800 border border-gold-rich/30 rounded-xl shadow-2xl w-full max-w-lg mx-4"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="p-6">
+          <h3 className="text-lg font-semibold text-gold-rich mb-2">
+            Generate {fieldLabels[fieldType]}
+          </h3>
+          <p className="text-sm text-text-muted mb-4">
+            {fieldDescriptions[fieldType]}
+          </p>
+          
+          {hasExistingContent && (
+            <div className="mb-4 p-3 rounded-lg bg-amber-500/10 border border-amber-500/30">
+              <div className="flex items-start gap-2">
+                <span className="text-lg">⚠️</span>
+                <p className="text-sm text-amber-200/90">
+                  This will replace your existing {fieldLabels[fieldType].toLowerCase()} content.
+                </p>
+              </div>
+            </div>
+          )}
+          
+          <textarea
+            className="w-full h-32 px-4 py-3 bg-dark-700 border border-gold-rich/20 rounded-lg text-text-primary placeholder-text-muted focus:outline-none focus:border-gold-rich/50 resize-none"
+            placeholder={`Example: ${fieldDescriptions[fieldType]}`}
+            value={prompt}
+            onChange={(e) => setPrompt(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && e.ctrlKey) {
+                handleGenerate()
+              }
+            }}
+            autoFocus
+          />
+          <div className="flex justify-end gap-3 mt-4">
+            <button
+              className="px-4 py-2 rounded-lg text-sm text-text-secondary hover:bg-dark-700 transition-colors"
+              onClick={() => {
+                onClose()
+                setPrompt('')
+              }}
+            >
+              Cancel
+            </button>
+            <button
+              className="px-4 py-2 rounded-lg text-sm bg-gold-rich/20 text-gold-rich hover:bg-gold-rich/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              onClick={handleGenerate}
+              disabled={!prompt.trim()}
+            >
+              Generate (Ctrl+Enter)
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
 
 // Dependency check: returns { canGenerate, missingMessage } for a given tab
 function checkDependencies(tabId, storyBibleData) {
@@ -759,6 +851,7 @@ function StoryBible() {
     saveBibleField,
     getStoryBible,
     generatePluginResponse,
+    generateFromPrompt,
     isElectronApi,
     saveCharacter,
     getCharacters,
@@ -771,6 +864,8 @@ function StoryBible() {
   const [isSaving, setIsSaving] = useState(false)
   const [isGenerating, setIsGenerating] = useState(false)
   const [generatingAction, setGeneratingAction] = useState('')
+  const [showPromptModal, setShowPromptModal] = useState(false)
+  const [promptFieldType, setPromptFieldType] = useState('')
   const saveTimeoutRef = useRef(null)
   
   const currentTab = TABS.find(t => t.id === currentBibleTab) || TABS[0]
@@ -968,6 +1063,44 @@ function StoryBible() {
     }
   }
   
+  const handleGenerateFromPrompt = async (prompt) => {
+    if (!isElectronApi) {
+      addNotification({ type: 'warning', message: 'AI generation requires the Python backend' })
+      return
+    }
+    
+    console.log('[StoryBible] Starting generation:', { prompt, fieldType: promptFieldType })
+    
+    setShowPromptModal(false)
+    setIsGenerating(true)
+    setGeneratingAction('generate_from_prompt')
+    
+    try {
+      console.log('[StoryBible] Calling generateFromPrompt...')
+      const result = await generateFromPrompt(prompt, promptFieldType)
+      console.log('[StoryBible] Result received:', { hasResult: !!result, length: result?.length })
+      
+      if (result && result.trim()) {
+        handleContentChange(result)
+        addNotification({ type: 'success', message: `${currentTab.label} generated successfully!` })
+      } else {
+        console.error('[StoryBible] Empty or null result')
+        addNotification({ type: 'error', message: `Failed to generate ${currentTab.label.toLowerCase()}` })
+      }
+    } catch (error) {
+      console.error('[StoryBible] Generate from prompt error:', error)
+      addNotification({ type: 'error', message: `Failed to generate ${currentTab.label.toLowerCase()}: ${error.message}` })
+    } finally {
+      setIsGenerating(false)
+      setGeneratingAction('')
+    }
+  }
+  
+  const handleOpenPromptModal = (fieldType) => {
+    setPromptFieldType(fieldType)
+    setShowPromptModal(true)
+  }
+  
   const handleGenerateOutline = async () => {
     // Get all available story context from the current project's storyBibleData
     const synopsis = storyBibleData['synopsis']?.trim() || ''
@@ -1075,6 +1208,72 @@ function StoryBible() {
           )}>
             {isSaving ? 'Saving...' : '✓ Saved'}
           </div>
+          
+          {/* AI Generate Button - for braindump tab */}
+          {currentBibleTab === 'braindump' && (
+            <button
+              className="btn btn-secondary"
+              onClick={() => handleOpenPromptModal('braindump')}
+              disabled={isGenerating}
+              title="Generate braindump from a short prompt"
+            >
+              {isGenerating && generatingAction === 'generate_from_prompt' ? (
+                <>
+                  <div className="spinner !w-4 !h-4" />
+                  <span>Generating...</span>
+                </>
+              ) : (
+                <>
+                  <span>{Icons.MAGIC}</span>
+                  <span>AI Generate</span>
+                </>
+              )}
+            </button>
+          )}
+          
+          {/* AI Generate Button - for genre tab */}
+          {currentBibleTab === 'genre' && (
+            <button
+              className="btn btn-secondary"
+              onClick={() => handleOpenPromptModal('genre')}
+              disabled={isGenerating}
+              title="Generate genre from a short prompt"
+            >
+              {isGenerating && generatingAction === 'generate_from_prompt' ? (
+                <>
+                  <div className="spinner !w-4 !h-4" />
+                  <span>Generating...</span>
+                </>
+              ) : (
+                <>
+                  <span>{Icons.MAGIC}</span>
+                  <span>AI Generate</span>
+                </>
+              )}
+            </button>
+          )}
+          
+          {/* AI Generate Button - for style tab */}
+          {currentBibleTab === 'style' && (
+            <button
+              className="btn btn-secondary"
+              onClick={() => handleOpenPromptModal('style')}
+              disabled={isGenerating}
+              title="Generate style from a short prompt"
+            >
+              {isGenerating && generatingAction === 'generate_from_prompt' ? (
+                <>
+                  <div className="spinner !w-4 !h-4" />
+                  <span>Generating...</span>
+                </>
+              ) : (
+                <>
+                  <span>{Icons.MAGIC}</span>
+                  <span>AI Generate</span>
+                </>
+              )}
+            </button>
+          )}
           
           {/* AI Generate Button - for synopsis tab */}
           {currentBibleTab === 'synopsis' && (
@@ -1230,6 +1429,14 @@ function StoryBible() {
         </div>
       )}
       
+      {/* Prompt Modal */}
+      <PromptModal
+        isOpen={showPromptModal}
+        onClose={() => setShowPromptModal(false)}
+        onGenerate={handleGenerateFromPrompt}
+        fieldType={promptFieldType}
+        hasExistingContent={!!content.trim()}
+      />
     </div>
   )
 }
